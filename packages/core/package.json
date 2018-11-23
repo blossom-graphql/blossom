@@ -1,0 +1,17 @@
+{
+  "name": "@blossom-gql/core",
+  "version": "0.0.0",
+  "main": "index.ts",
+  "author": "Sebastian Soto",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "@types/lodash.merge": "^4.6.4",
+    "dataloader": "^1.4.0",
+    "lodash.merge": "^4.6.1"
+  },
+  "peerDependencies": {
+    "@types/graphql": "^14.0.3",
+    "graphql": "^14.0.2"
+  }
+}
