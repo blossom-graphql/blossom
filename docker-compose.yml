@@ -1,0 +1,17 @@
+version: '2.4'
+
+services:
+  lerna:
+    image: node:10.13
+    init: true
+    environment:
+      - NODE_PATH=/var/app
+      - NODE_ENV=development
+    working_dir: /var/app
+    volumes:
+      - .:/var/app
+      - blossom-dev-yarn-cache:/root/.yarn-cache
+
+volumes:
+  blossom-dev-yarn-cache:
+    external: true
