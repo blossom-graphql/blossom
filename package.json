@@ -7,10 +7,16 @@
   "author": "Sebastian Soto",
   "license": "MIT",
   "private": false,
+  "scripts": {
+    "test": "npx jest --config ./scripts/jest/config.base.js"
+  },
   "devDependencies": {
+    "@types/jest": "^23.3.9",
     "@types/node": "^10.12.10",
+    "jest": "^23.6.0",
     "lerna": "^3.4.3",
     "prettier": "^1.15.2",
+    "ts-jest": "^23.10.5",
     "ts-node": "^7.0.1",
     "tslint": "^5.11.0",
     "typescript": "^3.1.6"

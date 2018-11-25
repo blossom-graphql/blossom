@@ -13,5 +13,9 @@
   "peerDependencies": {
     "@types/graphql": "^14.0.3",
     "graphql": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/graphql": "^14.0.3",
+    "graphql": "^14.0.2"
   }
 }

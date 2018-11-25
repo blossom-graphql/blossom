@@ -5,7 +5,6 @@ services:
     image: node:10.13
     init: true
     environment:
-      - NODE_PATH=/var/app
       - NODE_ENV=development
     working_dir: /var/app
     volumes:
