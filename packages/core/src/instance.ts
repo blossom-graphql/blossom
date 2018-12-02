@@ -93,6 +93,9 @@ export type RPCCallback<U> = (args?: any, ctx?: any, ast?: any) => U;
  * A descriptor of a RPC action, i.e. a query or a mutation.
  */
 type RPCDescription = RPCDescriptionBase & {
+  /**
+   * The function that resolves this RPC value.
+   */
   callback: RPCCallback<any>;
 };
 
@@ -122,9 +125,21 @@ function parseRPC(rpcDescription: RPCDescription): string {
 }
 
 /**
+ * Prototype of a Blossom instance.
+ */
+interface IBlossomInstance {
+  registerSchema: (schema: string) => void;
+  registerEnum: (enumItem: Enum) => void;
+  registerRootQuery: (query: RPCDescription) => void;
+  registerRootMutation: (mutation: RPCDescription) => void;
+  getRootSchema: () => string;
+  getRootValue: () => any;
+}
+
+/**
  * An instance class of a GraphQL engine.
  */
-class Instance {
+class BlossomInstance implements IBlossomInstance {
   /**
    * The list of schemas saved in this instance.
    */
@@ -266,10 +281,40 @@ class Instance {
 }
 
 /**
- * Creates a new instance to start from scratch.
+ * A function that receives a RPCCallback, proxies it to the Blossom instance
+ * and returns the exact same function, which in turn can be exported.
+ *
+ * These functions are meant to be used as top level decorators in the future
+ * if TC39 decides to bring support for them.
  */
-export function createInstance() {
-  const instance = new Instance();
+type AccumulatorFunction = (base: RPCCallback<any>) => RPCCallback<any>;
+
+/**
+ * A proxy to the Blossom instance in order to functionally access all of the
+ * user-facing concerns.
+ */
+interface IBlossomInstanceProxy {
+  /**
+   * The actual Blossom instance singleton.
+   */
+  instance: IBlossomInstance;
+  /**
+   * Accumulator function for registering a root query.
+   */
+  RootQuery: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
+  /**
+   * Accumulator function for registering a root mutation.
+   */
+  RootMutation: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
+}
+
+/**
+ * Creates a new Blossom instance. The instance in return provides the necessary
+ * elements to call the `blossom` resolving function, i.e. the consolidated and
+ * parsed GraphQL Schema and their corresponding root values.
+ */
+export function createInstance(): IBlossomInstanceProxy {
+  const instance = new BlossomInstance();
 
   return {
     instance,

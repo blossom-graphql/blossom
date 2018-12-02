@@ -10,7 +10,7 @@ export { blossom } from './src/blossom';
 
 export { Maybe, MaybePromise } from './src/common';
 
-export { ValidationError } from './src/errors';
+export { BlossomValidationError } from './src/errors';
 
 export { IBlossomContext } from './src/context';
 

@@ -6,20 +6,35 @@
  *
  */
 
-interface IValidationError {
+import { GraphQLError } from 'graphql';
+
+export interface IBlossomValidationError {
   errors: string[];
 }
 
-export class ValidationError extends Error implements IValidationError {
+export class BlossomValidationError extends Error
+  implements IBlossomValidationError {
   errors: string[];
 
   constructor(errors: string[]) {
     super(
-      `ValidationError (${
+      `BlossomValidationError (${
         errors.length
       } errors): expand errors member for details`,
     );
 
     this.errors = errors;
   }
+}
+
+export function validationErrorHandler(error: GraphQLError) {
+  if (!error.originalError) return error;
+
+  const errors = (error.originalError as BlossomValidationError).errors;
+
+  return {
+    ...error,
+    message: `Validation Errors (${errors.length})`,
+    details: errors,
+  };
 }

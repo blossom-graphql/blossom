@@ -6,6 +6,12 @@
  *
  */
 
+/**
+ * Maybe the expected value, otherwise null or undefined.
+ */
 export type Maybe<T> = T | null | undefined;
 
+/**
+ * A promise that resolves to Maybe<T>.
+ */
 export type MaybePromise<T> = Promise<Maybe<T>>;
