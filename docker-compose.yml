@@ -1,7 +1,7 @@
 version: '2.4'
 
 services:
-  lerna:
+  node:
     image: node:10.13
     init: true
     environment:

@@ -90,7 +90,10 @@ export function blossom(
   rootValue: any,
   customErrorHandlers: BlossomErrorHandlerMapping = DEFAULT_ERROR_HANDLERS,
 ) {
-  return async function(body: BlossomRequestBody, requestContext?: any) {
+  return async function blossomRequestResolver(
+    body: BlossomRequestBody,
+    requestContext?: any,
+  ) {
     // Prepare information to be passed to the parser.
     const { operationName, query, variables } = body;
 
