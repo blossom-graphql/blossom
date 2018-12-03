@@ -8,10 +8,12 @@
 
 import merge from 'lodash.merge';
 
+import { RootValueAlreadyInUse } from './errors';
+
 /**
  * Value descriptor of an enumeration.
  */
-interface EnumValue {
+interface IEnumValue {
   /**
    * Name and value.
    */
@@ -19,13 +21,13 @@ interface EnumValue {
   /**
    * Description, in the schema.
    */
-  description: string;
+  description?: string;
 }
 
 /**
  * Descriptor of a full enumeration in the schema.
  */
-interface Enum {
+interface IEnum {
   /**
    * Name of the enumeration.
    */
@@ -33,18 +35,18 @@ interface Enum {
   /**
    * Description for the schema.
    */
-  description: string;
+  description?: string;
   /**
    * List of possible value descriptors the enum
    * can take.
    */
-  values: EnumValue[];
+  values: IEnumValue[];
 }
 
 /**
  * A single argument descriptor of a RPC call.
  */
-interface RPCArgument {
+interface IRPCArgument {
   /**
    * Programatical name to be displayed.
    */
@@ -63,7 +65,7 @@ interface RPCArgument {
 /**
  * Base descriptor with the simplest elements.
  */
-interface RPCDescriptionBase {
+interface IRPCDescriptionBase {
   /**
    * Name that this callback will have over the
    * root query.
@@ -72,12 +74,12 @@ interface RPCDescriptionBase {
   /**
    * Full description of the operation in the comments.
    */
-  description: string;
+  description?: string;
   /**
    * List of arguments this callback will receive. Will render
    * nothing if none is provided.
    */
-  arguments?: RPCArgument[];
+  arguments?: IRPCArgument[];
   /**
    * The type this callback will be returning.
    */
@@ -92,7 +94,7 @@ export type RPCCallback<U> = (args?: any, ctx?: any, ast?: any) => U;
 /**
  * A descriptor of a RPC action, i.e. a query or a mutation.
  */
-type RPCDescription = RPCDescriptionBase & {
+type RPCDescription = IRPCDescriptionBase & {
   /**
    * The function that resolves this RPC value.
    */
@@ -129,7 +131,7 @@ function parseRPC(rpcDescription: RPCDescription): string {
  */
 interface IBlossomInstance {
   registerSchema: (schema: string) => void;
-  registerEnum: (enumItem: Enum) => void;
+  registerEnum: (enumItem: IEnum) => void;
   registerRootQuery: (query: RPCDescription) => void;
   registerRootMutation: (mutation: RPCDescription) => void;
   getRootSchema: () => string;
@@ -138,8 +140,10 @@ interface IBlossomInstance {
 
 /**
  * An instance class of a GraphQL engine.
+ *
+ * TODO: Add memoization to the common parameters + a reload() function.
  */
-class BlossomInstance implements IBlossomInstance {
+export class BlossomInstance implements IBlossomInstance {
   /**
    * The list of schemas saved in this instance.
    */
@@ -148,7 +152,7 @@ class BlossomInstance implements IBlossomInstance {
   /**
    * The list of registered enums saved in this instance.
    */
-  enums: Enum[] = [];
+  enums: IEnum[] = [];
 
   /**
    * The list of root queries stored on this instance.
@@ -177,7 +181,7 @@ class BlossomInstance implements IBlossomInstance {
    *
    * @param enumItem The descriptor of the enumeration
    */
-  registerEnum(enumItem: Enum) {
+  registerEnum(enumItem: IEnum) {
     this.enums.push(enumItem);
   }
 
@@ -187,8 +191,8 @@ class BlossomInstance implements IBlossomInstance {
    * @param query The descriptor of the root query.
    */
   registerRootQuery(query: RPCDescription) {
-    if (!!this.rootQueries.find(({ name }) => name === query.name)) {
-      throw new Error(
+    if (this.rootQueries.findIndex(({ name }) => name === query.name) > -1) {
+      throw new RootValueAlreadyInUse(
         `Root Query with name ${query.name} already registered on instance.`,
       );
     }
@@ -202,8 +206,10 @@ class BlossomInstance implements IBlossomInstance {
    * @param mutation The descriptor of the root mutation.
    */
   registerRootMutation(mutation: RPCDescription) {
-    if (!!this.rootMutations.find(({ name }) => name === mutation.name)) {
-      throw new Error(
+    if (
+      this.rootMutations.findIndex(({ name }) => name === mutation.name) > -1
+    ) {
+      throw new RootValueAlreadyInUse(
         `Root Mutation with name ${
           mutation.name
         } already registered on instance.`,
@@ -301,11 +307,11 @@ interface IBlossomInstanceProxy {
   /**
    * Accumulator function for registering a root query.
    */
-  RootQuery: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
+  RootQuery: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
   /**
    * Accumulator function for registering a root mutation.
    */
-  RootMutation: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
+  RootMutation: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
 }
 
 /**
@@ -318,7 +324,7 @@ export function createInstance(): IBlossomInstanceProxy {
 
   return {
     instance,
-    RootQuery(descriptor: RPCDescriptionBase) {
+    RootQuery(descriptor: IRPCDescriptionBase) {
       return function(base: RPCCallback<any>): RPCCallback<any> {
         instance.registerRootQuery({
           ...descriptor,
@@ -328,7 +334,7 @@ export function createInstance(): IBlossomInstanceProxy {
         return base;
       };
     },
-    RootMutation(descriptor: RPCDescriptionBase) {
+    RootMutation(descriptor: IRPCDescriptionBase) {
       return function(base: RPCCallback<any>): RPCCallback<any> {
         instance.registerRootMutation({
           ...descriptor,
