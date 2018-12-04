@@ -134,4 +134,6 @@ describe('BlossomInstance', () => {
       );
     });
   });
+
+  describe('getRootSchema', () => {});
 });

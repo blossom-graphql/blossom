@@ -6,7 +6,7 @@
  *
  */
 
-import { RPCCallback } from './instance';
+import { RPCCallback } from './schema';
 
 // ==================================================================
 // BASE TYPES
