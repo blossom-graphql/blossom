@@ -35,6 +35,7 @@ interface IBlossomInstance {
  * An instance class of a GraphQL engine.
  *
  * TODO: Add memoization to the common parameters + a reload() function.
+ * TODO: Convert rootQueries and rootMutation to dict in order to get O(1) R/W.
  */
 export class BlossomInstance implements IBlossomInstance {
   /**
@@ -56,6 +57,14 @@ export class BlossomInstance implements IBlossomInstance {
    * The list of root mutations stored on this instance.
    */
   rootMutations: RPCDescription[] = [];
+
+  /**
+   * Cache of the computed values of the instance for memoization.
+   */
+  memoValues: { rootSchema?: string; rootValue?: any } = {
+    rootSchema: undefined,
+    rootValue: undefined,
+  };
 
   /**
    * Take a schema chunk and adds it to the schema pool
@@ -116,7 +125,8 @@ export class BlossomInstance implements IBlossomInstance {
    * method of your favorite GraphQL server.
    */
   getRootSchema({ force = false }: { force?: boolean } = {}): string {
-    if (!force) return '';
+    // Try to retrieve memoization first.
+    if (this.memoValues.rootSchema && !force) return this.memoValues.rootSchema;
 
     // Convert the enums to strings.
     const enumsStrings = this.enums.map(enumDescription =>
@@ -131,20 +141,24 @@ export class BlossomInstance implements IBlossomInstance {
       renderRPCDescriptionToSchema(rootMutation),
     );
 
-    // Stitch them together and return
-    return renderSchema(
+    // Stitch them together, memoize and return
+    this.memoValues.rootSchema = renderSchema(
       enumsStrings,
       this.schemas,
       rootQueriesStrings,
       rootMutationsStrings,
     );
+
+    return this.memoValues.rootSchema;
   }
 
   /**
    * Takes root queries and mutations and convolves them on a single
    * object to be pased to the GraphQL engine.
    */
-  getRootValue(): any {
+  getRootValue({ force = false }: { force?: boolean } = {}): any {
+    if (this.memoValues.rootValue && !force) return this.memoValues.rootValue;
+
     const mutations = this.rootMutations.map(({ name, callback }) => ({
       [name]: callback,
     }));
@@ -164,7 +178,7 @@ export class BlossomInstance implements IBlossomInstance {
   hasRPC(name: string): boolean {
     return (
       this.rootQueries.findIndex(query => name === query.name) > -1 ||
-      this.rootQueries.findIndex(mutation => name === mutation.name) > -1
+      this.rootMutations.findIndex(mutation => name === mutation.name) > -1
     );
   }
 }
@@ -202,7 +216,7 @@ interface IBlossomInstanceProxy {
  * elements to call the `blossom` resolving function, i.e. the consolidated and
  * parsed GraphQL Schema and their corresponding root values.
  */
-export function createInstance(): IBlossomInstanceProxy {
+export function createBlossomInstance(): IBlossomInstanceProxy {
   const instance = new BlossomInstance();
 
   return {
