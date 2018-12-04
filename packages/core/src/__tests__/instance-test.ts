@@ -46,8 +46,8 @@ describe('BlossomInstance', () => {
       instance.registerSchema(TEST_SCHEMA_2);
 
       // This newly added schema must be on the schemas list.
-      expect(instance.schemas).toContain(TEST_SCHEMA_1);
-      expect(instance.schemas).toContain(TEST_SCHEMA_2);
+      expect(instance.schemaStrings).toContain(TEST_SCHEMA_1);
+      expect(instance.schemaStrings).toContain(TEST_SCHEMA_2);
     });
   });
 
@@ -271,7 +271,180 @@ describe('BlossomInstance', () => {
         [MUTATION_STRING_1, MUTATION_STRING_2],
       );
     });
+
+    it('should return memoized result when called more than once', () => {
+      const instance = createInstance();
+
+      instance.registerRootQuery({
+        name: 'testQuery',
+        type: 'Test!',
+        callback: () => null,
+      });
+      instance.registerRootMutation({
+        name: 'testMutation',
+        type: 'Test!',
+        callback: () => null,
+      });
+
+      expect(instance.getRootSchema({ force: false })).toBe(
+        instance.getRootSchema({ force: false }),
+      );
+    });
+
+    it('should return non-memoized result when called with force param to true', () => {
+      const instance = createInstance();
+
+      instance.registerRootQuery({
+        name: 'testQuery',
+        type: 'Test!',
+        callback: () => null,
+      });
+      instance.registerRootMutation({
+        name: 'testMutation',
+        type: 'Test!',
+        callback: () => null,
+      });
+
+      expect(instance.getRootSchema({ force: true })).not.toBe(
+        instance.getRootSchema({ force: true }),
+      );
+    });
   });
 
-  describe('getRootValue', () => {});
+  describe('getRootValue', () => {
+    it('should return empty object if no root queries / mutations are included', () => {
+      const instance = createInstance();
+
+      expect(instance.getRootValue()).toEqual({});
+    });
+
+    it('should have key correctly set when root query is added', () => {
+      const TEST_CALLBACK = () => null;
+      const RPC_NAME = 'testQuery';
+
+      const instance = createInstance();
+
+      instance.registerRootQuery({
+        name: RPC_NAME,
+        description: 'Test description',
+        type: 'Test!',
+        callback: TEST_CALLBACK,
+      });
+
+      const rootValue = instance.getRootValue();
+
+      // That must be a pass-through at this moment.
+      //
+      // ! If we are changing this in the future, then we need to create a unit
+      // ! for the augmenter and here expect that the property is the defined
+      // ! and the augmenter called.
+      expect(rootValue[RPC_NAME]).toBe(TEST_CALLBACK);
+    });
+
+    it('should have key correctly set when root query is added', () => {
+      const TEST_CALLBACK = () => null;
+      const RPC_NAME = 'testMutation';
+
+      const instance = createInstance();
+
+      instance.registerRootMutation({
+        name: RPC_NAME,
+        description: 'Test description',
+        type: 'Test!',
+        callback: TEST_CALLBACK,
+      });
+
+      const rootValue = instance.getRootValue();
+
+      // That must be a pass-through at this moment.
+      //
+      // ! If we are changing this in the future, then we need to create a unit
+      // ! for the augmenter and here expect that the property is the defined
+      // ! and the augmenter called.
+      expect(rootValue[RPC_NAME]).toBe(TEST_CALLBACK);
+    });
+
+    it('should memoize results when called more than once', () => {
+      const instance = createInstance();
+
+      instance.registerRootQuery({
+        name: 'testQuery',
+        type: 'Test!',
+        callback: () => null,
+      });
+      instance.registerRootMutation({
+        name: 'testMutation',
+        type: 'Test!',
+        callback: () => null,
+      });
+
+      // Calling more than once must yield the exact same result (not only equality
+      // but the same object in the heap).
+      expect(instance.getRootValue({ force: false })).toBe(
+        instance.getRootValue({ force: false }),
+      );
+    });
+
+    it('should force a new object when force option is true', () => {
+      const instance = createInstance();
+
+      instance.registerRootQuery({
+        name: 'testQuery',
+        type: 'Test!',
+        callback: () => null,
+      });
+      instance.registerRootMutation({
+        name: 'testMutation',
+        type: 'Test!',
+        callback: () => null,
+      });
+
+      // Calling more than once must yield the exact same result (not only equality
+      // but the same object in the heap).
+      expect(instance.getRootValue({ force: true })).not.toBe(
+        instance.getRootValue({ force: true }),
+      );
+    });
+
+    // ! Order in which they are merged won't be tested at this time because
+    // ! registerRootQuery / registerRootMutation are already checking that
+    // ! the RPCs are not registered.
+  });
+
+  describe('hasRPC', () => {
+    it('must return false when neither a query or mutation with the name has been registered', () => {
+      const TEST_NAME = 'testRPC';
+      const instance = createInstance();
+
+      expect(instance.hasRPC(TEST_NAME)).toBe(false);
+    });
+
+    it('must return true when a query with the name is registered', () => {
+      const TEST_NAME = 'testQuery';
+      const instance = createInstance();
+
+      instance.registerRootQuery({
+        name: TEST_NAME,
+        description: 'Test description',
+        type: 'Test!',
+        callback: () => null,
+      });
+
+      expect(instance.hasRPC(TEST_NAME)).toBe(true);
+    });
+
+    it('must return true when a mutation with the name is registered', () => {
+      const TEST_NAME = 'testMutation';
+      const instance = createInstance();
+
+      instance.registerRootMutation({
+        name: TEST_NAME,
+        description: 'Test description',
+        type: 'Test!',
+        callback: () => null,
+      });
+
+      expect(instance.hasRPC(TEST_NAME)).toBe(true);
+    });
+  });
 });

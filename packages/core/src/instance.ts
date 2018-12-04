@@ -27,9 +27,16 @@ interface IBlossomInstance {
   registerEnum: (enumItem: IEnum) => void;
   registerRootQuery: (query: RPCDescription) => void;
   registerRootMutation: (mutation: RPCDescription) => void;
-  getRootSchema: () => string;
+  getRootSchema: () => RootSchema;
   getRootValue: () => any;
 }
+
+/**
+ * Type for storing root schema state.
+ */
+type RootSchema = {
+  schemaString: string;
+};
 
 /**
  * An instance class of a GraphQL engine.
@@ -41,7 +48,7 @@ export class BlossomInstance implements IBlossomInstance {
   /**
    * The list of schemas saved in this instance.
    */
-  schemas: string[] = [];
+  schemaStrings: string[] = [];
 
   /**
    * The list of registered enums saved in this instance.
@@ -61,7 +68,7 @@ export class BlossomInstance implements IBlossomInstance {
   /**
    * Cache of the computed values of the instance for memoization.
    */
-  memoValues: { rootSchema?: string; rootValue?: any } = {
+  memoValues: { rootSchema?: RootSchema; rootValue?: any } = {
     rootSchema: undefined,
     rootValue: undefined,
   };
@@ -73,7 +80,7 @@ export class BlossomInstance implements IBlossomInstance {
    * @param schema The schema chunk to register.
    */
   registerSchema(schema: string) {
-    this.schemas.push(schema);
+    this.schemaStrings.push(schema);
   }
 
   /**
@@ -95,7 +102,9 @@ export class BlossomInstance implements IBlossomInstance {
   registerRootQuery(query: RPCDescription) {
     if (this.hasRPC(query.name)) {
       throw new RootValueAlreadyInUse(
-        `Root Query with name ${query.name} already registered on instance.`,
+        `Root Query / Mutation with name ${
+          query.name
+        } already registered on instance.`,
       );
     }
 
@@ -110,7 +119,7 @@ export class BlossomInstance implements IBlossomInstance {
   registerRootMutation(mutation: RPCDescription) {
     if (this.hasRPC(mutation.name)) {
       throw new RootValueAlreadyInUse(
-        `Root Mutation with name ${
+        `Root Query / Mutation with name ${
           mutation.name
         } already registered on instance.`,
       );
@@ -124,7 +133,7 @@ export class BlossomInstance implements IBlossomInstance {
    * schema to be passed to a `buildSchema` or `makeExecutableSchema`
    * method of your favorite GraphQL server.
    */
-  getRootSchema({ force = false }: { force?: boolean } = {}): string {
+  getRootSchema({ force = false }: { force?: boolean } = {}): RootSchema {
     // Try to retrieve memoization first.
     if (this.memoValues.rootSchema && !force) return this.memoValues.rootSchema;
 
@@ -142,12 +151,15 @@ export class BlossomInstance implements IBlossomInstance {
     );
 
     // Stitch them together, memoize and return
-    this.memoValues.rootSchema = renderSchema(
+    const schemaString = renderSchema(
       enumsStrings,
-      this.schemas,
+      this.schemaStrings,
       rootQueriesStrings,
       rootMutationsStrings,
     );
+    this.memoValues.rootSchema = {
+      schemaString,
+    };
 
     return this.memoValues.rootSchema;
   }
@@ -166,7 +178,10 @@ export class BlossomInstance implements IBlossomInstance {
       [name]: callback,
     }));
 
-    return merge({}, ...mutations, ...queries);
+    // Create the object in the memo and return it
+    this.memoValues.rootValue = merge({}, ...mutations, ...queries);
+
+    return this.memoValues.rootValue;
   }
 
   /**
@@ -180,6 +195,20 @@ export class BlossomInstance implements IBlossomInstance {
       this.rootQueries.findIndex(query => name === query.name) > -1 ||
       this.rootMutations.findIndex(mutation => name === mutation.name) > -1
     );
+  }
+
+  /**
+   * Returns rootValue. If not computed yet, will be computed for you.
+   */
+  get rootValue(): any {
+    return this.getRootValue({ force: false });
+  }
+
+  /**
+   * Returns rootSchemaString. If not computed yet, will be computed for you.
+   */
+  get rootSchemaString(): string {
+    return this.getRootSchema({ force: false }).schemaString;
   }
 }
 
