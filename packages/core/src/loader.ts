@@ -8,11 +8,15 @@
 
 import Dataloader from 'dataloader';
 
+interface ILoaderInstance {
+  get: <K, V>(batchFunction: Dataloader.BatchLoadFn<K, V>) => Dataloader<K, V>;
+}
+
 /**
  * Singleton that contains all the loader instances for an specific blossom
- * requessts.
+ * requests.
  */
-export class LoaderInstance {
+export class LoaderInstance implements ILoaderInstance {
   /**
    * Map that contains the already existing instances for the request.
    */
@@ -43,22 +47,30 @@ export class LoaderInstance {
   }
 }
 
-type LoaderRetrieveFunction<K, V> = (
+type LoaderRetrieveFunction = <K, V>(
   batchFunction: Dataloader.BatchLoadFn<K, V>,
 ) => Dataloader<K, V>;
+
+interface ILoaderInstanceProxy {
+  instance: ILoaderInstance;
+  getLoader: LoaderRetrieveFunction;
+}
 
 /**
  * Creates a loader instance, **to be used on a single Blossom request**.
  */
-export function createLoaderInstance(): LoaderRetrieveFunction<any, any> {
+export function createLoaderInstance(): ILoaderInstanceProxy {
   const instance = new LoaderInstance();
 
   /**
    * Retrieves the loader from the instance given its associated batch function.
    */
-  return function getLoader<K, V>(
-    batchFunction: Dataloader.BatchLoadFn<K, V>,
-  ): Dataloader<K, V> {
-    return instance.get(batchFunction);
+  return {
+    instance,
+    getLoader: function getLoader<K, V>(
+      batchFunction: Dataloader.BatchLoadFn<K, V>,
+    ): Dataloader<K, V> {
+      return instance.get(batchFunction);
+    },
   };
 }

@@ -219,7 +219,7 @@ export class BlossomInstance implements IBlossomInstance {
  * These functions are meant to be used as top level decorators in the future
  * if TC39 decides to bring support for them.
  */
-type AccumulatorFunction = (base: RPCCallback<any>) => RPCCallback<any>;
+type AccumulatorFunction = <R>(base: RPCCallback<R>) => RPCCallback<R>;
 
 /**
  * A proxy to the Blossom instance in order to functionally access all of the
@@ -251,7 +251,7 @@ export function createBlossomInstance(): IBlossomInstanceProxy {
   return {
     instance,
     RootQuery(descriptor: IRPCDescriptionBase) {
-      return function(base: RPCCallback<any>): RPCCallback<any> {
+      return function<R>(base: RPCCallback<R>): RPCCallback<R> {
         instance.registerRootQuery({
           ...descriptor,
           callback: base,
@@ -261,7 +261,7 @@ export function createBlossomInstance(): IBlossomInstanceProxy {
       };
     },
     RootMutation(descriptor: IRPCDescriptionBase) {
-      return function(base: RPCCallback<any>): RPCCallback<any> {
+      return function<R>(base: RPCCallback<R>): RPCCallback<R> {
         instance.registerRootMutation({
           ...descriptor,
           callback: base,
