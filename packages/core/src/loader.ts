@@ -8,6 +8,9 @@
 
 import Dataloader from 'dataloader';
 
+/**
+ * Interface for the LoaderInstance class. Required for mocking.
+ */
 interface ILoaderInstance {
   get: <K, V>(batchFunction: Dataloader.BatchLoadFn<K, V>) => Dataloader<K, V>;
 }
@@ -47,19 +50,26 @@ export class LoaderInstance implements ILoaderInstance {
   }
 }
 
+/**
+ * Function that receives a batching function as an argument and returns an
+ * associated Dataloader instance.
+ */
 type LoaderRetrieveFunction = <K, V>(
   batchFunction: Dataloader.BatchLoadFn<K, V>,
 ) => Dataloader<K, V>;
 
-interface ILoaderInstanceProxy {
+/**
+ * Proxy object that gives access to the loader instance and it's get method.
+ */
+type LoaderInstanceProxy = {
   instance: ILoaderInstance;
   getLoader: LoaderRetrieveFunction;
-}
+};
 
 /**
  * Creates a loader instance, **to be used on a single Blossom request**.
  */
-export function createLoaderInstance(): ILoaderInstanceProxy {
+export function createLoaderInstance(): LoaderInstanceProxy {
   const instance = new LoaderInstance();
 
   /**

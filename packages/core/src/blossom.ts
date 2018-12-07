@@ -6,30 +6,9 @@
  *
  */
 
-import { graphql, GraphQLSchema, GraphQLError } from 'graphql';
+import { graphql, GraphQLSchema } from 'graphql';
 
 import { createLoaderInstance } from './loader';
-import { BlossomValidationError, validationErrorHandler } from './errors';
-
-/**
- * A function that receives a GraphQL.js GraphQLError and returns the same error
- * structure or a subclass of it.
- */
-type BlossomErrorMappingFunction = (error: GraphQLError) => GraphQLError | any;
-
-/**
- * A mapping between error classes constructor and their respective error
- * handlers.
- */
-type BlossomErrorHandlerMapping = Map<Object, BlossomErrorMappingFunction>;
-
-/**
- * Default error handlers mapping. Includes the errors that are automatically
- * handled by Blossom, like validation errors.
- */
-const DEFAULT_ERROR_HANDLERS: BlossomErrorHandlerMapping = new Map([
-  [BlossomValidationError, validationErrorHandler],
-]);
 
 /**
  * The body of a (already pre-processed) Blossom request.
@@ -52,29 +31,6 @@ interface BlossomRequestBody {
 }
 
 /**
- * Receives a custom error mapping and returns a function that convert those
- * errors to the expected object structures to return.
- *
- * @param customErrorHandlers Mapping for the custom errors.
- */
-function formatError(customErrorHandlers: BlossomErrorHandlerMapping) {
-  return function errorFormatter(error: GraphQLError): GraphQLError | any {
-    // Do nothing if there's no original error
-    if (!error.originalError) {
-      return error;
-    }
-
-    // Find if there's a handler. Otherwise do nothing.
-    const handler = customErrorHandlers.get(error.originalError.constructor);
-    if (!handler) {
-      return error;
-    }
-
-    return handler(error);
-  };
-}
-
-/**
  * Main Blossom operator. Receives an schema and its root values and returns
  * an async function that can be used to process GraphQL requests.
  *
@@ -85,11 +41,7 @@ function formatError(customErrorHandlers: BlossomErrorHandlerMapping) {
  * @param rootValue An object containing all the functions representing the
  * root values that respond to root queries.
  */
-export function blossom(
-  rootSchema: GraphQLSchema,
-  rootValue: any,
-  customErrorHandlers: BlossomErrorHandlerMapping = DEFAULT_ERROR_HANDLERS,
-) {
+export function blossom(rootSchema: GraphQLSchema, rootValue: any) {
   return async function blossomRequestResolver(
     body: BlossomRequestBody,
     requestContext?: any,
@@ -111,11 +63,6 @@ export function blossom(
       variables,
       operationName,
     );
-
-    // If there are errors and we have
-    if (response.errors && response.errors.length > 0) {
-      response.errors = response.errors.map(formatError(customErrorHandlers));
-    }
 
     return response;
   };

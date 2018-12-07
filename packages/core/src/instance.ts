@@ -8,7 +8,13 @@
 
 import merge from 'lodash.merge';
 
-import { RootValueAlreadyInUse } from './errors';
+import {
+  BlossomError,
+  BlossomEmptyHandlerError,
+  BlossomRootValueAlreadyInUse,
+  BlossomErrorHandlerDict,
+  ErrorHandlingFunction,
+} from './errors';
 import {
   IEnum,
   IRPCDescriptionBase,
@@ -66,6 +72,14 @@ export class BlossomInstance implements IBlossomInstance {
   rootMutations: RPCDescription[] = [];
 
   /**
+   * Mapping for introducing error handlers in the instance.
+   */
+  errorHandlers: BlossomErrorHandlerDict = new Map<
+    Function,
+    ErrorHandlingFunction
+  >();
+
+  /**
    * Cache of the computed values of the instance for memoization.
    */
   memoValues: { rootSchema?: RootSchema; rootValue?: any } = {
@@ -101,7 +115,7 @@ export class BlossomInstance implements IBlossomInstance {
    */
   registerRootQuery(query: RPCDescription) {
     if (this.hasRPC(query.name)) {
-      throw new RootValueAlreadyInUse(
+      throw new BlossomRootValueAlreadyInUse(
         `Root Query / Mutation with name ${
           query.name
         } already registered on instance.`,
@@ -118,7 +132,7 @@ export class BlossomInstance implements IBlossomInstance {
    */
   registerRootMutation(mutation: RPCDescription) {
     if (this.hasRPC(mutation.name)) {
-      throw new RootValueAlreadyInUse(
+      throw new BlossomRootValueAlreadyInUse(
         `Root Query / Mutation with name ${
           mutation.name
         } already registered on instance.`,
@@ -126,6 +140,27 @@ export class BlossomInstance implements IBlossomInstance {
     }
 
     this.rootMutations.push(mutation);
+  }
+
+  registerErrorHandler(
+    errorClass: BlossomError,
+    handlingFunction?: ErrorHandlingFunction,
+  ) {
+    if (this.errorHandlers.has(errorClass)) {
+      throw new BlossomEmptyHandlerError(
+        `${errorClass.name} error handler already registered`,
+      );
+    }
+
+    if (handlingFunction) {
+      this.errorHandlers.set(errorClass, handlingFunction);
+    } else if (errorClass.handler) {
+      this.errorHandlers.set(errorClass, errorClass.handler);
+    } else {
+      throw new BlossomEmptyHandlerError(
+        `If handlingFunction parameter is empty, errorClass.handler must be implemented`,
+      );
+    }
   }
 
   /**
@@ -222,6 +257,17 @@ export class BlossomInstance implements IBlossomInstance {
 type AccumulatorFunction = <R>(base: RPCCallback<R>) => RPCCallback<R>;
 
 /**
+ * Options for the Blossom Error accumulator function.
+ */
+type BlossomErrorInput = {
+  /**
+   * Error handling function. If empty, the handler must be provided as a static
+   * handler method in the error class.
+   */
+  handler?: ErrorHandlingFunction;
+};
+
+/**
  * A proxy to the Blossom instance in order to functionally access all of the
  * user-facing concerns.
  */
@@ -229,15 +275,21 @@ interface IBlossomInstanceProxy {
   /**
    * The actual Blossom instance singleton.
    */
-  instance: IBlossomInstance;
+  blossomInstance: IBlossomInstance;
   /**
    * Accumulator function for registering a root query.
    */
-  RootQuery: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
+  BlossomRootQuery: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
   /**
    * Accumulator function for registering a root mutation.
    */
-  RootMutation: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
+  BlossomRootMutation: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
+  /**
+   * Accumulator for adding custom blossom errors.
+   */
+  BlossomError: (
+    opts?: BlossomErrorInput,
+  ) => (constructor: BlossomError) => BlossomError;
 }
 
 /**
@@ -246,13 +298,13 @@ interface IBlossomInstanceProxy {
  * parsed GraphQL Schema and their corresponding root values.
  */
 export function createBlossomInstance(): IBlossomInstanceProxy {
-  const instance = new BlossomInstance();
+  const blossomInstance = new BlossomInstance();
 
   return {
-    instance,
-    RootQuery(descriptor: IRPCDescriptionBase) {
+    blossomInstance,
+    BlossomRootQuery(descriptor: IRPCDescriptionBase) {
       return function<R>(base: RPCCallback<R>): RPCCallback<R> {
-        instance.registerRootQuery({
+        blossomInstance.registerRootQuery({
           ...descriptor,
           callback: base,
         });
@@ -260,14 +312,22 @@ export function createBlossomInstance(): IBlossomInstanceProxy {
         return base;
       };
     },
-    RootMutation(descriptor: IRPCDescriptionBase) {
+    BlossomRootMutation(descriptor: IRPCDescriptionBase) {
       return function<R>(base: RPCCallback<R>): RPCCallback<R> {
-        instance.registerRootMutation({
+        blossomInstance.registerRootMutation({
           ...descriptor,
           callback: base,
         });
 
         return base;
+      };
+    },
+    BlossomError(opts: BlossomErrorInput = {}) {
+      return function(errorClass: BlossomError) {
+        const { handler } = opts;
+        blossomInstance.registerErrorHandler(errorClass, handler);
+
+        return errorClass;
       };
     },
   };
