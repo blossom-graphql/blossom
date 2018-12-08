@@ -15,10 +15,10 @@ function newInstance() {
   return new LoaderInstance();
 }
 
+const batchFn = async (ids: number[]) => ids;
+
 describe('LoaderInstance', () => {
   describe('get', () => {
-    const batchFn = async (ids: number[]) => ids;
-
     it('should create new Dataloader when key is not set', () => {
       const instance = newInstance();
 
@@ -44,5 +44,20 @@ describe('createLoaderInstance', () => {
     const { instance: instance2 } = createLoaderInstance();
 
     expect(instance1).not.toBe(instance2);
+  });
+
+  it('should instance.get() with correct arguments when getLoader() is invoked', () => {
+    const { getLoader, instance } = createLoaderInstance();
+    const exampleLoader = new Dataloader(batchFn);
+
+    // Replace instance's get method with the mock.
+    instance.get = jest
+      .fn<typeof instance.get>()
+      .mockReturnValueOnce(exampleLoader);
+
+    const result = getLoader(batchFn);
+
+    expect(instance.get).toHaveBeenCalled();
+    expect(result).toBe(exampleLoader);
   });
 });
