@@ -6,8 +6,15 @@
  *
  */
 
-import { BlossomInstance } from '../instance';
-import { BlossomRootValueAlreadyInUse } from '../errors';
+import {
+  createBlossomDecorators,
+  BlossomInstance,
+  RootSchema,
+} from '../instance';
+import {
+  BlossomEmptyHandlerError,
+  BlossomRootValueAlreadyInUse,
+} from '../errors';
 
 import {
   IEnum,
@@ -411,6 +418,58 @@ describe('BlossomInstance', () => {
     // ! the RPCs are not registered.
   });
 
+  describe('registerErrorHandler', () => {
+    class TestError extends Error {}
+    class TestErrorWithHandler extends Error {
+      static handler(_: TestErrorWithHandler) {
+        return { render: false };
+      }
+    }
+    const handler1 = (_: TestError) => ({ render: false });
+    const handler2 = (_: TestError) => ({ render: true });
+
+    it(`must throw when a handler's been already registered for the error class`, () => {
+      const instance = createInstance();
+
+      instance.registerErrorHandler(TestError, handler1);
+
+      expect(() =>
+        instance.registerErrorHandler(TestError, handler2),
+      ).toThrowError(BlossomEmptyHandlerError);
+    });
+
+    it('should register handling function (and prioritize it) when available', () => {
+      const instance = createInstance();
+      instance.registerErrorHandler(TestErrorWithHandler, handler1);
+
+      const registeredHandler = instance.errorHandlers.get(
+        TestErrorWithHandler,
+      );
+
+      expect(registeredHandler).toBe(handler1);
+      expect(registeredHandler).not.toBe(TestErrorWithHandler.handler);
+    });
+
+    it('should register static function when handling function is not provided', () => {
+      const instance = createInstance();
+      instance.registerErrorHandler(TestErrorWithHandler);
+
+      const registeredHandler = instance.errorHandlers.get(
+        TestErrorWithHandler,
+      );
+
+      expect(registeredHandler).toBe(TestErrorWithHandler.handler);
+    });
+
+    it('should throw when neither handling function or static method is provided', () => {
+      const instance = createInstance();
+
+      expect(() => instance.registerErrorHandler(TestError)).toThrow(
+        BlossomEmptyHandlerError,
+      );
+    });
+  });
+
   describe('hasRPC', () => {
     it('must return false when neither a query or mutation with the name has been registered', () => {
       const TEST_NAME = 'testRPC';
@@ -446,5 +505,129 @@ describe('BlossomInstance', () => {
 
       expect(instance.hasRPC(TEST_NAME)).toBe(true);
     });
+  });
+
+  describe('rootValue', () => {
+    it('must call getRootValue() with force argument as false', () => {
+      const instance = createInstance();
+
+      // Mock and call
+      instance.getRootValue = jest
+        .fn<typeof instance.getRootValue>()
+        .mockReturnValueOnce({});
+
+      // Retrieve the value (this is a getter)
+      instance.rootValue;
+
+      expect(instance.getRootValue).toHaveBeenCalledWith({ force: false });
+    });
+  });
+
+  describe('rootSchemaString', () => {
+    it('must call getRootSchema() with force argument as false and return correct value', () => {
+      const instance = createInstance();
+      const schemaString = 'type Test {}';
+
+      // Mock and call
+      instance.getRootSchema = jest
+        .fn<typeof instance.getRootSchema>()
+        .mockReturnValueOnce({ schemaString });
+
+      // Retrieve the value (this is a getter)
+      const result = instance.rootSchemaString;
+
+      expect(instance.getRootSchema).toHaveBeenCalledWith({ force: false });
+      expect(result).toEqual(schemaString);
+    });
+  });
+});
+
+describe('createBlossomDecorators', () => {
+  const instanceMock = {
+    registerSchema: jest.fn<void>(),
+    registerEnum: jest.fn<void>(),
+    registerRootQuery: jest.fn<void>(),
+    registerRootMutation: jest.fn<void>(),
+    registerErrorHandler: jest.fn<void>(),
+    getRootSchema: jest.fn<RootSchema>(),
+    getRootValue: jest.fn<any>(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('must call registerRootQuery with correct arguments when BlossomRootQuery is invoked', () => {
+    instanceMock.registerRootQuery.mockReturnValueOnce(undefined);
+
+    const { BlossomRootQuery } = createBlossomDecorators(instanceMock);
+
+    const args = {
+      name: 'test',
+      type: 'Test',
+      description: 'Test',
+    };
+    const callback = () => null;
+
+    // Make the registering
+    BlossomRootQuery(args)(callback);
+
+    expect(instanceMock.registerRootQuery).toHaveBeenCalledWith({
+      ...args,
+      callback,
+    });
+  });
+
+  it('must call registerRootQuery with correct arguments when BlossomRootMutation is invoked', () => {
+    instanceMock.registerRootMutation.mockReturnValueOnce(undefined);
+
+    const { BlossomRootMutation } = createBlossomDecorators(instanceMock);
+
+    const args = {
+      name: 'test',
+      type: 'Test',
+      description: 'Test',
+    };
+    const callback = () => null;
+
+    // Make the registering
+    BlossomRootMutation(args)(callback);
+
+    expect(instanceMock.registerRootMutation).toHaveBeenCalledWith({
+      ...args,
+      callback,
+    });
+  });
+
+  it('must call registerErrorHandler with correct arguments when BlossomError is invoked with no handler', () => {
+    class TestError extends Error {}
+    instanceMock.registerErrorHandler.mockReturnValueOnce(TestError);
+
+    const { BlossomError } = createBlossomDecorators(instanceMock);
+
+    // Make the registering
+    BlossomError()(TestError);
+
+    expect(instanceMock.registerErrorHandler).toHaveBeenCalledWith(
+      TestError,
+      undefined,
+    );
+  });
+
+  it('must call registerErrorHandler with correct arguments when BlossomError is invoked with handler', () => {
+    class TestError extends Error {}
+    instanceMock.registerErrorHandler.mockReturnValueOnce(TestError);
+
+    const handler = (_: TestError) => ({ render: false });
+
+    const { BlossomError } = createBlossomDecorators(instanceMock);
+
+    // Make the registering
+    BlossomError({ handler })(TestError);
+
+    expect(instanceMock.registerErrorHandler).toHaveBeenCalledWith(
+      TestError,
+      handler,
+    );
   });
 });

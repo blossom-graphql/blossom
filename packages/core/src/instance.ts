@@ -28,11 +28,15 @@ import {
 /**
  * Prototype of a Blossom instance.
  */
-interface IBlossomInstance {
+export interface IBlossomInstance {
   registerSchema: (schema: string) => void;
   registerEnum: (enumItem: IEnum) => void;
   registerRootQuery: (query: RPCDescription) => void;
   registerRootMutation: (mutation: RPCDescription) => void;
+  registerErrorHandler: (
+    errorClass: BlossomError,
+    handlingFunction?: ErrorHandlingFunction,
+  ) => void;
   getRootSchema: () => RootSchema;
   getRootValue: () => any;
 }
@@ -40,7 +44,7 @@ interface IBlossomInstance {
 /**
  * Type for storing root schema state.
  */
-type RootSchema = {
+export type RootSchema = {
   schemaString: string;
 };
 
@@ -142,6 +146,15 @@ export class BlossomInstance implements IBlossomInstance {
     this.rootMutations.push(mutation);
   }
 
+  /**
+   * Registers an error handler for this Blossom instance.
+   *
+   * @param errorClass Constructor of the error class.
+   *
+   * @param handlingFunction Function that handles the error. If no function is
+   * provided, will try to retrieve handler from the static handler() method
+   * of the constructor.
+   */
   registerErrorHandler(
     errorClass: BlossomError,
     handlingFunction?: ErrorHandlingFunction,
@@ -273,10 +286,6 @@ type BlossomErrorInput = {
  */
 interface IBlossomInstanceProxy {
   /**
-   * The actual Blossom instance singleton.
-   */
-  blossomInstance: IBlossomInstance;
-  /**
    * Accumulator function for registering a root query.
    */
   BlossomRootQuery: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
@@ -293,15 +302,13 @@ interface IBlossomInstanceProxy {
 }
 
 /**
- * Creates a new Blossom instance. The instance in return provides the necessary
- * elements to call the `blossom` resolving function, i.e. the consolidated and
- * parsed GraphQL Schema and their corresponding root values.
+ * Receives a Blossom instance and returns a group of decorators that can be
+ * used to register multiple kinds of components.
  */
-export function createBlossomInstance(): IBlossomInstanceProxy {
-  const blossomInstance = new BlossomInstance();
-
+export function createBlossomDecorators(
+  blossomInstance: IBlossomInstance,
+): IBlossomInstanceProxy {
   return {
-    blossomInstance,
     BlossomRootQuery(descriptor: IRPCDescriptionBase) {
       return function<R>(base: RPCCallback<R>): RPCCallback<R> {
         blossomInstance.registerRootQuery({
