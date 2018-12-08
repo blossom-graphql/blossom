@@ -14,12 +14,20 @@ import { GraphQLError } from 'graphql';
 type ExtensionFormat = typeof GraphQLError.prototype.extensions;
 
 /**
+ * Output of the error handling function.
+ */
+type ErrorHandlerOutput = {
+  render: boolean;
+  extensions?: ExtensionFormat;
+};
+
+/**
  * A function that receives an error (which will be available on the originalError
  * entry from GraphQLError type) and converts it to the GraphQL extension format.
  */
 export type ErrorHandlingFunction = <E extends Error>(
   error: E,
-) => ExtensionFormat;
+) => ErrorHandlerOutput;
 
 /**
  * Dict that associates error class to error handler.
@@ -42,35 +50,57 @@ export type BlossomError = Function & { handler?: ErrorHandlingFunction };
  *
  * @param dict Dictionary where the error handlers are stored.
  */
-function formatError<U extends Error>(
+export function formatError<U extends Error>(
   error: U,
   dict: BlossomErrorHandlerDict,
-): ExtensionFormat {
+): ErrorHandlerOutput {
   const handler = dict.get(error.constructor);
 
+  // If there's no associated handler we don't add extensions and we simply
+  // exclude them.
   if (!handler) {
-    return undefined;
+    return { render: true, extensions: undefined };
   }
 
   return handler<typeof error>(error);
 }
 
+/**
+ * Receives a list of GraphQLErrors and formats each one of them when an error
+ * handler is provided for their error constructors.
+ *
+ * @param errors List of GraphQLErrors
+ * @param dict Dictionary with error handlers
+ * @param errorFormatter Custom error formatter (used for testing mocking)
+ */
 export function formatGraphQLErrors(
   errors: GraphQLError[],
   dict: BlossomErrorHandlerDict,
+  errorFormatter = formatError,
 ): GraphQLError[] {
   return errors.reduce(
     (acc, error) => {
-      // If there's no original error there's nothing to handle.
+      // If there's no original error there's nothing to handle. This is usually
+      // a GraphQL parsing error.
       if (!error.originalError) {
         acc.push(error);
         return acc;
       }
 
-      acc.push({
-        ...error,
-        extensions: formatError(error, dict),
-      });
+      // Format the error
+      const { render, extensions } = errorFormatter(error, dict);
+
+      if (render) {
+        acc.push({
+          ...error,
+          extensions: {
+            ...extensions,
+            errorName: error.originalError.constructor.name,
+          },
+        });
+      }
+
+      // Always return the accumulated value.
       return acc;
     },
     [] as GraphQLError[],

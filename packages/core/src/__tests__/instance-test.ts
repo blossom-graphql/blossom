@@ -7,7 +7,7 @@
  */
 
 import { BlossomInstance } from '../instance';
-import { RootValueAlreadyInUse } from '../errors';
+import { BlossomRootValueAlreadyInUse } from '../errors';
 
 import {
   IEnum,
@@ -109,7 +109,7 @@ describe('BlossomInstance', () => {
 
       // Registering the same name again must throw an error.
       expect(() => instance.registerRootQuery(RPC_DESCRIPTION)).toThrow(
-        RootValueAlreadyInUse,
+        BlossomRootValueAlreadyInUse,
       );
     });
   });
@@ -150,7 +150,7 @@ describe('BlossomInstance', () => {
 
       // Registering the same name again must throw an error.
       expect(() => instance.registerRootMutation(RPC_DESCRIPTION)).toThrow(
-        RootValueAlreadyInUse,
+        BlossomRootValueAlreadyInUse,
       );
     });
   });
