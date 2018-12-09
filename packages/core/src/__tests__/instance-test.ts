@@ -14,8 +14,8 @@ import {
 import {
   BlossomEmptyHandlerError,
   BlossomRootValueAlreadyInUse,
+  ErrorHandlingFunction,
 } from '../errors';
-
 import {
   IEnum,
   renderEnumToSchema,
@@ -23,6 +23,7 @@ import {
   renderSchema,
   RPCDescription,
 } from '../schema';
+import { GraphQLSchema, buildSchema } from 'graphql';
 
 jest.mock('../schema');
 
@@ -36,11 +37,18 @@ const MOCKS = {
   renderSchema: renderSchema as jest.Mock<typeof renderSchema>,
 };
 
-const createInstance: () => BlossomInstance = () => {
-  return new BlossomInstance();
+const createInstance = (factory?: typeof buildSchema) => {
+  return new BlossomInstance(factory);
 };
 
 describe('BlossomInstance', () => {
+  const schemaBuilderMock = jest.fn<typeof buildSchema>();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    schemaBuilderMock.mockReturnValue(new GraphQLSchema({ query: undefined }));
+  });
+
   describe('registerSchema', () => {
     it('should add a new schema to the schema list', () => {
       const TEST_SCHEMA_1 = 'type Test1 {}';
@@ -196,7 +204,7 @@ describe('BlossomInstance', () => {
     it('should call renderEnumToSchema method when provided with enums', () => {
       MOCKS.renderEnumToSchema.mockReturnValue('enum TestEnum { foo, bar }');
 
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
       instance.registerEnum(TEST_ENUM);
       instance.getRootSchema();
 
@@ -208,7 +216,7 @@ describe('BlossomInstance', () => {
         .mockReturnValueOnce('  testQuery1: Test')
         .mockReturnValueOnce('  testQuery2: Test');
 
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
       instance.registerRootQuery(ROOT_QUERY_1);
       instance.registerRootQuery(ROOT_QUERY_2);
       instance.getRootSchema();
@@ -226,7 +234,7 @@ describe('BlossomInstance', () => {
         .mockReturnValueOnce('  testMutation1: Test')
         .mockReturnValueOnce('  testMutation2: Test');
 
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
       instance.registerRootMutation(ROOT_MUTATION_1);
       instance.registerRootMutation(ROOT_MUTATION_2);
       instance.getRootSchema();
@@ -256,7 +264,7 @@ describe('BlossomInstance', () => {
 
       MOCKS.renderSchema.mockReturnValue(`this doesn't matter!!`);
 
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
 
       // Register values
       instance.registerEnum(TEST_ENUM);
@@ -280,7 +288,7 @@ describe('BlossomInstance', () => {
     });
 
     it('should return memoized result when called more than once', () => {
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
 
       instance.registerRootQuery({
         name: 'testQuery',
@@ -299,7 +307,7 @@ describe('BlossomInstance', () => {
     });
 
     it('should return non-memoized result when called with force param to true', () => {
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
 
       instance.registerRootQuery({
         name: 'testQuery',
@@ -525,7 +533,7 @@ describe('BlossomInstance', () => {
 
   describe('rootSchemaString', () => {
     it('must call getRootSchema() with force argument as false and return correct value', () => {
-      const instance = createInstance();
+      const instance = createInstance(schemaBuilderMock);
       const schemaString = 'type Test {}';
 
       // Mock and call
@@ -540,10 +548,31 @@ describe('BlossomInstance', () => {
       expect(result).toEqual(schemaString);
     });
   });
+
+  describe('rootSchema', () => {
+    it('must call getRootSchema() with force argument as false and return correct value', () => {
+      const resultMock = new GraphQLSchema({ query: null });
+
+      const instance = createInstance(schemaBuilderMock);
+      const schemaString = 'type Test {}';
+
+      // Mock and call
+      instance.getRootSchema = jest
+        .fn<typeof instance.getRootSchema>()
+        .mockReturnValueOnce({ schemaString, parsedSchema: resultMock });
+
+      // Retrieve the value (this is a getter)
+      const result = instance.rootSchema;
+
+      expect(instance.getRootSchema).toHaveBeenCalledWith({ force: false });
+      expect(result).toEqual(resultMock);
+    });
+  });
 });
 
 describe('createBlossomDecorators', () => {
   const instanceMock = {
+    errorHandlers: new Map<Function, ErrorHandlingFunction>(),
     registerSchema: jest.fn<void>(),
     registerEnum: jest.fn<void>(),
     registerRootQuery: jest.fn<void>(),
@@ -551,6 +580,9 @@ describe('createBlossomDecorators', () => {
     registerErrorHandler: jest.fn<void>(),
     getRootSchema: jest.fn<RootSchema>(),
     getRootValue: jest.fn<any>(),
+    rootSchemaString: '',
+    rootSchema: new GraphQLSchema({ query: null }),
+    rootValue: null,
   };
 
   beforeEach(() => {

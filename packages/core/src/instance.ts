@@ -24,11 +24,13 @@ import {
   RPCDescription,
   RPCCallback,
 } from './schema';
+import { GraphQLSchema, buildSchema } from 'graphql';
 
 /**
  * Prototype of a Blossom instance.
  */
 export interface IBlossomInstance {
+  errorHandlers: Map<Function, ErrorHandlingFunction>;
   registerSchema: (schema: string) => void;
   registerEnum: (enumItem: IEnum) => void;
   registerRootQuery: (query: RPCDescription) => void;
@@ -39,6 +41,9 @@ export interface IBlossomInstance {
   ) => void;
   getRootSchema: () => RootSchema;
   getRootValue: () => any;
+  rootSchemaString: string;
+  rootSchema: GraphQLSchema;
+  rootValue: any;
 }
 
 /**
@@ -46,6 +51,7 @@ export interface IBlossomInstance {
  */
 export type RootSchema = {
   schemaString: string;
+  parsedSchema: GraphQLSchema;
 };
 
 /**
@@ -55,6 +61,12 @@ export type RootSchema = {
  * TODO: Convert rootQueries and rootMutation to dict in order to get O(1) R/W.
  */
 export class BlossomInstance implements IBlossomInstance {
+  /**
+   * Function that receives a string or a source and converts it to a parsed
+   * GraphQL Schema.
+   */
+  schemaBuilder: typeof buildSchema;
+
   /**
    * The list of schemas saved in this instance.
    */
@@ -90,6 +102,16 @@ export class BlossomInstance implements IBlossomInstance {
     rootSchema: undefined,
     rootValue: undefined,
   };
+
+  /**
+   * Returns a new BlossomInstance class instance.
+   *
+   * @param schemaBuilder Function that converts schema string to parsed
+   * GraphQL string.
+   */
+  constructor(schemaBuilder = buildSchema) {
+    this.schemaBuilder = schemaBuilder;
+  }
 
   /**
    * Take a schema chunk and adds it to the schema pool
@@ -205,8 +227,11 @@ export class BlossomInstance implements IBlossomInstance {
       rootQueriesStrings,
       rootMutationsStrings,
     );
+    const parsedSchema = this.schemaBuilder(schemaString);
+
     this.memoValues.rootSchema = {
       schemaString,
+      parsedSchema,
     };
 
     return this.memoValues.rootSchema;
@@ -253,10 +278,17 @@ export class BlossomInstance implements IBlossomInstance {
   }
 
   /**
-   * Returns rootSchemaString. If not computed yet, will be computed for you.
+   * Returns rootSchema String. If not computed yet, will be computed for you.
    */
   get rootSchemaString(): string {
     return this.getRootSchema({ force: false }).schemaString;
+  }
+
+  /**
+   * Return parsed root schema. If not computed yet, will be computed for you.
+   */
+  get rootSchema(): GraphQLSchema {
+    return this.getRootSchema({ force: false }).parsedSchema;
   }
 }
 

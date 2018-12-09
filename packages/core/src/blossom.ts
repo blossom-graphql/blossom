@@ -6,9 +6,11 @@
  *
  */
 
-import { graphql, GraphQLSchema } from 'graphql';
+import { graphql, ExecutionResult } from 'graphql';
 
+import { IBlossomInstance } from './instance';
 import { createLoaderInstance } from './loader';
+import { formatGraphQLErrors } from './errors';
 
 /**
  * The body of a (already pre-processed) Blossom request.
@@ -41,11 +43,14 @@ interface BlossomRequestBody {
  * @param rootValue An object containing all the functions representing the
  * root values that respond to root queries.
  */
-export function blossom(rootSchema: GraphQLSchema, rootValue: any) {
+export function blossom(instance: IBlossomInstance) {
+  // We extract here to save on the request resolving operation.
+  const { errorHandlers, rootSchema, rootValue } = instance;
+
   return async function blossomRequestResolver(
     body: BlossomRequestBody,
     requestContext?: any,
-  ) {
+  ): Promise<ExecutionResult<any>> {
     // Prepare information to be passed to the parser.
     const { operationName, query, variables } = body;
 
@@ -64,6 +69,16 @@ export function blossom(rootSchema: GraphQLSchema, rootValue: any) {
       operationName,
     );
 
-    return response;
+    // Format errors when available
+    const formattedErrors =
+      response.errors && response.errors.length > 0
+        ? formatGraphQLErrors(response.errors, errorHandlers)
+        : response.errors;
+
+    // Send final result.
+    return {
+      ...response,
+      errors: formattedErrors,
+    };
   };
 }

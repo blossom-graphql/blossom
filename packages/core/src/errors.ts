@@ -74,10 +74,10 @@ export function formatError<U extends Error>(
  * @param errorFormatter Custom error formatter (used for testing mocking)
  */
 export function formatGraphQLErrors(
-  errors: GraphQLError[],
+  errors: ReadonlyArray<GraphQLError>,
   dict: BlossomErrorHandlerDict,
   errorFormatter = formatError,
-): GraphQLError[] {
+): ReadonlyArray<GraphQLError> {
   return errors.reduce(
     (acc, error) => {
       // If there's no original error there's nothing to handle. This is usually
