@@ -6,15 +6,12 @@
  *
  */
 
-import {
-  createBlossomDecorators,
-  BlossomInstance,
-  RootSchema,
-} from '../instance';
+import { GraphQLSchema, buildSchema } from 'graphql';
+
+import { createBlossomDecorators, BlossomInstance } from '../instance';
 import {
   BlossomEmptyHandlerError,
   BlossomRootValueAlreadyInUse,
-  ErrorHandlingFunction,
 } from '../errors';
 import {
   IEnum,
@@ -23,7 +20,8 @@ import {
   renderSchema,
   RPCDescription,
 } from '../schema';
-import { GraphQLSchema, buildSchema } from 'graphql';
+
+import { instanceMock } from './mocks/instance-mocks';
 
 jest.mock('../schema');
 
@@ -571,20 +569,6 @@ describe('BlossomInstance', () => {
 });
 
 describe('createBlossomDecorators', () => {
-  const instanceMock = {
-    errorHandlers: new Map<Function, ErrorHandlingFunction>(),
-    registerSchema: jest.fn<void>(),
-    registerEnum: jest.fn<void>(),
-    registerRootQuery: jest.fn<void>(),
-    registerRootMutation: jest.fn<void>(),
-    registerErrorHandler: jest.fn<void>(),
-    getRootSchema: jest.fn<RootSchema>(),
-    getRootValue: jest.fn<any>(),
-    rootSchemaString: '',
-    rootSchema: new GraphQLSchema({ query: null }),
-    rootValue: null,
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
   });

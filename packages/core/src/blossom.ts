@@ -29,7 +29,7 @@ interface BlossomRequestBody {
    * If the query contain variables declarations, the value of the variables
    * as a key-value object for this particular request.
    */
-  variables: any;
+  variables?: any;
 }
 
 /**
