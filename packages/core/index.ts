@@ -8,11 +8,9 @@
 
 export { blossom } from './src/blossom';
 
-export { createBlossomInstance } from './src/instance';
+export { createBlossomDecorators } from './src/instance';
 
 export { Maybe, MaybePromise } from './src/common';
-
-export { BlossomValidationError } from './src/errors';
 
 export { IBlossomContext } from './src/context';
 
