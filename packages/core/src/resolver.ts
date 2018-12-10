@@ -132,7 +132,7 @@ interface ConnectionBase<T> {
 /**
  * Additional elements required in a connection.
  */
-interface ConnectionDecorator {
+export interface ConnectionDecorator {
   __typename: string;
 }
 
@@ -157,6 +157,7 @@ type ConnectionResolver<I, O> = (
  * Creates a resolver from an input -> output mapping.
  *
  * @param resolver Resolver base function to convert to a resolver.
+ *
  * @param typename Typename the resolver will be returning.
  */
 export function createResolver<I, O>(
@@ -175,7 +176,9 @@ export function createResolver<I, O>(
  * family of schemas.
  *
  * @param resolver Resolver function to convert.
- * @param typename Typename of the resolver. This will return <typename>+Connection.
+ *
+ * @param typename Typename of the resolver. This will return
+ * `<typename>+Connection`.
  */
 export function createConnectionResolver<I, O>(
   resolver: Resolver<I, O>,
@@ -202,7 +205,7 @@ export function createConnectionResolver<I, O>(
             // If we are on a paginated result the simplest (and most expected)
             // outcome is that the data is always defined on the pages that are
             // being shown.
-            return <O>resolver(edge.node(), attributes);
+            return resolver(edge.node(), context) as O;
           },
           cursor: edge.cursor,
         }))
