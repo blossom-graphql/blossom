@@ -161,8 +161,8 @@ type ConnectionResolver<I, O> = (
  * @param typename Typename the resolver will be returning.
  */
 export function createResolver<I, O>(
-  resolver: ResolverBase<I, O>,
   typename: string,
+  resolver: ResolverBase<I, O>,
 ): Resolver<I, O> {
   return (input: I, context?: any) => {
     const resolved = <O>resolver(input, context);
@@ -181,8 +181,8 @@ export function createResolver<I, O>(
  * `<typename>+Connection`.
  */
 export function createConnectionResolver<I, O>(
-  resolver: Resolver<I, O>,
   typename: string,
+  resolver: Resolver<I, O>,
 ): ConnectionResolver<I, O> {
   // The final resolver function to compose
   return (attributes: ConnectionBase<I>, context?: any): Connection<O> => ({

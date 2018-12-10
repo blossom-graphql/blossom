@@ -30,7 +30,7 @@ describe('createResolver', () => {
 
   it('must have called the resolver with correct arguments', () => {
     const resolverInput = { message: 'foo' };
-    const builtResolver = createResolver(testResolver, TYPENAME);
+    const builtResolver = createResolver(TYPENAME, testResolver);
     const testContext = { foo: 'bar' };
     builtResolver(resolverInput, testContext);
 
@@ -38,7 +38,7 @@ describe('createResolver', () => {
   });
 
   it('must include defined typename on output', () => {
-    const builtResolver = createResolver(testResolver, TYPENAME);
+    const builtResolver = createResolver(TYPENAME, testResolver);
     const resolvedValue = builtResolver({ message: 'foo' });
 
     // TypeScript Guard
@@ -53,7 +53,7 @@ describe('createResolver', () => {
     const resolverInput = { message: 'foo' };
 
     const preResolverOutput = testResolver(resolverInput);
-    const builtResolver = createResolver(testResolver, TYPENAME);
+    const builtResolver = createResolver(TYPENAME, testResolver);
     const resolvedValue = builtResolver(resolverInput);
 
     // TypeScript Guard
@@ -101,8 +101,8 @@ describe('createConnectionResolver', () => {
 
   it('must include correct typename after calling resolver', () => {
     const builtConnectionResolver = createConnectionResolver(
-      testResolver,
       TYPENAME,
+      testResolver,
     );
 
     // Resolve the connection
@@ -113,8 +113,8 @@ describe('createConnectionResolver', () => {
 
   it('must directly wire pageInfo from the attributes property', () => {
     const builtConnectionResolver = createConnectionResolver(
-      testResolver,
       TYPENAME,
+      testResolver,
     );
 
     // Resolve the connection
@@ -128,8 +128,8 @@ describe('createConnectionResolver', () => {
       'edges() property has not been called',
     () => {
       const builtConnectionResolver = createConnectionResolver(
-        testResolver,
         TYPENAME,
+        testResolver,
       );
 
       // Resolve the connection
@@ -147,8 +147,8 @@ describe('createConnectionResolver', () => {
       expect.assertions(1);
 
       const builtConnectionResolver = createConnectionResolver(
-        testResolver,
         TYPENAME,
+        testResolver,
       );
       const resolverContext = { foo: 'bar' };
 
@@ -174,8 +174,8 @@ describe('createConnectionResolver', () => {
       expect.assertions(1);
 
       const builtConnectionResolver = createConnectionResolver(
-        testResolver,
         TYPENAME,
+        testResolver,
       );
 
       // Resolve the connection
@@ -191,8 +191,8 @@ describe('createConnectionResolver', () => {
       'if edges().node() function is invoked',
     async () => {
       const builtConnectionResolver = createConnectionResolver(
-        testResolver,
         TYPENAME,
+        testResolver,
       );
       const connectionAttributesEdges = await connectionAttributes.edges();
       const resolverContext = { foo: 'bar' };
@@ -228,8 +228,8 @@ describe('createConnectionResolver', () => {
     'must properly wire edges().cursor() from the ' + 'connections function',
     async () => {
       const builtConnectionResolver = createConnectionResolver(
-        testResolver,
         TYPENAME,
+        testResolver,
       );
       const connectionAttributesEdges = await connectionAttributes.edges();
 
