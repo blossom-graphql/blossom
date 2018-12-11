@@ -62,3 +62,6 @@ typings/
 
 # we really don't want this
 .DS_Store
+
+# Ignore test folders
+packages/test-*
