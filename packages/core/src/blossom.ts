@@ -15,7 +15,7 @@ import { formatGraphQLErrors } from './errors';
 /**
  * The body of a (already pre-processed) Blossom request.
  */
-interface BlossomRequestBody {
+type BlossomRequestBody = {
   /**
    * Name of the operation. This matches the string after `query` or `mutation`
    * statements.
@@ -30,7 +30,7 @@ interface BlossomRequestBody {
    * as a key-value object for this particular request.
    */
   variables?: any;
-}
+};
 
 /**
  * Main Blossom operator. Receives an schema and its root values and returns

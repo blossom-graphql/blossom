@@ -12,7 +12,7 @@ export { createBlossomDecorators } from './src/instance';
 
 export { Maybe, MaybePromise } from './src/common';
 
-export { IBlossomContext } from './src/context';
+export { BlossomContext } from './src/context';
 
 export { deliver, deliverGroup } from './src/helpers';
 

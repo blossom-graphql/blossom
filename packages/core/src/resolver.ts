@@ -27,7 +27,7 @@ type Resolver<I, O> = (input: I, context?: any) => ResolverOutputItem<O>;
 /**
  * Configuration required by the resolver function.
  */
-interface ResolverConfig<I, O> {
+type ResolverConfig<I, O> = {
   /**
    * Attributes passed to be mapped to a resolver output.
    */
@@ -44,14 +44,14 @@ interface ResolverConfig<I, O> {
    * or user permissions.
    */
   context?: any;
-}
+};
 
 /**
  * Additional parameters used to make a resolver output.
  */
-interface ResolvedOutputItemBase {
+type ResolvedOutputItemBase = {
   __typename: string;
-}
+};
 
 /**
  * Output of a resolver includes the user-defined type and
@@ -78,7 +78,7 @@ export type ResolverOutput<O> =
 /**
  * Page info element of a connection.
  */
-interface ConnectionPageInfo {
+type ConnectionPageInfo = {
   /**
    * Total elements available con the connection. This is
    * a thunk that will be called by the resolver **on demand**.
@@ -92,12 +92,12 @@ interface ConnectionPageInfo {
    * Has the connection a previous page? Thunked.
    */
   hasPreviousPage: () => PromiseLike<boolean>;
-}
+};
 
 /**
  * The representation of a single edge item.
  */
-interface ConnectionEdge<T> {
+type ConnectionEdge<T> = {
   /**
    * Node contents of the connection.
    */
@@ -107,7 +107,7 @@ interface ConnectionEdge<T> {
    * called on demand.
    */
   cursor: () => string;
-}
+};
 
 /**
  * Array of edges of the connection. This is an allias and has a promise
@@ -118,7 +118,7 @@ type ConnectionEdges<T> = RPCCallback<PromiseLike<ConnectionEdge<T>[]>>;
 /**
  * Represents the basic elements a connection requires: edges and pageInfo.
  */
-interface ConnectionBase<T> {
+type ConnectionBase<T> = {
   /**
    * Edges of the connection.
    */
@@ -127,14 +127,14 @@ interface ConnectionBase<T> {
    * Page information of the connection.
    */
   pageInfo: ConnectionPageInfo;
-}
+};
 
 /**
  * Additional elements required in a connection.
  */
-export interface ConnectionDecorator {
+export type ConnectionDecorator = {
   __typename: string;
-}
+};
 
 /**
  * A full connection is the base and the decorator.
@@ -230,12 +230,10 @@ export function resolve<I, O>(
   if (!attributes) {
     return null;
   } else if (Array.isArray(attributes)) {
-    // On array, perform a map operation over every resolved
-    // item.
+    // On array, perform a map operation over every resolved item.
     return attributes.map(attr => resolver(attr, context));
   } else {
-    // If it's just an object, them perform the resolving with
-    // the context.
+    // If it's just an object, them perform the resolving with the context.
     return resolver(attributes, context);
   }
 }

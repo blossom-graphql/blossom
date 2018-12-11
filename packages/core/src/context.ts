@@ -11,7 +11,7 @@ import * as Dataloader from 'dataloader';
 /**
  * A context for an specific Blossom request.
  */
-export interface IBlossomContext<R> {
+export type BlossomContext<R> = {
   /**
    * User-defined context for this request. Can be any type and is defined by
    * the developer by finding the suitable value in the generic signature.
@@ -21,4 +21,4 @@ export interface IBlossomContext<R> {
    * Function to retrieve a loader instance in this particular request.
    */
   loader: <K, V>(loader: Dataloader.BatchLoadFn<K, V>) => Dataloader<K, V>;
-}
+};

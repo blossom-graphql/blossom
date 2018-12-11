@@ -14,7 +14,7 @@ import {
   BlossomRootValueAlreadyInUse,
 } from '../errors';
 import {
-  IEnum,
+  Enum,
   renderEnumToSchema,
   renderRPCDescriptionToSchema,
   renderSchema,
@@ -169,7 +169,7 @@ describe('BlossomInstance', () => {
   });
 
   describe('getRootSchema', () => {
-    const TEST_ENUM: IEnum = {
+    const TEST_ENUM: Enum = {
       name: 'TestEnum',
       values: [{ name: 'foo' }, { name: 'bar' }],
     };

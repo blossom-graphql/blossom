@@ -1,7 +1,7 @@
 /**
  * Value descriptor of an enumeration.
  */
-export interface IEnumValue {
+export type EnumValue = {
   /**
    * Name and value.
    */
@@ -10,12 +10,12 @@ export interface IEnumValue {
    * Description, in the schema.
    */
   description?: string;
-}
+};
 
 /**
  * Descriptor of a full enumeration in the schema.
  */
-export interface IEnum {
+export type Enum = {
   /**
    * Name of the enumeration.
    */
@@ -28,13 +28,13 @@ export interface IEnum {
    * List of possible value descriptors the enum
    * can take.
    */
-  values: IEnumValue[];
-}
+  values: EnumValue[];
+};
 
 /**
  * A single argument descriptor of a RPC call.
  */
-export interface IRPCArgument {
+export type RPCArgument = {
   /**
    * Programatical name to be displayed.
    */
@@ -48,12 +48,12 @@ export interface IRPCArgument {
    * Expected type for this parameter.
    */
   type: string;
-}
+};
 
 /**
  * Base descriptor with the simplest elements.
  */
-export interface IRPCDescriptionBase {
+export type RPCDescriptionBase = {
   /**
    * Name that this callback will have over the
    * root query.
@@ -67,12 +67,12 @@ export interface IRPCDescriptionBase {
    * List of arguments this callback will receive. Will render
    * nothing if none is provided.
    */
-  arguments?: IRPCArgument[];
+  arguments?: RPCArgument[];
   /**
    * The type this callback will be returning.
    */
   type: string;
-}
+};
 
 /**
  * The signature of a callback function.
@@ -82,7 +82,7 @@ export type RPCCallback<U> = (args?: any, ctx?: any, ast?: any) => U;
 /**
  * A descriptor of a RPC action, i.e. a query or a mutation.
  */
-export type RPCDescription = IRPCDescriptionBase & {
+export type RPCDescription = RPCDescriptionBase & {
   /**
    * The function that resolves this RPC value.
    */
@@ -99,7 +99,7 @@ export function renderEnumToSchema({
   name,
   description,
   values,
-}: IEnum): string {
+}: Enum): string {
   const valuesStrings = values.map(
     ({ name, description }) =>
       `  """\n  ${description || ''}\n  """\n  ${name}`,

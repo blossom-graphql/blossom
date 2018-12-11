@@ -16,8 +16,8 @@ import {
   ErrorHandlingFunction,
 } from './errors';
 import {
-  IEnum,
-  IRPCDescriptionBase,
+  Enum,
+  RPCDescriptionBase,
   renderEnumToSchema,
   renderRPCDescriptionToSchema,
   renderSchema,
@@ -32,7 +32,7 @@ import { GraphQLSchema, buildSchema } from 'graphql';
 export interface IBlossomInstance {
   errorHandlers: Map<Function, ErrorHandlingFunction>;
   registerSchema: (schema: string) => void;
-  registerEnum: (enumItem: IEnum) => void;
+  registerEnum: (enumItem: Enum) => void;
   registerRootQuery: (query: RPCDescription) => void;
   registerRootMutation: (mutation: RPCDescription) => void;
   registerErrorHandler: (
@@ -75,7 +75,7 @@ export class BlossomInstance implements IBlossomInstance {
   /**
    * The list of registered enums saved in this instance.
    */
-  enums: IEnum[] = [];
+  enums: Enum[] = [];
 
   /**
    * The list of root queries stored on this instance.
@@ -130,7 +130,7 @@ export class BlossomInstance implements IBlossomInstance {
    *
    * @param enumItem The descriptor of the enumeration
    */
-  registerEnum(enumItem: IEnum) {
+  registerEnum(enumItem: Enum) {
     this.enums.push(enumItem);
   }
 
@@ -316,22 +316,22 @@ type BlossomErrorInput = {
  * A proxy to the Blossom instance in order to functionally access all of the
  * user-facing concerns.
  */
-interface IBlossomInstanceProxy {
+type BlossomInstanceProxy = {
   /**
    * Accumulator function for registering a root query.
    */
-  BlossomRootQuery: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
+  BlossomRootQuery: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
   /**
    * Accumulator function for registering a root mutation.
    */
-  BlossomRootMutation: (descriptor: IRPCDescriptionBase) => AccumulatorFunction;
+  BlossomRootMutation: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
   /**
    * Accumulator for adding custom blossom errors.
    */
   BlossomError: (
     opts?: BlossomErrorInput,
   ) => (constructor: BlossomError) => BlossomError;
-}
+};
 
 /**
  * Receives a Blossom instance and returns a group of decorators that can be
@@ -339,9 +339,9 @@ interface IBlossomInstanceProxy {
  */
 export function createBlossomDecorators(
   blossomInstance: IBlossomInstance,
-): IBlossomInstanceProxy {
+): BlossomInstanceProxy {
   return {
-    BlossomRootQuery(descriptor: IRPCDescriptionBase) {
+    BlossomRootQuery(descriptor: RPCDescriptionBase) {
       return function<R>(base: RPCCallback<R>): RPCCallback<R> {
         blossomInstance.registerRootQuery({
           ...descriptor,
@@ -351,7 +351,7 @@ export function createBlossomDecorators(
         return base;
       };
     },
-    BlossomRootMutation(descriptor: IRPCDescriptionBase) {
+    BlossomRootMutation(descriptor: RPCDescriptionBase) {
       return function<R>(base: RPCCallback<R>): RPCCallback<R> {
         blossomInstance.registerRootMutation({
           ...descriptor,
