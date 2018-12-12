@@ -6,7 +6,21 @@
   "author": "Sebastian Soto",
   "license": "MIT",
   "private": false,
+  "bin": {
+    "blossom": "./bin/blossom.js"
+  },
   "dependencies": {
-    "commander": "^2.19.0"
+    "@types/graphql": "^14.0.3",
+    "commander": "^2.19.0",
+    "graphql": "^14.0.2",
+    "nodemon": "^1.18.8",
+    "tmp": "^0.0.33",
+    "ts-loader": "^5.3.1",
+    "typescript": "^3.2.2",
+    "webpack": "^4.27.1"
+  },
+  "devDependencies": {
+    "ts-node": "^7.0.1",
+    "typescript": "^3.2.2"
   }
 }
