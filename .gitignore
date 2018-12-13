@@ -63,5 +63,8 @@ typings/
 # we really don't want this
 .DS_Store
 
-# Ignore test folders
+# Ignore build output directory
+dist
+
+# Ignore test directory
 packages/test-*

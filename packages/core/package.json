@@ -1,7 +1,7 @@
 {
   "name": "@blossom-gql/core",
   "version": "0.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "author": "Sebastian Soto",
   "license": "MIT",
   "private": false,

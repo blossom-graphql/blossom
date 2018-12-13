@@ -9,6 +9,10 @@
   "bin": {
     "blossom": "./bin/blossom.js"
   },
+  "files": [
+    "bin/blossom.js",
+    "dist/**/*.js"
+  ],
   "dependencies": {
     "@types/graphql": "^14.0.3",
     "commander": "^2.19.0",
