@@ -1,0 +1,38 @@
+"""
+Test schema description.
+"""
+type Post {
+  """
+  Unique identifier.
+  """
+  id: ID!
+  title: String! @function
+  content: String @promise
+  testFunction(number: Int): Int @promise
+}
+
+input PostInput {
+  title: String!
+  content: String!
+}
+
+type Query {
+  """
+  Test function description.
+  """
+  testQuery(id: ID!): Post
+}
+
+type Mutation {
+  testMutation(
+    """
+    Test comments.
+    """
+    input: PostInput!
+  ): Post
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+}
