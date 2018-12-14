@@ -8,16 +8,36 @@
 
 import program from 'commander';
 
-import serverAction from './cmd/server';
+import { commandDict, CommandState, registerCommand } from './lib/commands';
+
 import VERSION from './version';
+import commands from './available-commands';
+
+const commandState: CommandState = {
+  currentCommand: '',
+  commandArgs: [],
+};
 
 program.version(VERSION);
 
-program
-  .command('server')
-  .description('Starts the development server for this Blossom project.')
-  .action(serverAction);
+// Register all of our commands
+for (const command of commands) {
+  registerCommand(program, commandState, command);
+}
 
+// Parse and start running.
 program.parse(process.argv);
 
-// program.outputHelp();
+// Retrieve command from commands dictionary and invoke the handler with all
+// the other arguments that could possibly be expected.
+if (commandState.currentCommand) {
+  const command = commandDict[commandState.currentCommand];
+
+  if (!command) {
+    throw new Error(`Command ${command} not found command dictionary.`);
+  }
+
+  command.handler(...commandState.commandArgs);
+} else {
+  program.outputHelp();
+}
