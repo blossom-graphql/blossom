@@ -1,8 +1,8 @@
 {
   "include": [],
   "references": [
-    { "path": "packages/cli/tsconfig.json" },
     { "path": "packages/core/tsconfig.json" },
+    { "path": "packages/toolbelt/tsconfig.json" }
   ],
   "compilerOptions": {
     "composite": true

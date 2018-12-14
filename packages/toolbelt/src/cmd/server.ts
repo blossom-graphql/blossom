@@ -1,38 +1,43 @@
+/**
+ * Copyright (c) The Blossom GraphQL Team.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
 import { spawn } from 'child_process';
+
 import chalk from 'chalk';
 import webpack, { Configuration } from 'webpack';
 
 import baseConfig from '../config/webpack.base';
 import VERSION from '../version';
 import { appPath } from '../lib/paths';
+import { SpawnProcess } from '../lib/processes';
 
 function clearConsole(): void {
   process.stdout.write(new Buffer('1B63', 'hex'));
 }
 
-function startProcess() {
-  const nodeSpawn = spawn('node', [appPath('./dist/server.js')]);
-
-  nodeSpawn.stdout.pipe(process.stdout);
-  nodeSpawn.stderr.pipe(process.stderr);
-  process.stdin.pipe(nodeSpawn.stdin);
-
-  nodeSpawn.on('exit', (code, signal) => {
-    const message = `\n[Process exited with code ${code}${
-      signal ? ` and signal ${signal}` : ''
-    }]`;
-
-    if (code !== 0) {
-      console.log(chalk.red.bold(message));
-    } else {
-      console.log(chalk.bold(message));
-    }
-
-    if (process.stdin.isTTY) {
-      console.log('Save any file or type any key to restart process.');
-    }
-  });
+function startProcess(): void {
+  runningProcesses.push(
+    new SpawnProcess(spawn('node', [appPath('./dist/server.js')])),
+  );
 }
+
+function clearProcesses(): void {
+  if (runningProcesses.length === 0) return;
+
+  runningProcesses.forEach(process => {
+    process.kill();
+  });
+
+  runningProcesses = [];
+}
+
+let firstCompilation = true;
+let runningProcesses: SpawnProcess[] = [];
 
 export default function serverAction() {
   clearConsole();
@@ -41,7 +46,7 @@ export default function serverAction() {
     '🌺',
     chalk.red.bold('Blossom'),
     '-',
-    chalk.bold(`CLI v${VERSION}`),
+    chalk.bold(`Toolbelt v${VERSION}`),
   );
   console.log('Starting development server...');
 
@@ -52,6 +57,8 @@ export default function serverAction() {
 
   // Warn the user that a re-compilation is happening...
   compiler.hooks.watchRun.tap('Send Warning', () => {
+    if (firstCompilation) return;
+
     console.log('');
     console.log(chalk.bold('[Re-compiling bundle...]'));
   });
@@ -62,11 +69,13 @@ export default function serverAction() {
       poll: undefined,
     },
     (_, stats) => {
+      if (firstCompilation) firstCompilation = false;
+
       clearConsole();
 
       const hasErrors = stats.hasErrors();
       const hasWarnings = stats.hasWarnings();
-      const compileSuccessful = !hasErrors && !hasWarnings;
+      let compileSuccessful = !hasErrors && !hasWarnings;
 
       if (hasErrors) {
         console.log(chalk.bold.red('Errors found while compiling'), '\n');
@@ -77,11 +86,23 @@ export default function serverAction() {
       }
 
       if (hasWarnings) {
-        console.log(chalk.bold.yellow('Warnings found while compiling!'), '\n');
+        const filteredWarnings = stats.compilation.warnings.filter(
+          warning =>
+            warning.name !== 'ModuleDependencyWarning' ||
+            !warning.message.includes('Critical dependency'),
+        );
+        const hasFilteredWarnings = filteredWarnings.length > 0;
 
-        const info = stats.toJson();
+        if (hasFilteredWarnings) {
+          console.log(
+            chalk.bold.yellow('Warnings found while compiling!'),
+            '\n',
+          );
 
-        info.warnings.forEach((warning: string) => console.log(warning));
+          filteredWarnings.forEach(warning => console.log(warning));
+        } else {
+          compileSuccessful = !hasErrors && !hasFilteredWarnings;
+        }
       }
 
       // We don't spawn child process when there's errors
@@ -97,6 +118,9 @@ export default function serverAction() {
       } else {
         console.log(chalk.bold('Starting compiled bundle...'), '\n');
       }
+
+      // Clear any other running process
+      clearProcesses();
 
       // Start the main process
       startProcess();
