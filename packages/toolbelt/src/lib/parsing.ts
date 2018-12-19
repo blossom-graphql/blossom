@@ -16,6 +16,7 @@ import {
   TypeNode,
   InputValueDefinitionNode,
   DirectiveNode,
+  NamedTypeNode,
 } from 'graphql';
 
 type DocumentNodeDescriptor<T> = {
@@ -43,11 +44,27 @@ enum ThunkType {
 type FieldDescriptor = {
   name: string;
   comments?: string;
+  type: KnownTypeDescriptor | ReferencedTypeDescriptor;
   array: boolean;
   required: boolean;
   thunkType: ThunkType;
   elementDescriptor?: FieldDescriptor;
 };
+
+type KnownTypeDescriptor = {
+  kind: 'KnownType';
+  type: 'string' | 'boolean' | 'number';
+};
+
+type ReferencedTypeDescriptor = {
+  kind: 'ReferencedType';
+  name: string;
+};
+
+enum ObjectTypeKind {
+  Object = 'Object',
+  Input = 'Input',
+}
 
 const SUPPORTED_OPERATION_TYPES = ['query', 'mutation'];
 
@@ -122,6 +139,9 @@ export function parseDocumentNode(document: DocumentNode, originFile?: string) {
     objects: Object.values(intermediateDict.objects)
       .map(object => parseDocumentObjectType(object.node, intermediateDict))
       .filter(result => result !== null),
+    inputs: Object.values(intermediateDict.inputs)
+      .map(input => parseDocumentObjectType(input.node, intermediateDict))
+      .filter(result => result !== null),
   };
 }
 
@@ -161,8 +181,45 @@ export function thunkTypeFromDirectives(
   }
 }
 
+export function parseFieldType(
+  kind: ObjectTypeKind,
+  type: NamedTypeNode,
+  intermediateDict: IntermediateDictionary,
+): KnownTypeDescriptor | ReferencedTypeDescriptor {
+  const name = type.name.value;
+
+  switch (name) {
+    case 'ID':
+    case 'String':
+      return { kind: 'KnownType', type: 'string' };
+    case 'Int':
+    case 'Float':
+      return { kind: 'KnownType', type: 'number' };
+    case 'Boolean':
+      return { kind: 'KnownType', type: 'boolean' };
+    default:
+      const typeNotFound =
+        (kind === ObjectTypeKind.Object &&
+          !intermediateDict.objects.hasOwnProperty(name) &&
+          !intermediateDict.enums.hasOwnProperty(name)) ||
+        (kind === ObjectTypeKind.Input &&
+          !intermediateDict.inputs.hasOwnProperty(name) &&
+          !intermediateDict.enums.hasOwnProperty(name));
+
+      if (typeNotFound) {
+        throw new Error(
+          `Cannot find reference for type ${name}. Did you spell it correctly? If this type is defined in another schema file, please import it on top.`,
+        );
+      }
+
+      return { kind: 'ReferencedType', name: type.name.value };
+  }
+}
+
 export function parseFieldDefinitionNode(
   definition: FieldDefinitionNode | InputValueDefinitionNode | TypeNode,
+  kind: ObjectTypeKind,
+  intermediateDict: IntermediateDictionary,
 ): FieldDescriptor | undefined {
   if (
     definition.kind === 'FieldDefinition' ||
@@ -182,12 +239,20 @@ export function parseFieldDefinitionNode(
     const staticResults = {
       name: definition.name.value,
       comments: definition.description && definition.description.value,
-      thunkType: definition.directives
-        ? thunkTypeFromDirectives(definition.directives)
-        : ThunkType.none,
+      // Only parse thunk type for definitions that are objects and have
+      // directives. We don't parse them for inputs. Moreover, we even should
+      // throw an error in the future.
+      thunkType:
+        definition.directives && kind === ObjectTypeKind.Object
+          ? thunkTypeFromDirectives(definition.directives)
+          : ThunkType.none,
     };
 
-    const result = parseFieldDefinitionNode(definition.type) as FieldDescriptor;
+    const result = parseFieldDefinitionNode(
+      definition.type,
+      kind,
+      intermediateDict,
+    ) as FieldDescriptor;
 
     return {
       ...baseResult,
@@ -197,10 +262,15 @@ export function parseFieldDefinitionNode(
   } else if (definition.kind === 'ListType') {
     // A list. We must enforce that array is true in this case and then recurse
     // to set the behavior of the element.
-    const result = parseFieldDefinitionNode(definition.type) as FieldDescriptor;
+    const result = parseFieldDefinitionNode(
+      definition.type,
+      kind,
+      intermediateDict,
+    ) as FieldDescriptor;
 
     return {
       name: '',
+      type: { kind: 'KnownType', type: 'boolean' },
       required: false,
       array: true,
       elementDescriptor: result,
@@ -210,7 +280,11 @@ export function parseFieldDefinitionNode(
     // Non null type. Result will be defined by recursing into definition.type.
     // However, required must be forced to be true.
 
-    const result = parseFieldDefinitionNode(definition.type) as FieldDescriptor;
+    const result = parseFieldDefinitionNode(
+      definition.type,
+      kind,
+      intermediateDict,
+    ) as FieldDescriptor;
 
     return {
       ...result,
@@ -220,10 +294,9 @@ export function parseFieldDefinitionNode(
     // Named type is the base result value. From here we just need to retrieve
     // the type in order to match it with any of the references.
 
-    // TODO: Set type.
-
     return {
       name: definition.name.value,
+      type: parseFieldType(kind, definition, intermediateDict),
       thunkType: ThunkType.none,
       array: false,
       required: false,
@@ -255,7 +328,13 @@ export function parseDocumentObjectType(
     const parsedFields =
       type.fields &&
       (type.fields
-        .map(parseFieldDefinitionNode)
+        .map(field =>
+          parseFieldDefinitionNode(
+            field,
+            ObjectTypeKind.Object,
+            intermediateDict,
+          ),
+        )
         .filter(field => field !== undefined) as FieldDescriptor[]);
 
     fields = parsedFields;
@@ -263,7 +342,13 @@ export function parseDocumentObjectType(
     const parsedFields =
       type.fields &&
       (type.fields
-        .map(parseFieldDefinitionNode)
+        .map(field =>
+          parseFieldDefinitionNode(
+            field,
+            ObjectTypeKind.Input,
+            intermediateDict,
+          ),
+        )
         .filter(field => field !== undefined) as FieldDescriptor[]);
 
     fields = parsedFields;
