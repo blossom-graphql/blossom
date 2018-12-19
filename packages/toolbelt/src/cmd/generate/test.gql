@@ -6,12 +6,13 @@ type Post {
   Unique identifier.
   """
   id: ID!
-  title: String! @function
-  content: String @promise
-  testFunction(number: Int): Int @promise
+  title: String! @blossomImpl(type: function)
+  content: String @blossomImpl(type: async)
+  testFunction(number: Int): Int @blossomImpl(type: function)
+  testArray: [String!]! @blossomImpl(type: async)
 }
 
-input PostInput {
+input PostPayload {
   title: String!
   content: String!
 }

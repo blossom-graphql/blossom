@@ -35,7 +35,7 @@ type IntermediateDictionary = {
   mutationType?: string;
 };
 
-enum ThunkType {
+export enum ThunkType {
   asyncFunction = 'asyncFunction',
   function = 'function',
   none = 'none',
@@ -59,6 +59,12 @@ type KnownTypeDescriptor = {
 type ReferencedTypeDescriptor = {
   kind: 'ReferencedType';
   name: string;
+};
+
+export type ObjectTypeDescription = {
+  name: string;
+  comments?: string;
+  fields: FieldDescriptor[];
 };
 
 enum ObjectTypeKind {
@@ -138,10 +144,10 @@ export function parseDocumentNode(document: DocumentNode, originFile?: string) {
   return {
     objects: Object.values(intermediateDict.objects)
       .map(object => parseDocumentObjectType(object.node, intermediateDict))
-      .filter(result => result !== null),
+      .filter(result => result !== null) as ObjectTypeDescription[],
     inputs: Object.values(intermediateDict.inputs)
       .map(input => parseDocumentObjectType(input.node, intermediateDict))
-      .filter(result => result !== null),
+      .filter(result => result !== null) as ObjectTypeDescription[],
   };
 }
 
@@ -310,7 +316,7 @@ export function parseFieldDefinitionNode(
 export function parseDocumentObjectType(
   type: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
   intermediateDict: IntermediateDictionary,
-) {
+): ObjectTypeDescription | null {
   let fields: FieldDescriptor[] | undefined;
 
   if (type.kind === 'ObjectTypeDefinition') {
@@ -357,6 +363,6 @@ export function parseDocumentObjectType(
   return {
     name: type.name.value,
     comments: type.description && type.description.value,
-    fields,
+    fields: fields || ([] as FieldDescriptor[]),
   };
 }

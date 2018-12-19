@@ -1,22 +1,21 @@
+/**
+ * Copyright (c) The Blossom GraphQL Team.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import {
-  parse,
-  DefinitionNode,
-  DocumentNode,
-  ObjectTypeDefinitionNode,
-  SchemaDefinitionNode,
-  DirectiveNode,
-} from 'graphql';
+import * as ts from 'typescript';
+import { DocumentNode, parse } from 'graphql';
+import cosmiconfig from 'cosmiconfig';
+import prettier from 'prettier';
 
-// const knownMappings = {
-//   String: 'string',
-//   Int: 'number',
-//   Float: 'number',
-//   Boolean: 'boolean',
-//   ID: 'id',
-// };
+import { parseDocumentNode } from '../../lib/parsing';
+import { generateTypeAlias } from '../../lib/codegen';
 
 function getDocument(): DocumentNode | undefined {
   try {
@@ -27,119 +26,69 @@ function getDocument(): DocumentNode | undefined {
   }
 }
 
-const document = getDocument();
+async function run() {
+  // Parse document
+  const document = getDocument();
 
-if (!document) {
-  throw new Error('No valid document. Quitting.');
-}
-
-type Dict = {
-  objects: { [key: string]: ObjectTypeDefinitionNode };
-  inputs: { [key: string]: DefinitionNode };
-  schema?: SchemaDefinitionNode;
-  queryType?: string;
-  mutationType?: string;
-};
-
-const dict: Dict = {
-  objects: {},
-  inputs: {},
-  schema: undefined,
-  queryType: '',
-  mutationType: '',
-};
-
-for (let definition of document.definitions) {
-  switch (definition.kind) {
-    case 'ObjectTypeDefinition':
-      dict.objects[definition.name.value] = definition;
-      break;
-    case 'InputObjectTypeDefinition':
-      dict.inputs[definition.name.value] = definition;
-      break;
-    case 'SchemaDefinition':
-      dict.schema = definition;
-      break;
-  }
-}
-
-if (dict.schema) {
-  for (let operation of dict.schema.operationTypes) {
-    if (['query', 'mutation'].includes(operation.operation)) {
-      if (!dict.objects.hasOwnProperty(operation.type.name.value)) {
-        throw new Error(
-          `Type ${operation.type.name.value} not defined in this file for ${
-            operation.operation
-          } schema.`,
-        );
-      }
-
-      if (operation.operation === 'query') {
-        dict.queryType = operation.type.name.value;
-      } else if (operation.operation === 'mutation') {
-        dict.mutationType = operation.type.name.value;
-      }
-    } else {
-      throw new Error(`Operation ${operation.operation} not supported`);
-    }
-  }
-}
-
-for (const [name, object] of Object.entries(dict.objects)) {
-  if (name === dict.queryType || name === dict.mutationType) {
-    continue;
+  if (!document) {
+    throw new Error('No valid document. Quitting.');
   }
 
-  const fields =
-    object.fields &&
-    object.fields.map((field: any) => {
-      const type = field.type;
+  const parsing = parseDocumentNode(document);
 
-      let required = type.kind === 'NonNullType';
-      let fieldType: string | undefined;
-      let thunkType: 'promise' | 'function' | undefined;
+  const resultFile = ts.createSourceFile(
+    'test.ts',
+    '',
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS,
+  );
 
-      if (type.kind === 'NamedType') {
-        fieldType = type.name.value;
-      } else if (required && type.type.kind === 'NamedType') {
-        fieldType = type.type.name.value;
-      }
-
-      field.directives.forEach((directive: DirectiveNode) => {
-        if (directive.name.value === 'function') {
-          if (thunkType) {
-            throw new Error('Thunk type already defined');
-          }
-
-          thunkType = 'function';
-        } else if (directive.name.value === 'promise') {
-          if (thunkType) {
-            throw new Error('Thunk type already defined');
-          }
-
-          thunkType = 'promise';
-        }
-      });
-
-      if (field.arguments.length > 0) {
-        if (thunkType !== 'promise') {
-          thunkType = 'function';
-        }
-      }
-
-      return {
-        name: field.name.value,
-        comments: field.description && field.description.value,
-        type: fieldType,
-        required,
-        thunkType,
-        arguments: field.arguments,
-      };
-    });
-
-  console.log({
-    name,
-    comments: object.description && object.description.value,
-    fields,
+  const printer = ts.createPrinter({
+    newLine: ts.NewLineKind.LineFeed,
   });
+
+  const printedNodes: string[] = [...parsing.objects, ...parsing.inputs].map(
+    object =>
+      printer.printNode(
+        ts.EmitHint.Unspecified,
+        generateTypeAlias(object),
+        resultFile,
+      ),
+  );
+
+  // Use prettier! Retrieve config first
+  const prettierConfigExplorer = cosmiconfig('prettier');
+
+  let prettierConfig: any = {};
+
+  try {
+    const result = await prettierConfigExplorer.search();
+
+    if (result && !result.isEmpty) {
+      prettierConfig = result.config;
+    }
+  } catch (error) {
+    // Prettier settings not found
+    // TODO: Logging.
+  }
+
+  const formattedFile = prettier.format(printedNodes.join('\n\n'), {
+    parser: 'babylon',
+    ...prettierConfig,
+  });
+
+  console.log(formattedFile);
+}
+
+try {
+  run()
+    .then(() => process.exit(0))
+    .catch(error => {
+      console.error(error);
+      process.exit(1);
+    });
+} catch (error) {
+  console.error(error);
+  process.exit(1);
 }
