@@ -1,3 +1,7 @@
+type NestedTest {
+  key: [String]
+}
+
 """
 Test schema description.
 """
@@ -10,6 +14,7 @@ type Post {
   content: String @blossomImpl(type: async)
   testFunction(number: Int): Int @blossomImpl(type: function)
   testArray: [String!]! @blossomImpl(type: async)
+  nestedTest: NestedTest! @blossomImpl(type: async)
 }
 
 input PostPayload {

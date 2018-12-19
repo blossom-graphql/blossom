@@ -36,20 +36,30 @@ type IntermediateDictionary = {
 };
 
 export enum ThunkType {
-  asyncFunction = 'asyncFunction',
-  function = 'function',
-  none = 'none',
+  AsyncFunction = 'AsyncFunction',
+  Function = 'Function',
+  None = 'None',
 }
 
-type FieldDescriptor = {
+type SingleFieldDescriptor = {
   name: string;
   comments?: string;
   type: KnownTypeDescriptor | ReferencedTypeDescriptor;
-  array: boolean;
+  array: false;
   required: boolean;
   thunkType: ThunkType;
-  elementDescriptor?: FieldDescriptor;
 };
+
+type ArrayFieldDescriptor = {
+  name: string;
+  comments?: string;
+  array: true;
+  required: boolean;
+  thunkType: ThunkType;
+  elementDescriptor: FieldDescriptor;
+};
+
+export type FieldDescriptor = SingleFieldDescriptor | ArrayFieldDescriptor;
 
 type KnownTypeDescriptor = {
   kind: 'KnownType';
@@ -158,7 +168,7 @@ export function thunkTypeFromDirectives(
     ({ name: { value } }) => value === 'blossomImpl',
   );
   if (!blossomImplDirective) {
-    return ThunkType.none;
+    return ThunkType.None;
   }
 
   const typeArgument =
@@ -167,7 +177,7 @@ export function thunkTypeFromDirectives(
       argument => argument.name.value === 'type',
     );
   if (!typeArgument) {
-    return ThunkType.none;
+    return ThunkType.None;
   }
 
   if (
@@ -176,14 +186,14 @@ export function thunkTypeFromDirectives(
   ) {
     switch (typeArgument.value.value) {
       case 'function':
-        return ThunkType.function;
+        return ThunkType.Function;
       case 'async':
-        return ThunkType.asyncFunction;
+        return ThunkType.AsyncFunction;
       default:
-        return ThunkType.none;
+        return ThunkType.None;
     }
   } else {
-    return ThunkType.none;
+    return ThunkType.None;
   }
 }
 
@@ -251,7 +261,7 @@ export function parseFieldDefinitionNode(
       thunkType:
         definition.directives && kind === ObjectTypeKind.Object
           ? thunkTypeFromDirectives(definition.directives)
-          : ThunkType.none,
+          : ThunkType.None,
     };
 
     const result = parseFieldDefinitionNode(
@@ -276,11 +286,10 @@ export function parseFieldDefinitionNode(
 
     return {
       name: '',
-      type: { kind: 'KnownType', type: 'boolean' },
       required: false,
       array: true,
       elementDescriptor: result,
-      thunkType: ThunkType.none,
+      thunkType: ThunkType.None,
     };
   } else if (definition.kind === 'NonNullType') {
     // Non null type. Result will be defined by recursing into definition.type.
@@ -303,7 +312,7 @@ export function parseFieldDefinitionNode(
     return {
       name: definition.name.value,
       type: parseFieldType(kind, definition, intermediateDict),
-      thunkType: ThunkType.none,
+      thunkType: ThunkType.None,
       array: false,
       required: false,
     };

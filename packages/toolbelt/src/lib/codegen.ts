@@ -8,7 +8,9 @@
 
 import * as ts from 'typescript';
 
-import { ObjectTypeDescription, ThunkType } from './parsing';
+ts.createNode;
+
+import { FieldDescriptor, ObjectTypeDescription, ThunkType } from './parsing';
 
 export function generateFunctionTypeNode(
   terminalType: ts.TypeNode,
@@ -68,6 +70,49 @@ export function generateFunctionTypeNode(
   return ts.createFunctionTypeNode(undefined, args, outputType);
 }
 
+export function appendJSDocComments(declaration: ts.Node, text: string) {
+  const appendedLines = text
+    .split('\n')
+    .map(line => `* ${line}`)
+    .join('\n');
+
+  ts.addSyntheticLeadingComment(
+    declaration,
+    ts.SyntaxKind.MultiLineCommentTrivia,
+    `*\n${appendedLines}\n`,
+    true,
+  );
+}
+
+export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
+  // If it's an array, then we must recurse based on the element descriptor
+  if (field.array) {
+    return ts.createArrayTypeNode(
+      generateTerminalTypeNode(field.elementDescriptor),
+    );
+  }
+
+  if (field.type.kind === 'KnownType') {
+    const typeValue = field.type.type;
+
+    if (typeValue === 'string') {
+      return ts.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+    } else if (typeValue === 'boolean') {
+      return ts.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+    } else if (typeValue === 'number') {
+      return ts.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+    }
+  } else if (field.type.kind === 'ReferencedType') {
+    return ts.createTypeReferenceNode(
+      ts.createIdentifier(field.type.name),
+      undefined,
+    );
+  }
+
+  // TODO: Log warning.
+  return ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+}
+
 export function generateTypeAlias(
   descriptor: ObjectTypeDescription,
 ): ts.TypeAliasDeclaration {
@@ -75,45 +120,18 @@ export function generateTypeAlias(
     field => {
       let typeNode: ts.TypeNode;
       let requiredSignature: ts.Token<ts.SyntaxKind.QuestionToken> | undefined;
-      let terminalTypeNode: ts.TypeNode;
 
-      // Map to a type keyword based on the type
-      if (field.type.kind === 'KnownType') {
-        switch (field.type.type) {
-          case 'boolean':
-            terminalTypeNode = ts.createKeywordTypeNode(
-              ts.SyntaxKind.BooleanKeyword,
-            );
-            break;
-          case 'string':
-            terminalTypeNode = ts.createKeywordTypeNode(
-              ts.SyntaxKind.StringKeyword,
-            );
-            break;
-          case 'number':
-          default:
-            terminalTypeNode = ts.createKeywordTypeNode(
-              ts.SyntaxKind.NumberKeyword,
-            );
-            break;
-        }
-      } else {
-        terminalTypeNode = ts.createKeywordTypeNode(
-          ts.SyntaxKind.BooleanKeyword,
-        );
-      }
-
-      // Wrap terminalTypeNode in an array if the type is array
+      const terminalTypeNode = generateTerminalTypeNode(field);
 
       // Wrap in a function based in the thunk type
       switch (field.thunkType) {
-        case ThunkType.asyncFunction:
-        case ThunkType.function:
+        case ThunkType.AsyncFunction:
+        case ThunkType.Function:
           requiredSignature = undefined;
           typeNode = generateFunctionTypeNode(
             terminalTypeNode,
             field.required,
-            field.thunkType === ThunkType.asyncFunction,
+            field.thunkType === ThunkType.AsyncFunction,
           );
           break;
 
@@ -126,13 +144,19 @@ export function generateTypeAlias(
           break;
       }
 
-      return ts.createPropertySignature(
+      const declaration = ts.createPropertySignature(
         undefined,
         ts.createIdentifier(field.name),
         requiredSignature,
         typeNode,
         undefined,
       );
+
+      if (field.comments) {
+        appendJSDocComments(declaration, field.comments);
+      }
+
+      return declaration;
     },
   );
 
@@ -143,6 +167,10 @@ export function generateTypeAlias(
     undefined,
     ts.createTypeLiteralNode(members),
   );
+
+  if (descriptor.comments) {
+    appendJSDocComments(declaration, descriptor.comments);
+  }
 
   return declaration;
 }
