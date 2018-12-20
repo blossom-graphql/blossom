@@ -57,6 +57,8 @@ async function run() {
       ),
   );
 
+  const generatedFile = printedNodes.join('\n\n');
+
   // Use prettier! Retrieve config first
   const prettierConfigExplorer = cosmiconfig('prettier');
 
@@ -73,7 +75,7 @@ async function run() {
     // TODO: Logging.
   }
 
-  const formattedFile = prettier.format(printedNodes.join('\n\n'), {
+  const formattedFile = prettier.format(generatedFile, {
     parser: 'babylon',
     ...prettierConfig,
   });

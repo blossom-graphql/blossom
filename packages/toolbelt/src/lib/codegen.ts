@@ -8,39 +8,45 @@
 
 import * as ts from 'typescript';
 
-ts.createNode;
-
 import { FieldDescriptor, ObjectTypeDescription, ThunkType } from './parsing';
+
+export function generateArgumentsTypeLiteral(
+  args: FieldDescriptor[] | undefined,
+): ts.ParameterDeclaration {
+  const name = ts.createIdentifier('args');
+
+  if (!args || args.length === 0) {
+    return ts.createParameter(
+      undefined,
+      undefined,
+      undefined,
+      name,
+      undefined,
+      ts.createTypeLiteralNode([]),
+    );
+  }
+
+  return ts.createParameter(
+    undefined,
+    undefined,
+    undefined,
+    name,
+    undefined,
+    ts.createTypeLiteralNode(args.map(generateTypeElement)),
+  );
+}
 
 export function generateFunctionTypeNode(
   terminalType: ts.TypeNode,
-  required: boolean,
+  args: FieldDescriptor[] | undefined,
   isAsync: boolean = false,
 ): ts.FunctionTypeNode {
-  const outputTerminalType = required
-    ? terminalType
-    : ts.createUnionTypeNode([
-        terminalType,
-        ts.createKeywordTypeNode(ts.SyntaxKind.NullKeyword),
-        ts.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword),
-      ]);
-
   const outputType = isAsync
-    ? ts.createTypeReferenceNode(ts.createIdentifier('Promise'), [
-        outputTerminalType,
-      ])
-    : outputTerminalType;
+    ? ts.createTypeReferenceNode(ts.createIdentifier('Promise'), [terminalType])
+    : terminalType;
 
-  const args = [
-    ts.createParameter(
-      undefined,
-      undefined,
-      undefined,
-      ts.createIdentifier('args'),
-      undefined,
-      // TODO: Map me to the correct type.
-      ts.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-    ),
+  const signatureArgs = [
+    generateArgumentsTypeLiteral(args),
     // Context parameter.
     ts.createParameter(
       undefined,
@@ -67,7 +73,7 @@ export function generateFunctionTypeNode(
     ),
   ];
 
-  return ts.createFunctionTypeNode(undefined, args, outputType);
+  return ts.createFunctionTypeNode(undefined, signatureArgs, outputType);
 }
 
 export function appendJSDocComments(declaration: ts.Node, text: string) {
@@ -84,80 +90,104 @@ export function appendJSDocComments(declaration: ts.Node, text: string) {
   );
 }
 
+export function wrapInOptionalType(
+  typeNode: ts.TypeNode,
+  required: boolean,
+): ts.TypeNode {
+  if (required) {
+    return typeNode;
+  } else {
+    return ts.createTypeReferenceNode(ts.createIdentifier('Nullable'), [
+      typeNode,
+    ]);
+  }
+}
+
 export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
   // If it's an array, then we must recurse based on the element descriptor
   if (field.array) {
-    return ts.createArrayTypeNode(
-      generateTerminalTypeNode(field.elementDescriptor),
+    return wrapInOptionalType(
+      ts.createTypeReferenceNode(ts.createIdentifier('ReadonlyArray'), [
+        generateTerminalTypeNode(field.elementDescriptor),
+      ]),
+      field.required,
     );
   }
+
+  let terminalType: ts.TypeNode = ts.createKeywordTypeNode(
+    ts.SyntaxKind.UnknownKeyword,
+  );
 
   if (field.type.kind === 'KnownType') {
     const typeValue = field.type.type;
 
     if (typeValue === 'string') {
-      return ts.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
+      terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
     } else if (typeValue === 'boolean') {
-      return ts.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
+      terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
     } else if (typeValue === 'number') {
-      return ts.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+      terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
     }
   } else if (field.type.kind === 'ReferencedType') {
-    return ts.createTypeReferenceNode(
+    terminalType = ts.createTypeReferenceNode(
       ts.createIdentifier(field.type.name),
       undefined,
     );
+  } else {
+    // TODO: Log warning.
+    return terminalType;
   }
 
-  // TODO: Log warning.
-  return ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
+  return wrapInOptionalType(terminalType, field.required);
+}
+
+export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
+  let typeNode: ts.TypeNode;
+  let requiredSignature: ts.Token<ts.SyntaxKind.QuestionToken> | undefined;
+
+  const terminalTypeNode = generateTerminalTypeNode(field);
+
+  // Wrap in a function based in the thunk type
+  switch (field.thunkType) {
+    case ThunkType.AsyncFunction:
+    case ThunkType.Function:
+      requiredSignature = undefined;
+      typeNode = generateFunctionTypeNode(
+        terminalTypeNode,
+        field.arguments,
+        field.thunkType === ThunkType.AsyncFunction,
+      );
+      break;
+
+    default:
+      // ThunkType.None
+      requiredSignature = field.required
+        ? undefined
+        : ts.createToken(ts.SyntaxKind.QuestionToken);
+      typeNode = terminalTypeNode;
+      break;
+  }
+
+  const declaration = ts.createPropertySignature(
+    undefined,
+    ts.createIdentifier(field.name),
+    requiredSignature,
+    typeNode,
+    undefined,
+  );
+
+  if (field.comments) {
+    appendJSDocComments(declaration, field.comments);
+  }
+
+  return declaration;
 }
 
 export function generateTypeAlias(
   descriptor: ObjectTypeDescription,
 ): ts.TypeAliasDeclaration {
   const members: ReadonlyArray<ts.TypeElement> = descriptor.fields.map(
-    field => {
-      let typeNode: ts.TypeNode;
-      let requiredSignature: ts.Token<ts.SyntaxKind.QuestionToken> | undefined;
-
-      const terminalTypeNode = generateTerminalTypeNode(field);
-
-      // Wrap in a function based in the thunk type
-      switch (field.thunkType) {
-        case ThunkType.AsyncFunction:
-        case ThunkType.Function:
-          requiredSignature = undefined;
-          typeNode = generateFunctionTypeNode(
-            terminalTypeNode,
-            field.required,
-            field.thunkType === ThunkType.AsyncFunction,
-          );
-          break;
-
-        default:
-          // ThunkType.None
-          requiredSignature = field.required
-            ? undefined
-            : ts.createToken(ts.SyntaxKind.QuestionToken);
-          typeNode = terminalTypeNode;
-          break;
-      }
-
-      const declaration = ts.createPropertySignature(
-        undefined,
-        ts.createIdentifier(field.name),
-        requiredSignature,
-        typeNode,
-        undefined,
-      );
-
-      if (field.comments) {
-        appendJSDocComments(declaration, field.comments);
-      }
-
-      return declaration;
-    },
+    generateTypeElement,
   );
 
   const declaration = ts.createTypeAliasDeclaration(

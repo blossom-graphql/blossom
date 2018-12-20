@@ -48,6 +48,7 @@ type SingleFieldDescriptor = {
   array: false;
   required: boolean;
   thunkType: ThunkType;
+  arguments?: FieldDescriptor[];
 };
 
 type ArrayFieldDescriptor = {
@@ -57,6 +58,7 @@ type ArrayFieldDescriptor = {
   required: boolean;
   thunkType: ThunkType;
   elementDescriptor: FieldDescriptor;
+  arguments?: FieldDescriptor[];
 };
 
 export type FieldDescriptor = SingleFieldDescriptor | ArrayFieldDescriptor;
@@ -236,46 +238,8 @@ export function parseFieldDefinitionNode(
   definition: FieldDefinitionNode | InputValueDefinitionNode | TypeNode,
   kind: ObjectTypeKind,
   intermediateDict: IntermediateDictionary,
-): FieldDescriptor | undefined {
-  if (
-    definition.kind === 'FieldDefinition' ||
-    definition.kind === 'InputValueDefinition'
-  ) {
-    // One of the base types incoming. We set the common elements and recurse
-    // by calling this same function with definition.type.
-
-    // These are the starting point and the defaults if nothing else is set.
-    const baseResult = {
-      array: false,
-      required: false,
-      elementDescriptor: undefined,
-    };
-
-    // These are always set and should not change.
-    const staticResults = {
-      name: definition.name.value,
-      comments: definition.description && definition.description.value,
-      // Only parse thunk type for definitions that are objects and have
-      // directives. We don't parse them for inputs. Moreover, we even should
-      // throw an error in the future.
-      thunkType:
-        definition.directives && kind === ObjectTypeKind.Object
-          ? thunkTypeFromDirectives(definition.directives)
-          : ThunkType.None,
-    };
-
-    const result = parseFieldDefinitionNode(
-      definition.type,
-      kind,
-      intermediateDict,
-    ) as FieldDescriptor;
-
-    return {
-      ...baseResult,
-      ...result,
-      ...staticResults,
-    };
-  } else if (definition.kind === 'ListType') {
+): FieldDescriptor {
+  if (definition.kind === 'ListType') {
     // A list. We must enforce that array is true in this case and then recurse
     // to set the behavior of the element.
     const result = parseFieldDefinitionNode(
@@ -317,8 +281,58 @@ export function parseFieldDefinitionNode(
       required: false,
     };
   } else {
-    // Unhandled by this parser.
-    return undefined;
+    // One of the base types incoming. We set the common elements and recurse
+    // by calling this same function with definition.type.
+
+    // Parse arguments
+    let args: FieldDescriptor[] | undefined;
+
+    if (
+      definition.kind === 'FieldDefinition' &&
+      definition.arguments &&
+      definition.arguments.length > 0
+    ) {
+      args = definition.arguments.map(argument =>
+        parseFieldDefinitionNode(
+          argument,
+          ObjectTypeKind.Input,
+          intermediateDict,
+        ),
+      );
+    }
+
+    // These are the starting point and the defaults if nothing else is set.
+    const baseResult = {
+      array: false,
+      required: false,
+      elementDescriptor: undefined,
+    };
+
+    // These are always set and should not change.
+    const staticResults = {
+      name: definition.name.value,
+      comments: definition.description && definition.description.value,
+      // Only parse thunk type for definitions that are objects and have
+      // directives. We don't parse them for inputs. Moreover, we even should
+      // throw an error in the future.
+      thunkType:
+        definition.directives && kind === ObjectTypeKind.Object
+          ? thunkTypeFromDirectives(definition.directives)
+          : ThunkType.None,
+      arguments: args,
+    };
+
+    const result = parseFieldDefinitionNode(
+      definition.type,
+      kind,
+      intermediateDict,
+    ) as FieldDescriptor;
+
+    return {
+      ...baseResult,
+      ...result,
+      ...staticResults,
+    };
   }
 }
 
