@@ -46,7 +46,7 @@ type DocumentNameMap<T> = { [key: string]: DocumentNodeDescriptor<T> };
  * consolidated into maps. This in turn is useful for checking whether
  * internal types are defined inside the schema.
  */
-type IntermediateDictionary = {
+export type IntermediateDictionary = {
   /**
    * Map of parsed objects (GraphQL types).
    */
@@ -189,7 +189,7 @@ export type ObjectTypeDescription = {
 /**
  * Any of the possible object types.
  */
-enum ObjectTypeKind {
+export enum ObjectTypeKind {
   /**
    * Object. Used for `type` declarations in GraphQL Schemas.
    */

@@ -12,6 +12,10 @@ import {
   ThunkImplementationType,
   BLOSSOM_IMPLEMENTATION_DIRECTIVE,
   BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
+  parseFieldType,
+  ObjectTypeKind,
+  IntermediateDictionary,
+  KnownScalarTypes,
 } from '../parsing';
 
 describe('thunkTypeFromDirectives', () => {
@@ -44,7 +48,7 @@ describe('thunkTypeFromDirectives', () => {
 
   const blossomImplDirective = (
     value: ThunkImplementationType,
-    argumentType: 'StringValue' | 'EnumValue',
+    argumentType: 'StringValue' | 'EnumValue' | 'AnotherValue',
   ) => ({
     kind: 'Directive' as 'Directive',
     name: {
@@ -230,6 +234,53 @@ describe('thunkTypeFromDirectives', () => {
       }),
     ).toBe(ThunkType.AsyncFunction);
   });
+
+  it('must return ThunkType.None with no arguments and blossom implementation directive (as another value)', () => {
+    expect(
+      thunkTypeFromDirectives({
+        ...baseField,
+        arguments: undefined,
+        directives: [
+          {
+            kind: 'Directive',
+            name: {
+              kind: 'Name',
+              value: 'testDirective',
+            },
+          },
+          blossomImplDirective(
+            ThunkImplementationType.AsyncFunction,
+            'AnotherValue',
+          ),
+        ],
+      }),
+    ).toBe(ThunkType.None);
+  });
 });
 
-describe('parseDocumentObjectType', () => {});
+describe('parseFieldType', () => {
+  const intermediateDict: IntermediateDictionary = {
+    objects: {},
+    inputs: {},
+    enums: {},
+  };
+
+  it('must return KnownScalarTypes.String for GraphQL ID type', () => {
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'ID',
+          },
+        },
+        intermediateDict,
+      ),
+    ).toEqual({
+      kind: 'KnownScalarType',
+      type: KnownScalarTypes.String,
+    });
+  });
+});
