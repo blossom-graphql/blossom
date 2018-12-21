@@ -18,7 +18,7 @@ module.exports = {
   },
   globals: {
     'ts-jest': {
-      tsConfig: path.join(process.cwd(), 'tsconfig.json'),
+      tsConfig: path.join(process.cwd(), 'scripts/jest/tsconfig.json'),
     },
   },
 };
