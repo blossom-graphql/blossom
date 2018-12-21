@@ -36,6 +36,8 @@ async function run() {
 
   const parsing = parseDocumentNode(document);
 
+  console.log(JSON.stringify(parsing, null, 2));
+
   const resultFile = ts.createSourceFile(
     'test.ts',
     '',

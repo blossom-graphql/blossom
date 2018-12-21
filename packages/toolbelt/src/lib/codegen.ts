@@ -8,7 +8,12 @@
 
 import * as ts from 'typescript';
 
-import { FieldDescriptor, ObjectTypeDescription, ThunkType } from './parsing';
+import {
+  FieldDescriptor,
+  ObjectTypeDescription,
+  ThunkType,
+  KnownScalarTypes,
+} from './parsing';
 
 export function generateArgumentsTypeLiteral(
   args: FieldDescriptor[] | undefined,
@@ -118,14 +123,14 @@ export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
     ts.SyntaxKind.UnknownKeyword,
   );
 
-  if (field.type.kind === 'KnownType') {
+  if (field.type.kind === 'KnownScalarType') {
     const typeValue = field.type.type;
 
-    if (typeValue === 'string') {
+    if (typeValue === KnownScalarTypes.String) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
-    } else if (typeValue === 'boolean') {
+    } else if (typeValue === KnownScalarTypes.Boolean) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
-    } else if (typeValue === 'number') {
+    } else if (typeValue === KnownScalarTypes.Number) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
     }
   } else if (field.type.kind === 'ReferencedType') {
