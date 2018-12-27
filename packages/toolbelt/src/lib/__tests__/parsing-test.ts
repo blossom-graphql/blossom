@@ -7,15 +7,17 @@
  */
 
 import {
+  BLOSSOM_IMPLEMENTATION_DIRECTIVE,
+  BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
+  IntermediateDictionary,
+  KnownScalarTypes,
+  ObjectTypeKind,
+  parseFieldDefinitionNode,
+  parseFieldType,
   thunkTypeFromDirectives,
   ThunkType,
   ThunkImplementationType,
-  BLOSSOM_IMPLEMENTATION_DIRECTIVE,
-  BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
-  parseFieldType,
-  ObjectTypeKind,
-  IntermediateDictionary,
-  KnownScalarTypes,
+  UnknownTypeError,
 } from '../parsing';
 
 describe('thunkTypeFromDirectives', () => {
@@ -259,7 +261,7 @@ describe('thunkTypeFromDirectives', () => {
 });
 
 describe('parseFieldType', () => {
-  const intermediateDict: IntermediateDictionary = {
+  const emptyIntermediateDict: IntermediateDictionary = {
     objects: {},
     inputs: {},
     enums: {},
@@ -268,7 +270,7 @@ describe('parseFieldType', () => {
   it('must return KnownScalarTypes.String for GraphQL ID type', () => {
     expect(
       parseFieldType(
-        ObjectTypeKind.Object, // whatever, shouldn't matter
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
         {
           kind: 'NamedType',
           name: {
@@ -276,11 +278,353 @@ describe('parseFieldType', () => {
             value: 'ID',
           },
         },
-        intermediateDict,
+        emptyIntermediateDict,
       ),
     ).toEqual({
       kind: 'KnownScalarType',
       type: KnownScalarTypes.String,
+    });
+  });
+
+  it('must return KnownScalarTypes.String for GraphQL String type', () => {
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'String',
+          },
+        },
+        emptyIntermediateDict,
+      ),
+    ).toEqual({
+      kind: 'KnownScalarType',
+      type: KnownScalarTypes.String,
+    });
+  });
+
+  it('must return KnownScalarTypes.Number for GraphQL Int type', () => {
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'Int',
+          },
+        },
+        emptyIntermediateDict,
+      ),
+    ).toEqual({
+      kind: 'KnownScalarType',
+      type: KnownScalarTypes.Number,
+    });
+  });
+
+  it('must return KnownScalarTypes.Number for GraphQL Float type', () => {
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'Float',
+          },
+        },
+        emptyIntermediateDict,
+      ),
+    ).toEqual({
+      kind: 'KnownScalarType',
+      type: KnownScalarTypes.Number,
+    });
+  });
+
+  it('must return KnownScalarTypes.Boolean for GraphQL Boolean type', () => {
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'Boolean',
+          },
+        },
+        emptyIntermediateDict,
+      ),
+    ).toEqual({
+      kind: 'KnownScalarType',
+      type: KnownScalarTypes.Boolean,
+    });
+  });
+
+  it('must throw UnknownTypeError when a referenced type is not available in the intermediate dictionary', () => {
+    expect(() =>
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'WhateverName',
+          },
+        },
+        emptyIntermediateDict,
+      ),
+    ).toThrowError(UnknownTypeError);
+
+    expect(() =>
+      parseFieldType(
+        ObjectTypeKind.Input, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'WhateverName',
+          },
+        },
+        emptyIntermediateDict,
+      ),
+    ).toThrowError(UnknownTypeError);
+  });
+
+  it('must return correct referenced type when the definition is available in objects', () => {
+    const intermediateDictWithObject: IntermediateDictionary = {
+      objects: {
+        TestObject: {
+          originFile: 'test-origin.gql',
+          node: {
+            kind: 'ObjectTypeDefinition',
+            name: {
+              kind: 'Name',
+              value: 'TestObject',
+            },
+          },
+        },
+      },
+      inputs: {},
+      enums: {},
+    };
+
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestObject',
+          },
+        },
+        intermediateDictWithObject,
+      ),
+    ).toEqual({
+      kind: 'ReferencedType',
+      name: 'TestObject',
+    });
+  });
+
+  it('must return correct referenced type when the definition is available in enums', () => {
+    const intermediateDictWithEnum: IntermediateDictionary = {
+      objects: {},
+      inputs: {},
+      enums: {
+        TestEnum: {
+          originFile: 'test-origin.gql',
+          node: {
+            kind: 'EnumTypeDefinition',
+            name: {
+              kind: 'Name',
+              value: 'TestEnum',
+            },
+          },
+        },
+      },
+    };
+
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestEnum',
+          },
+        },
+        intermediateDictWithEnum,
+      ),
+    ).toEqual({
+      kind: 'ReferencedType',
+      name: 'TestEnum',
+    });
+
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Input, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestEnum',
+          },
+        },
+        intermediateDictWithEnum,
+      ),
+    ).toEqual({
+      kind: 'ReferencedType',
+      name: 'TestEnum',
+    });
+  });
+
+  it('must return correct referenced type when the definition is available in inputs', () => {
+    const intermediateDictWithInput: IntermediateDictionary = {
+      objects: {},
+      inputs: {
+        TestInput: {
+          originFile: 'test-origin.gql',
+          node: {
+            kind: 'InputObjectTypeDefinition',
+            name: {
+              kind: 'Name',
+              value: 'TestInput',
+            },
+          },
+        },
+      },
+      enums: {},
+    };
+
+    expect(
+      parseFieldType(
+        ObjectTypeKind.Input, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestInput',
+          },
+        },
+        intermediateDictWithInput,
+      ),
+    ).toEqual({
+      kind: 'ReferencedType',
+      name: 'TestInput',
+    });
+  });
+
+  it('must return throw UnknownTypeError when referenced type is in inputs', () => {
+    const intermediateDictWithInput: IntermediateDictionary = {
+      objects: {},
+      inputs: {
+        TestInput: {
+          originFile: 'test-origin.gql',
+          node: {
+            kind: 'InputObjectTypeDefinition',
+            name: {
+              kind: 'Name',
+              value: 'TestInput',
+            },
+          },
+        },
+      },
+      enums: {},
+    };
+
+    expect(() =>
+      parseFieldType(
+        ObjectTypeKind.Object, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestInput',
+          },
+        },
+        intermediateDictWithInput,
+      ),
+    ).toThrowError(UnknownTypeError);
+  });
+
+  it('must return throw UnknownTypeError when referenced type is in objects', () => {
+    const intermediateDictWithInput: IntermediateDictionary = {
+      objects: {
+        TestObject: {
+          originFile: 'test-origin.gql',
+          node: {
+            kind: 'ObjectTypeDefinition',
+            name: {
+              kind: 'Name',
+              value: 'TestObject',
+            },
+          },
+        },
+      },
+      inputs: {},
+      enums: {},
+    };
+
+    expect(() =>
+      parseFieldType(
+        ObjectTypeKind.Input, // whatever, shouldn't matter for this case
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestObject',
+          },
+        },
+        intermediateDictWithInput,
+      ),
+    ).toThrowError(UnknownTypeError);
+  });
+});
+
+describe('parseFieldDefinitionNode', () => {
+  it('must return correct values when definiton has a NamedType kind', () => {
+    const fieldTypeReturn = {
+      kind: 'ReferencedType',
+      name: 'TestType',
+    };
+
+    const intermediateDict: IntermediateDictionary = {
+      objects: {
+        TestType: {
+          node: {
+            kind: 'ObjectTypeDefinition',
+            name: {
+              kind: 'Name',
+              value: 'TestType',
+            },
+          },
+        },
+      },
+      inputs: {},
+      enums: {},
+    };
+
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: 'TestType',
+          },
+        },
+        ObjectTypeKind.Object,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'TestType',
+      type: fieldTypeReturn,
+      thunkType: ThunkType.None,
+      array: false,
+      required: false,
     });
   });
 });

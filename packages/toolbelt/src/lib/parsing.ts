@@ -347,6 +347,20 @@ export function thunkTypeFromDirectives(field: FieldDefinitionNode) {
 }
 
 /**
+ * Error class thrown when a type definitions is required and is not found on the
+ * intermediate dictionary.
+ */
+export class UnknownTypeError extends Error {
+  constructor(name: string) {
+    super(
+      `Cannot find reference for type ${name}. Did you spell it correctly? ` +
+        `If this type is defined in another schema file, please import it on ` +
+        `top using an #import statement.`,
+    );
+  }
+}
+
+/**
  * Receives a NamedType (GraphQL) structure and maps it to a KnownTypeDescriptor
  * or a ReferencedTypeDescriptor depending on whether the is a known type or
  * is available on a definition.
@@ -388,9 +402,7 @@ export function parseFieldType(
           !intermediateDict.enums.hasOwnProperty(name));
 
       if (typeNotFound) {
-        throw new Error(
-          `Cannot find reference for type ${name}. Did you spell it correctly? If this type is defined in another schema file, please import it on top.`,
-        );
+        throw new UnknownTypeError(name);
       }
 
       return { kind: 'ReferencedType', name: type.name.value };
@@ -454,7 +466,7 @@ export function parseFieldDefinitionNode(
 
     return {
       name: definition.name.value,
-      type: parseFieldType(kind, definition, intermediateDict),
+      type: module.exports.parseFieldType(kind, definition, intermediateDict),
       thunkType: ThunkType.None,
       array: false,
       required: false,
