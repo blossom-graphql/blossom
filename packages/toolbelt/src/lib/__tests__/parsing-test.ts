@@ -585,28 +585,38 @@ describe('parseFieldType', () => {
 });
 
 describe('parseFieldDefinitionNode', () => {
-  it('must return correct values when definiton has a NamedType kind', () => {
-    const fieldTypeReturn = {
-      kind: 'ReferencedType',
-      name: 'TestType',
-    };
-
-    const intermediateDict: IntermediateDictionary = {
-      objects: {
-        TestType: {
-          node: {
-            kind: 'ObjectTypeDefinition',
-            name: {
-              kind: 'Name',
-              value: 'TestType',
-            },
+  const intermediateDict: IntermediateDictionary = {
+    objects: {
+      TestType: {
+        node: {
+          kind: 'ObjectTypeDefinition',
+          name: {
+            kind: 'Name',
+            value: 'TestType',
           },
         },
       },
-      inputs: {},
-      enums: {},
-    };
+    },
+    inputs: {
+      TestInput: {
+        node: {
+          kind: 'InputObjectTypeDefinition',
+          name: {
+            kind: 'Name',
+            value: 'TestInput',
+          },
+        },
+      },
+    },
+    enums: {},
+  };
 
+  const fieldTypeReturn = {
+    kind: 'ReferencedType',
+    name: 'TestType',
+  };
+
+  it('must return correct values when definiton has a NamedType kind', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -625,6 +635,346 @@ describe('parseFieldDefinitionNode', () => {
       thunkType: ThunkType.None,
       array: false,
       required: false,
+    });
+  });
+
+  it('must return correct values when definiton has a NonNullType kind', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'NonNullType',
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestType',
+            },
+          },
+        },
+        ObjectTypeKind.Object,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'TestType',
+      type: fieldTypeReturn,
+      thunkType: ThunkType.None,
+      array: false,
+      required: true,
+    });
+  });
+
+  it('must return correct values when definiton has a ListType kind', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'ListType',
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestType',
+            },
+          },
+        },
+        ObjectTypeKind.Object,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: '',
+      thunkType: ThunkType.None,
+      array: true,
+      required: false,
+      elementDescriptor: {
+        name: 'TestType',
+        type: fieldTypeReturn,
+        thunkType: ThunkType.None,
+        array: false,
+        required: false,
+      },
+    });
+  });
+
+  // FieldDefinition - no arguments - directive
+  // => arguments list MUST be empty
+  // => ThunkType must be Function
+  it('must return correct value for FieldDefinition / No Arguments / Implementation Directive', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'FieldDefinition',
+          description: {
+            kind: 'StringValue',
+            value: 'Test description',
+          },
+          name: {
+            kind: 'Name',
+            value: 'testField',
+          },
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestType',
+            },
+          },
+          directives: [
+            {
+              kind: 'Directive',
+              name: {
+                kind: 'Name',
+                value: BLOSSOM_IMPLEMENTATION_DIRECTIVE,
+              },
+              arguments: [
+                {
+                  kind: 'Argument',
+                  name: {
+                    kind: 'Name',
+                    value: BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
+                  },
+                  value: {
+                    kind: 'StringValue',
+                    value: ThunkImplementationType.Function,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        ObjectTypeKind.Object,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'testField',
+      comments: 'Test description',
+      elementDescriptor: undefined,
+      array: false,
+      required: false,
+      arguments: [],
+      thunkType: ThunkType.Function,
+      type: {
+        kind: 'ReferencedType',
+        name: 'TestType',
+      },
+    });
+  });
+
+  // FieldDefinition - no arguments - no directives
+  // => arguments list MUST be empty
+  // => ThunkType must be None
+  it('must return correct value for FieldDefinition / No Arguments / No Directives', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'FieldDefinition',
+          description: {
+            kind: 'StringValue',
+            value: 'Test description',
+          },
+          name: {
+            kind: 'Name',
+            value: 'testField',
+          },
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestType',
+            },
+          },
+        },
+        ObjectTypeKind.Object,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'testField',
+      comments: 'Test description',
+      elementDescriptor: undefined,
+      array: false,
+      required: false,
+      arguments: [],
+      thunkType: ThunkType.None,
+      type: {
+        kind: 'ReferencedType',
+        name: 'TestType',
+      },
+    });
+  });
+
+  // FieldDefinition - arguments - no directives
+  // => arguments list MUST NOT be empty
+  // => ThunkType must be Function (because of arguments)
+  it('must return correct value for FieldDefinition / Arguments / No Directives', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'FieldDefinition',
+          description: {
+            kind: 'StringValue',
+            value: 'Test description',
+          },
+          name: {
+            kind: 'Name',
+            value: 'testField',
+          },
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestType',
+            },
+          },
+          arguments: [
+            {
+              kind: 'InputValueDefinition',
+              name: {
+                kind: 'Name',
+                value: 'testArg',
+              },
+              type: {
+                kind: 'NamedType',
+                name: {
+                  kind: 'Name',
+                  value: 'TestInput',
+                },
+              },
+            },
+          ],
+        },
+        ObjectTypeKind.Object,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'testField',
+      comments: 'Test description',
+      elementDescriptor: undefined,
+      array: false,
+      required: false,
+      arguments: [
+        {
+          name: 'testArg',
+          elementDescriptor: undefined,
+          comments: undefined,
+          arguments: [],
+          array: false,
+          required: false,
+          thunkType: ThunkType.None,
+          type: {
+            kind: 'ReferencedType',
+            name: 'TestInput',
+          },
+        },
+      ],
+      thunkType: ThunkType.Function,
+      type: {
+        kind: 'ReferencedType',
+        name: 'TestType',
+      },
+    });
+  });
+
+  // InputValueDefinition - no arguments - directive
+  // => arguments list MUST NOT be empty
+  // => ThunkType must be None (we don't care about directives here)
+  it('must return correct value for InputTypeDefinition / No Arguments / Implementation Directive', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'InputValueDefinition',
+          description: {
+            kind: 'StringValue',
+            value: 'Test description',
+          },
+          name: {
+            kind: 'Name',
+            value: 'testField',
+          },
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestInput',
+            },
+          },
+          directives: [
+            {
+              kind: 'Directive',
+              name: {
+                kind: 'Name',
+                value: BLOSSOM_IMPLEMENTATION_DIRECTIVE,
+              },
+              arguments: [
+                {
+                  kind: 'Argument',
+                  name: {
+                    kind: 'Name',
+                    value: BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
+                  },
+                  value: {
+                    kind: 'StringValue',
+                    value: ThunkImplementationType.Function,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        ObjectTypeKind.Input,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'testField',
+      comments: 'Test description',
+      elementDescriptor: undefined,
+      array: false,
+      required: false,
+      arguments: [],
+      thunkType: ThunkType.None,
+      type: {
+        kind: 'ReferencedType',
+        name: 'TestInput',
+      },
+    });
+  });
+
+  // InputValueDefinition - no arguments - no directives
+  // => arguments list MUST be empty
+  // => ThunkType must be None
+  it('must return correct value for InputValueDefinition / No Arguments / No Directives', () => {
+    expect(
+      parseFieldDefinitionNode(
+        {
+          kind: 'InputValueDefinition',
+          description: {
+            kind: 'StringValue',
+            value: 'Test description',
+          },
+          name: {
+            kind: 'Name',
+            value: 'testField',
+          },
+          type: {
+            kind: 'NamedType',
+            name: {
+              kind: 'Name',
+              value: 'TestInput',
+            },
+          },
+        },
+        ObjectTypeKind.Input,
+        intermediateDict,
+      ),
+    ).toEqual({
+      name: 'testField',
+      comments: 'Test description',
+      elementDescriptor: undefined,
+      array: false,
+      required: false,
+      arguments: [],
+      thunkType: ThunkType.None,
+      type: {
+        kind: 'ReferencedType',
+        name: 'TestInput',
+      },
     });
   });
 });

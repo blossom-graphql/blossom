@@ -466,7 +466,7 @@ export function parseFieldDefinitionNode(
 
     return {
       name: definition.name.value,
-      type: module.exports.parseFieldType(kind, definition, intermediateDict),
+      type: parseFieldType(kind, definition, intermediateDict),
       thunkType: ThunkType.None,
       array: false,
       required: false,
@@ -475,8 +475,9 @@ export function parseFieldDefinitionNode(
     // One of the base types incoming. We set the common elements and recurse
     // by calling this same function with definition.type.
 
-    // Parse arguments
-    let args: FieldDescriptor[] | undefined;
+    // Parse arguments. We only consider them when the definition is a
+    // FieldDefinition. We initialize this as
+    let args: FieldDescriptor[];
 
     if (
       definition.kind === 'FieldDefinition' &&
@@ -490,6 +491,8 @@ export function parseFieldDefinitionNode(
           intermediateDict,
         ),
       );
+    } else {
+      args = [];
     }
 
     // These are the starting point and the defaults if nothing else is set.
