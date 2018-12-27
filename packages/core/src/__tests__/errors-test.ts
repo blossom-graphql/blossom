@@ -33,7 +33,7 @@ const DICT = new Map<Function, ErrorHandlingFunction>([
   [Error1, error1Handler],
 ]);
 
-describe('formatError', () => {
+describe(formatError, () => {
   it('should return correct results when handler is not available', () => {
     expect(formatError(new UnhandledError(), DICT)).toEqual({
       render: true,
@@ -55,7 +55,7 @@ describe('formatError', () => {
   });
 });
 
-describe('formatGraphQLErrors', () => {
+describe(formatGraphQLErrors, () => {
   const errorFormatterMock = jest.fn<typeof formatError>();
 
   beforeEach(() => errorFormatterMock.mockClear());

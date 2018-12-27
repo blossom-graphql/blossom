@@ -18,9 +18,10 @@ import {
   ThunkType,
   ThunkImplementationType,
   UnknownTypeError,
+  parseDocumentObjectType,
 } from '../parsing';
 
-describe('thunkTypeFromDirectives', () => {
+describe(thunkTypeFromDirectives, () => {
   const baseField = {
     kind: 'FieldDefinition' as 'FieldDefinition',
     name: {
@@ -260,7 +261,7 @@ describe('thunkTypeFromDirectives', () => {
   });
 });
 
-describe('parseFieldType', () => {
+describe(parseFieldType, () => {
   const emptyIntermediateDict: IntermediateDictionary = {
     objects: {},
     inputs: {},
@@ -584,7 +585,7 @@ describe('parseFieldType', () => {
   });
 });
 
-describe('parseFieldDefinitionNode', () => {
+describe(parseFieldDefinitionNode, () => {
   const intermediateDict: IntermediateDictionary = {
     objects: {
       TestType: {
@@ -975,6 +976,40 @@ describe('parseFieldDefinitionNode', () => {
         kind: 'ReferencedType',
         name: 'TestInput',
       },
+    });
+  });
+});
+
+describe(parseDocumentObjectType, () => {
+  const EMPTY_INTERMEDIATE_DICT: IntermediateDictionary = {
+    objects: {},
+    inputs: {},
+    enums: {},
+  };
+
+  const OBJECT_NAME = 'TestObject';
+  const DESCRIPTION = 'Test description';
+
+  it('must return correct values for an ObjectTypeDefinition with no fields', () => {
+    expect(
+      parseDocumentObjectType(
+        {
+          kind: 'ObjectTypeDefinition',
+          description: {
+            kind: 'StringValue',
+            value: DESCRIPTION,
+          },
+          name: {
+            kind: 'Name',
+            value: OBJECT_NAME,
+          },
+        },
+        EMPTY_INTERMEDIATE_DICT,
+      ),
+    ).toEqual({
+      name: OBJECT_NAME,
+      comments: DESCRIPTION,
+      fields: [],
     });
   });
 });

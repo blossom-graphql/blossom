@@ -11,7 +11,7 @@
     as of now is currently no possible to do such thing.
 
     More information: https://github.com/facebook/jest/issues/936. Solutions
-    discussed in this issue is unsufficient to provide maintainable code.
+    discussed in this issue are unsufficient to provide maintainable code.
 
   - If a module is calling another module, then mocking **must** be performed.
     There's no limitation for this case.

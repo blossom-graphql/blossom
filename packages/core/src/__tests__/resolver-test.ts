@@ -25,7 +25,7 @@ const testResolver = jest.fn(({ message }: TestResolverInput) => {
 
 const TYPENAME = 'Test';
 
-describe('createResolver', () => {
+describe(createResolver, () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('must have called the resolver with correct arguments', () => {
@@ -68,7 +68,7 @@ describe('createResolver', () => {
   });
 });
 
-describe('createConnectionResolver', () => {
+describe(createConnectionResolver, () => {
   beforeEach(() => jest.clearAllMocks());
 
   // We are testing reference equality. If in the future more than node must be
@@ -264,7 +264,7 @@ describe('createConnectionResolver', () => {
   );
 });
 
-describe('resolve', () => {
+describe(resolve, () => {
   beforeEach(() => jest.clearAllMocks());
 
   // Need to create the mock resolver here, inside the closure, in order to

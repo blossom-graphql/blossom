@@ -32,7 +32,7 @@ const reusableLoaderInstanceResult = {
   getLoader: () => null,
 };
 
-describe('blossom', () => {
+describe(blossom, () => {
   beforeEach(() => {
     jest.clearAllMocks();
 

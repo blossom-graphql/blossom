@@ -544,52 +544,52 @@ export function parseDocumentObjectType(
   type: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
   intermediateDict: IntermediateDictionary,
 ): ObjectTypeDescription | null {
-  let fields: FieldDescriptor[] | undefined;
-
-  if (type.kind === 'ObjectTypeDefinition') {
-    const name = type.name.value;
-
-    // We don't parse types that are part of the query or mutation types.
-    // These are meant to be handled separately on root values.
-    if (
-      name === intermediateDict.queryType ||
-      name === intermediateDict.mutationType
-    ) {
-      return null;
+  /**
+   * Receives a FieldDefinitionNode or a InputValueDefinitionNode an maps it
+   * to a FieldDescriptor, the intermediate Blossom structure used for analysis
+   * and code generation.
+   *
+   * This method lives inside the closure in order to gain access to `type`
+   * and `intermediateDict` elements from the parent function.
+   *
+   * @param field GraphQL descriptor for the field, which can be either an
+   * object field or an input field.
+   */
+  function parserIteratee(
+    field: FieldDefinitionNode | InputValueDefinitionNode,
+  ): FieldDescriptor {
+    if (type.kind === 'ObjectTypeDefinition') {
+      return parseFieldDefinitionNode(
+        field,
+        ObjectTypeKind.Object,
+        intermediateDict,
+      );
+    } else {
+      return parseFieldDefinitionNode(
+        field,
+        ObjectTypeKind.Input,
+        intermediateDict,
+      );
     }
-
-    const parsedFields =
-      type.fields &&
-      (type.fields
-        .map(field =>
-          parseFieldDefinitionNode(
-            field,
-            ObjectTypeKind.Object,
-            intermediateDict,
-          ),
-        )
-        .filter(field => field !== undefined) as FieldDescriptor[]);
-
-    fields = parsedFields;
-  } else {
-    const parsedFields =
-      type.fields &&
-      (type.fields
-        .map(field =>
-          parseFieldDefinitionNode(
-            field,
-            ObjectTypeKind.Input,
-            intermediateDict,
-          ),
-        )
-        .filter(field => field !== undefined) as FieldDescriptor[]);
-
-    fields = parsedFields;
   }
 
+  // We always start with an empty array of FieldDescriptor elements and we
+  // populate the array based on whether the result of parserIteratee is
+  // empty or not.
+  let fields: FieldDescriptor[] = [];
+
+  if (type.fields) {
+    for (const field of type.fields) {
+      const fieldDescriptor = parserIteratee(field);
+
+      fieldDescriptor !== undefined && fields.push(fieldDescriptor);
+    }
+  }
+
+  // Mount the parsed object.
   return {
     name: type.name.value,
     comments: type.description && type.description.value,
-    fields: fields || ([] as FieldDescriptor[]),
+    fields,
   };
 }

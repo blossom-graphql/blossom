@@ -17,7 +17,7 @@ function newInstance() {
 
 const batchFn = async (ids: number[]) => ids;
 
-describe('LoaderInstance', () => {
+describe(LoaderInstance, () => {
   describe('get', () => {
     it('should create new Dataloader when key is not set', () => {
       const instance = newInstance();
@@ -38,7 +38,7 @@ describe('LoaderInstance', () => {
   });
 });
 
-describe('createLoaderInstance', () => {
+describe(createLoaderInstance, () => {
   it('should return unique instances every time the function is invoked', () => {
     const { instance: instance1 } = createLoaderInstance();
     const { instance: instance2 } = createLoaderInstance();

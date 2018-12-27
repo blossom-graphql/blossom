@@ -12,7 +12,7 @@ import {
   renderSchema,
 } from '../schema';
 
-describe('renderRPCDescriptionToSchema', () => {
+describe(renderRPCDescriptionToSchema, () => {
   it('should return correct string when function has no description', () => {
     expect(
       renderRPCDescriptionToSchema({
@@ -107,7 +107,7 @@ describe('renderRPCDescriptionToSchema', () => {
   });
 });
 
-describe('renderEnumToSchema', () => {
+describe(renderEnumToSchema, () => {
   it('should return correct string when enum has no description', () => {
     expect(
       renderEnumToSchema({
@@ -184,7 +184,7 @@ enum TestEnum {
   });
 });
 
-describe('renderSchema', () => {
+describe(renderSchema, () => {
   const TEST_TYPE = 'type Test { foo: String }';
   const TEST_ENUM = 'enum TestEnum { foo, bar }';
   const TEST_QUERY_RPC = '  testQuery: Test';

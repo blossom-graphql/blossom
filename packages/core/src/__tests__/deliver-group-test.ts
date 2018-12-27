@@ -10,7 +10,7 @@ import { deliverGroup } from '../helpers';
 
 const pluckById = ({ id }: { id: number }) => id;
 
-describe('deliverGroup', () => {
+describe(deliverGroup, () => {
   it('should return correct values on empty results array', () => {
     const KEYS = [1, 2, 3];
     const RESULTS: { id: number }[] = [];

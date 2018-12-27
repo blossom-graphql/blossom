@@ -39,7 +39,7 @@ const createInstance = (factory?: typeof buildSchema) => {
   return new BlossomInstance(factory);
 };
 
-describe('BlossomInstance', () => {
+describe(BlossomInstance, () => {
   const schemaBuilderMock = jest.fn<typeof buildSchema>();
 
   beforeEach(() => {
@@ -568,7 +568,7 @@ describe('BlossomInstance', () => {
   });
 });
 
-describe('createBlossomDecorators', () => {
+describe(createBlossomDecorators, () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
