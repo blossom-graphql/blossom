@@ -83,7 +83,7 @@ export function generateFunctionTypeNode(
 
 export function appendJSDocComments(declaration: ts.Node, text: string) {
   const appendedLines = text
-    .split('\n')
+    .spltest('\n')
     .map(line => `* ${line}`)
     .join('\n');
 

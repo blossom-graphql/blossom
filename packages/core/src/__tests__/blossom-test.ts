@@ -41,7 +41,7 @@ describe(blossom, () => {
     );
   });
 
-  it('should have called createLoaderInstance in order to create a new loader context', async () => {
+  test('should have called createLoaderInstance in order to create a new loader context', async () => {
     expect.assertions(1);
 
     MOCKS.graphql.mockReturnValue({
@@ -59,7 +59,7 @@ describe(blossom, () => {
     expect(MOCKS.createLoaderInstance).toHaveBeenCalled();
   });
 
-  it('should have called graphql function and return its correct value', async () => {
+  test('should have called graphql function and return its correct value', async () => {
     expect.assertions(2);
 
     const blossomRequest = {
@@ -94,7 +94,7 @@ describe(blossom, () => {
     expect(result).toEqual(resolvedResult);
   });
 
-  it('must not call error formatting function when errors are not defined', async () => {
+  test('must not call error formatting function when errors are not defined', async () => {
     expect.assertions(1);
 
     MOCKS.graphql.mockReturnValue({
@@ -112,7 +112,7 @@ describe(blossom, () => {
     expect(MOCKS.formatGraphQLErrors).not.toHaveBeenCalled();
   });
 
-  it('must not call error formatting function when errors length is zero', async () => {
+  test('must not call error formatting function when errors length is zero', async () => {
     expect.assertions(1);
 
     MOCKS.graphql.mockReturnValue({
@@ -131,7 +131,7 @@ describe(blossom, () => {
     expect(MOCKS.formatGraphQLErrors).not.toHaveBeenCalled();
   });
 
-  it('must call formatGraphQLErrors with correct arguments and properly wire output', async () => {
+  test('must call formatGraphQLErrors with correct arguments and properly wire output', async () => {
     expect.assertions(2);
 
     const errorsResponse = [

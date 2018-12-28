@@ -11,7 +11,7 @@ import { deliver } from '../helpers';
 const pluckById = ({ id }: { id: number }) => id;
 
 describe(deliver, () => {
-  it('should return correct values on empty array', () => {
+  test('should return correct values on empty array', () => {
     const KEYS = [1, 2, 3];
     const RESULTS: { id: number }[] = [];
 
@@ -20,7 +20,7 @@ describe(deliver, () => {
     expect(deliver(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });
 
-  it('should return correct values on all-matching arrays', () => {
+  test('should return correct values on all-matching arrays', () => {
     const KEYS = [1, 2, 3];
     const RESULTS = [{ id: 2 }, { id: 3 }, { id: 1 }];
 
@@ -29,7 +29,7 @@ describe(deliver, () => {
     expect(deliver(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });
 
-  it('should return correct values when key is duplicated', () => {
+  test('should return correct values when key is duplicated', () => {
     const KEYS = [1, 2, 3, 2];
     const RESULTS = [{ id: 2 }, { id: 3 }, { id: 1 }];
 
@@ -38,7 +38,7 @@ describe(deliver, () => {
     expect(deliver(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });
 
-  it('should pick the latest result when the plucking scalar is duplicated', () => {
+  test('should pick the latest result when the plucking scalar is duplicated', () => {
     const KEYS = [1, 2, 3];
     const RESULTS = [
       { id: 2, key: 'foo' },

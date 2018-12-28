@@ -1,5 +1,5 @@
 type NestedTest {
-  key: [String]
+  key: [String!]
 }
 
 """
@@ -10,11 +10,20 @@ type Post {
   Unique identifier.
   """
   id: ID!
-  title: String! @blossomImpl(type: function)
-  content: String @blossomImpl(type: async)
-  testFunction(number: Int): Int @blossomImpl(type: function)
-  testArray: [String!]! @blossomImpl(type: async)
-  nestedTest: NestedTest! @blossomImpl(type: async)
+  title: String!
+  """
+  If I put a comment here, it's gonna appear.
+  """
+  content: String
+  testFunction(
+    """
+    Comments for this type.
+    """
+    testNumber: Int!
+    testArray: [String!]!  
+  ): Int
+  testArray: [String!]!
+  nestedTest: [NestedTest!]!
 }
 
 input PostPayload {

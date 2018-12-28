@@ -87,12 +87,12 @@ async function run() {
 
 try {
   run()
-    .then(() => process.exit(0))
+    .then(() => process.extest(0))
     .catch(error => {
       console.error(error);
-      process.exit(1);
+      process.extest(1);
     });
 } catch (error) {
   console.error(error);
-  process.exit(1);
+  process.extest(1);
 }

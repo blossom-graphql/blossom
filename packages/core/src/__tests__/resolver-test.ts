@@ -28,7 +28,7 @@ const TYPENAME = 'Test';
 describe(createResolver, () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('must have called the resolver with correct arguments', () => {
+  test('must have called the resolver with correct arguments', () => {
     const resolverInput = { message: 'foo' };
     const builtResolver = createResolver(TYPENAME, testResolver);
     const testContext = { foo: 'bar' };
@@ -37,7 +37,7 @@ describe(createResolver, () => {
     expect(testResolver).toHaveBeenCalledWith(resolverInput, testContext);
   });
 
-  it('must include defined typename on output', () => {
+  test('must include defined typename on output', () => {
     const builtResolver = createResolver(TYPENAME, testResolver);
     const resolvedValue = builtResolver({ message: 'foo' });
 
@@ -49,7 +49,7 @@ describe(createResolver, () => {
     expect(resolvedValue.__typename).toBe(TYPENAME);
   });
 
-  it('must include properties that the original function returns', () => {
+  test('must include properties that the original function returns', () => {
     const resolverInput = { message: 'foo' };
 
     const preResolverOutput = testResolver(resolverInput);
@@ -99,7 +99,7 @@ describe(createConnectionResolver, () => {
     },
   };
 
-  it('must include correct typename after calling resolver', () => {
+  test('must include correct typename after calling resolver', () => {
     const builtConnectionResolver = createConnectionResolver(
       TYPENAME,
       testResolver,
@@ -111,7 +111,7 @@ describe(createConnectionResolver, () => {
     expect(resolvedConnection.__typename).toBe(`${TYPENAME}Connection`);
   });
 
-  it('must directly wire pageInfo from the attributes property', () => {
+  test('must directly wire pageInfo from the attributes property', () => {
     const builtConnectionResolver = createConnectionResolver(
       TYPENAME,
       testResolver,
@@ -123,7 +123,7 @@ describe(createConnectionResolver, () => {
     expect(resolvedConnection.pageInfo).toBe(connectionAttributes.pageInfo);
   });
 
-  it(
+  test(
     'must not call edges() on the attributes object if the result ' +
       'edges() property has not been called',
     () => {
@@ -140,7 +140,7 @@ describe(createConnectionResolver, () => {
     },
   );
 
-  it(
+  test(
     'must call edges() on the attributes object with the ' +
       'correct arguments when the result edges() property is called called',
     async () => {
@@ -167,7 +167,7 @@ describe(createConnectionResolver, () => {
     },
   );
 
-  it(
+  test(
     'must not call resolver function if edges().node() function ' +
       'has not been invoked',
     async () => {
@@ -186,7 +186,7 @@ describe(createConnectionResolver, () => {
     },
   );
 
-  it(
+  test(
     'must call resolver function with correct arguments ' +
       'if edges().node() function is invoked',
     async () => {
@@ -224,7 +224,7 @@ describe(createConnectionResolver, () => {
     },
   );
 
-  it(
+  test(
     'must properly wire edges().cursor() from the ' + 'connections function',
     async () => {
       const builtConnectionResolver = createConnectionResolver(
@@ -284,7 +284,7 @@ describe(resolve, () => {
   });
   const resolverContext = { foo: 'bar' };
 
-  it('must return null if attributes are not passed', () => {
+  test('must return null if attributes are not passed', () => {
     expect(
       resolve<TestResolverInput, TestResolverOutput>({
         attributes: null,
@@ -294,7 +294,7 @@ describe(resolve, () => {
     ).toBeNull();
   });
 
-  it(
+  test(
     'must call resolver as many times as elements are ' +
       'passed on an array as attributes',
     () => {
@@ -312,7 +312,7 @@ describe(resolve, () => {
     },
   );
 
-  it('must return resolved values in the correct order', () => {
+  test('must return resolved values in the correct order', () => {
     // Might look like an integration test, but it is not. testResolver is
     // mocked on this describe() block.
 
@@ -329,7 +329,7 @@ describe(resolve, () => {
     });
   });
 
-  it(
+  test(
     'must call resolver once, with correct arguments, when ' +
       'a single element is passed',
     () => {
@@ -349,7 +349,7 @@ describe(resolve, () => {
     },
   );
 
-  it('must return correct resolved value', () => {
+  test('must return correct resolved value', () => {
     // Might look like an integration test, but it is not. testResolver is
     // mocked on this describe() block.
 

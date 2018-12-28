@@ -34,14 +34,14 @@ const DICT = new Map<Function, ErrorHandlingFunction>([
 ]);
 
 describe(formatError, () => {
-  it('should return correct results when handler is not available', () => {
+  test('should return correct results when handler is not available', () => {
     expect(formatError(new UnhandledError(), DICT)).toEqual({
       render: true,
       extensions: undefined,
     });
   });
 
-  it('should return correct results when handler is available', () => {
+  test('should return correct results when handler is available', () => {
     const result = formatError(new Error1(), DICT);
 
     expect(result).toEqual({
@@ -60,11 +60,11 @@ describe(formatGraphQLErrors, () => {
 
   beforeEach(() => errorFormatterMock.mockClear());
 
-  it('should return empty array when empty array is provided', () => {
+  test('should return empty array when empty array is provided', () => {
     expect(formatGraphQLErrors([] as GraphQLError[], DICT)).toEqual([]);
   });
 
-  it('should return same error when GraphQLError has no original error', () => {
+  test('should return same error when GraphQLError has no original error', () => {
     const error = new GraphQLError('Test');
 
     const results = formatGraphQLErrors([error], DICT);
@@ -73,7 +73,7 @@ describe(formatGraphQLErrors, () => {
     expect(results[0]).toBe(error);
   });
 
-  it('should exclude errors that have render set to false', () => {
+  test('should exclude errors that have render set to false', () => {
     const error = new GraphQLError(
       'Test',
       undefined,
@@ -94,7 +94,7 @@ describe(formatGraphQLErrors, () => {
     expect(results.length).toBe(0);
   });
 
-  it('should include extensions with render options as true, with correct extensions', () => {
+  test('should include extensions with render options as true, with correct extensions', () => {
     const error = new GraphQLError(
       'Test',
       undefined,
@@ -116,7 +116,7 @@ describe(formatGraphQLErrors, () => {
     expect(results[0].extensions).toEqual({ errorName: 'Error', foo: 'bar' });
   });
 
-  it('should return correct values', () => {
+  test('should return correct values', () => {
     const error = new GraphQLError(
       'Test',
       undefined,

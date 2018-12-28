@@ -11,7 +11,7 @@ import { deliverGroup } from '../helpers';
 const pluckById = ({ id }: { id: number }) => id;
 
 describe(deliverGroup, () => {
-  it('should return correct values on empty results array', () => {
+  test('should return correct values on empty results array', () => {
     const KEYS = [1, 2, 3];
     const RESULTS: { id: number }[] = [];
 
@@ -20,7 +20,7 @@ describe(deliverGroup, () => {
     expect(deliverGroup(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });
 
-  it("should return correct values when there's only one matching result per key", () => {
+  test("should return correct values when there's only one matching result per key", () => {
     const KEYS = [1, 2, 3];
     const RESULTS = [{ id: 2 }, { id: 3 }, { id: 1 }];
 
@@ -29,7 +29,7 @@ describe(deliverGroup, () => {
     expect(deliverGroup(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });
 
-  it('should return correct values when there are multiple results per key', () => {
+  test('should return correct values when there are multiple results per key', () => {
     const KEYS = [1, 2, 3];
     const RESULTS = [
       { id: 2, key: 'foo' },
@@ -47,7 +47,7 @@ describe(deliverGroup, () => {
     expect(deliverGroup(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });
 
-  it('should return correct values when there are duplicated keys', () => {
+  test('should return correct values when there are duplicated keys', () => {
     const KEYS = [1, 2, 3, 2];
     const RESULTS = [{ id: 2 }, { id: 3 }, { id: 1 }];
 

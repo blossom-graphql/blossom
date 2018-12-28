@@ -48,7 +48,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('registerSchema', () => {
-    it('should add a new schema to the schema list', () => {
+    test('should add a new schema to the schema list', () => {
       const TEST_SCHEMA_1 = 'type Test1 {}';
       const TEST_SCHEMA_2 = 'type Test2 {}';
 
@@ -65,7 +65,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('registerEnum', () => {
-    it('should add a new enum to the schema list', () => {
+    test('should add a new enum to the schema list', () => {
       const TEST_ENUM_1 = {
         name: 'TestEnum1',
         values: [{ name: 'foo' }, { name: 'bar' }],
@@ -87,7 +87,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('registerRootQuery', () => {
-    it('should properly register the rpc description on the list of root queries', () => {
+    test('should properly register the rpc description on the list of root queries', () => {
       const RPC_DESCRIPTION_1 = {
         name: 'testRootQuery1',
         type: 'TestType',
@@ -109,7 +109,7 @@ describe(BlossomInstance, () => {
       expect(instance.rootQueries).toContain(RPC_DESCRIPTION_2);
     });
 
-    it('should throw error when query with the same name is already registered', () => {
+    test('should throw error when query with the same name is already registered', () => {
       const RPC_DESCRIPTION = {
         name: 'testRootQuery',
         type: 'TestType',
@@ -128,7 +128,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('registerRootMutation', () => {
-    it('should properly register the rpc description on the list of root queries', () => {
+    test('should properly register the rpc description on the list of root queries', () => {
       const RPC_DESCRIPTION_1 = {
         name: 'testRootMutation1',
         type: 'TestType',
@@ -150,7 +150,7 @@ describe(BlossomInstance, () => {
       expect(instance.rootMutations).toContain(RPC_DESCRIPTION_2);
     });
 
-    it('should throw error when mutation with the same name is already registered', () => {
+    test('should throw error when mutation with the same name is already registered', () => {
       const RPC_DESCRIPTION = {
         name: 'testRootMutation',
         type: 'TestType',
@@ -199,7 +199,7 @@ describe(BlossomInstance, () => {
       callback: () => null,
     };
 
-    it('should call renderEnumToSchema method when provided with enums', () => {
+    test('should call renderEnumToSchema method when provided with enums', () => {
       MOCKS.renderEnumToSchema.mockReturnValue('enum TestEnum { foo, bar }');
 
       const instance = createInstance(schemaBuilderMock);
@@ -209,7 +209,7 @@ describe(BlossomInstance, () => {
       expect(MOCKS.renderEnumToSchema).toBeCalledWith(TEST_ENUM);
     });
 
-    it('should call renderRPCDescriptionToSchema as many times as root queries are registered', () => {
+    test('should call renderRPCDescriptionToSchema as many times as root queries are registered', () => {
       MOCKS.renderRPCDescriptionToSchema
         .mockReturnValueOnce('  testQuery1: Test')
         .mockReturnValueOnce('  testQuery2: Test');
@@ -227,7 +227,7 @@ describe(BlossomInstance, () => {
       );
     });
 
-    it('should call renderRPCDescriptionToSchema as many times as root mutations are registered', () => {
+    test('should call renderRPCDescriptionToSchema as many times as root mutations are registered', () => {
       MOCKS.renderRPCDescriptionToSchema
         .mockReturnValueOnce('  testMutation1: Test')
         .mockReturnValueOnce('  testMutation2: Test');
@@ -245,7 +245,7 @@ describe(BlossomInstance, () => {
       );
     });
 
-    it('should call renderSchema with correct arguments', () => {
+    test('should call renderSchema with correct arguments', () => {
       // Mock results of each of the calls
       const ENUM_STRING = 'enum TestEnum { foo, bar }';
       const QUERY_STRING_1 = '  testQuery1: Test';
@@ -285,7 +285,7 @@ describe(BlossomInstance, () => {
       );
     });
 
-    it('should return memoized result when called more than once', () => {
+    test('should return memoized result when called more than once', () => {
       const instance = createInstance(schemaBuilderMock);
 
       instance.registerRootQuery({
@@ -304,7 +304,7 @@ describe(BlossomInstance, () => {
       );
     });
 
-    it('should return non-memoized result when called with force param to true', () => {
+    test('should return non-memoized result when called with force param to true', () => {
       const instance = createInstance(schemaBuilderMock);
 
       instance.registerRootQuery({
@@ -325,13 +325,13 @@ describe(BlossomInstance, () => {
   });
 
   describe('getRootValue', () => {
-    it('should return empty object if no root queries / mutations are included', () => {
+    test('should return empty object if no root queries / mutations are included', () => {
       const instance = createInstance();
 
       expect(instance.getRootValue()).toEqual({});
     });
 
-    it('should have key correctly set when root query is added', () => {
+    test('should have key correctly set when root query is added', () => {
       const TEST_CALLBACK = () => null;
       const RPC_NAME = 'testQuery';
 
@@ -354,7 +354,7 @@ describe(BlossomInstance, () => {
       expect(rootValue[RPC_NAME]).toBe(TEST_CALLBACK);
     });
 
-    it('should have key correctly set when root query is added', () => {
+    test('should have key correctly set when root query is added', () => {
       const TEST_CALLBACK = () => null;
       const RPC_NAME = 'testMutation';
 
@@ -377,7 +377,7 @@ describe(BlossomInstance, () => {
       expect(rootValue[RPC_NAME]).toBe(TEST_CALLBACK);
     });
 
-    it('should memoize results when called more than once', () => {
+    test('should memoize results when called more than once', () => {
       const instance = createInstance();
 
       instance.registerRootQuery({
@@ -398,7 +398,7 @@ describe(BlossomInstance, () => {
       );
     });
 
-    it('should force a new object when force option is true', () => {
+    test('should force a new object when force option is true', () => {
       const instance = createInstance();
 
       instance.registerRootQuery({
@@ -434,7 +434,7 @@ describe(BlossomInstance, () => {
     const handler1 = (_: TestError) => ({ render: false });
     const handler2 = (_: TestError) => ({ render: true });
 
-    it(`must throw when a handler's been already registered for the error class`, () => {
+    test(`must throw when a handler's been already registered for the error class`, () => {
       const instance = createInstance();
 
       instance.registerErrorHandler(TestError, handler1);
@@ -444,7 +444,7 @@ describe(BlossomInstance, () => {
       ).toThrowError(BlossomEmptyHandlerError);
     });
 
-    it('should register handling function (and prioritize it) when available', () => {
+    test('should register handling function (and prioritize it) when available', () => {
       const instance = createInstance();
       instance.registerErrorHandler(TestErrorWithHandler, handler1);
 
@@ -456,7 +456,7 @@ describe(BlossomInstance, () => {
       expect(registeredHandler).not.toBe(TestErrorWithHandler.handler);
     });
 
-    it('should register static function when handling function is not provided', () => {
+    test('should register static function when handling function is not provided', () => {
       const instance = createInstance();
       instance.registerErrorHandler(TestErrorWithHandler);
 
@@ -467,7 +467,7 @@ describe(BlossomInstance, () => {
       expect(registeredHandler).toBe(TestErrorWithHandler.handler);
     });
 
-    it('should throw when neither handling function or static method is provided', () => {
+    test('should throw when neither handling function or static method is provided', () => {
       const instance = createInstance();
 
       expect(() => instance.registerErrorHandler(TestError)).toThrow(
@@ -477,14 +477,14 @@ describe(BlossomInstance, () => {
   });
 
   describe('hasRPC', () => {
-    it('must return false when neither a query or mutation with the name has been registered', () => {
+    test('must return false when neither a query or mutation with the name has been registered', () => {
       const TEST_NAME = 'testRPC';
       const instance = createInstance();
 
       expect(instance.hasRPC(TEST_NAME)).toBe(false);
     });
 
-    it('must return true when a query with the name is registered', () => {
+    test('must return true when a query with the name is registered', () => {
       const TEST_NAME = 'testQuery';
       const instance = createInstance();
 
@@ -498,7 +498,7 @@ describe(BlossomInstance, () => {
       expect(instance.hasRPC(TEST_NAME)).toBe(true);
     });
 
-    it('must return true when a mutation with the name is registered', () => {
+    test('must return true when a mutation with the name is registered', () => {
       const TEST_NAME = 'testMutation';
       const instance = createInstance();
 
@@ -514,7 +514,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('rootValue', () => {
-    it('must call getRootValue() with force argument as false', () => {
+    test('must call getRootValue() with force argument as false', () => {
       const instance = createInstance();
 
       // Mock and call
@@ -530,7 +530,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('rootSchemaString', () => {
-    it('must call getRootSchema() with force argument as false and return correct value', () => {
+    test('must call getRootSchema() with force argument as false and return correct value', () => {
       const instance = createInstance(schemaBuilderMock);
       const schemaString = 'type Test {}';
 
@@ -548,7 +548,7 @@ describe(BlossomInstance, () => {
   });
 
   describe('rootSchema', () => {
-    it('must call getRootSchema() with force argument as false and return correct value', () => {
+    test('must call getRootSchema() with force argument as false and return correct value', () => {
       const resultMock = new GraphQLSchema({ query: null });
 
       const instance = createInstance(schemaBuilderMock);
@@ -573,7 +573,7 @@ describe(createBlossomDecorators, () => {
     jest.clearAllMocks();
   });
 
-  it('must call registerRootQuery with correct arguments when BlossomRootQuery is invoked', () => {
+  test('must call registerRootQuery with correct arguments when BlossomRootQuery is invoked', () => {
     instanceMock.registerRootQuery.mockReturnValueOnce(undefined);
 
     const { BlossomRootQuery } = createBlossomDecorators(instanceMock);
@@ -594,7 +594,7 @@ describe(createBlossomDecorators, () => {
     });
   });
 
-  it('must call registerRootQuery with correct arguments when BlossomRootMutation is invoked', () => {
+  test('must call registerRootQuery with correct arguments when BlossomRootMutation is invoked', () => {
     instanceMock.registerRootMutation.mockReturnValueOnce(undefined);
 
     const { BlossomRootMutation } = createBlossomDecorators(instanceMock);
@@ -615,7 +615,7 @@ describe(createBlossomDecorators, () => {
     });
   });
 
-  it('must call registerErrorHandler with correct arguments when BlossomError is invoked with no handler', () => {
+  test('must call registerErrorHandler with correct arguments when BlossomError is invoked with no handler', () => {
     class TestError extends Error {}
     instanceMock.registerErrorHandler.mockReturnValueOnce(TestError);
 
@@ -630,7 +630,7 @@ describe(createBlossomDecorators, () => {
     );
   });
 
-  it('must call registerErrorHandler with correct arguments when BlossomError is invoked with handler', () => {
+  test('must call registerErrorHandler with correct arguments when BlossomError is invoked with handler', () => {
     class TestError extends Error {}
     instanceMock.registerErrorHandler.mockReturnValueOnce(TestError);
 

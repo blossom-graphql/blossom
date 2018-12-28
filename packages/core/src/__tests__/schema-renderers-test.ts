@@ -13,7 +13,7 @@ import {
 } from '../schema';
 
 describe(renderRPCDescriptionToSchema, () => {
-  it('should return correct string when function has no description', () => {
+  test('should return correct string when function has no description', () => {
     expect(
       renderRPCDescriptionToSchema({
         name: 'testFunction',
@@ -26,7 +26,7 @@ describe(renderRPCDescriptionToSchema, () => {
   testFunction: Test`);
   });
 
-  it('should return correct string when function has no arguments', () => {
+  test('should return correct string when function has no arguments', () => {
     expect(
       renderRPCDescriptionToSchema({
         name: 'testFunction',
@@ -40,7 +40,7 @@ describe(renderRPCDescriptionToSchema, () => {
   testFunction: Test`);
   });
 
-  it('should return correct string when function has empty arguments lists', () => {
+  test('should return correct string when function has empty arguments lists', () => {
     expect(
       renderRPCDescriptionToSchema({
         name: 'testFunction',
@@ -55,7 +55,7 @@ describe(renderRPCDescriptionToSchema, () => {
   testFunction: Test`);
   });
 
-  it('should return correct string when function has argument with no description', () => {
+  test('should return correct string when function has argument with no description', () => {
     expect(
       renderRPCDescriptionToSchema({
         name: 'testFunction',
@@ -75,7 +75,7 @@ describe(renderRPCDescriptionToSchema, () => {
   ): Test`);
   });
 
-  it('should return correct string when function has multiple arguments', () => {
+  test('should return correct string when function has multiple arguments', () => {
     expect(
       renderRPCDescriptionToSchema({
         name: 'testFunction',
@@ -108,7 +108,7 @@ describe(renderRPCDescriptionToSchema, () => {
 });
 
 describe(renderEnumToSchema, () => {
-  it('should return correct string when enum has no description', () => {
+  test('should return correct string when enum has no description', () => {
     expect(
       renderEnumToSchema({
         name: 'TestEnum',
@@ -125,7 +125,7 @@ enum TestEnum {
 }`);
   });
 
-  it('should return correct string when enum has no values (empty array)', () => {
+  test('should return correct string when enum has no values (empty array)', () => {
     expect(
       renderEnumToSchema({
         name: 'TestEnum',
@@ -140,7 +140,7 @@ enum TestEnum {
 }`);
   });
 
-  it('should return correct string when enum has value with no description', () => {
+  test('should return correct string when enum has value with no description', () => {
     expect(
       renderEnumToSchema({
         name: 'TestEnum',
@@ -158,7 +158,7 @@ enum TestEnum {
 }`);
   });
 
-  it('should return correct string when enum has multiple values', () => {
+  test('should return correct string when enum has multiple values', () => {
     expect(
       renderEnumToSchema({
         name: 'TestEnum',
@@ -190,29 +190,29 @@ describe(renderSchema, () => {
   const TEST_QUERY_RPC = '  testQuery: Test';
   const TEST_MUTATION_RPC = '  testMutation: Test';
 
-  it('should render an empty string when nothing is passed', () => {
+  test('should render an empty string when nothing is passed', () => {
     expect(renderSchema([], [], [], [])).toEqual('');
   });
 
-  it('should return no schema {} statement if no root queries or mutations are defined', () => {
+  test('should return no schema {} statement if no root queries or mutations are defined', () => {
     const renderedSchema = renderSchema([], [TEST_TYPE], [], []);
 
     expect(renderedSchema.indexOf('schema {')).toBe(-1);
   });
 
-  it('should return rendered enum values', () => {
+  test('should return rendered enum values', () => {
     const renderedSchema = renderSchema([TEST_ENUM], [], [], []);
 
     expect(renderedSchema.indexOf(TEST_ENUM)).toBeGreaterThan(-1);
   });
 
-  it('should return rendered type values', () => {
+  test('should return rendered type values', () => {
     const renderedSchema = renderSchema([], [TEST_TYPE], [], []);
 
     expect(renderedSchema.indexOf(TEST_TYPE)).toBeGreaterThan(-1);
   });
 
-  it('should correctly consider inclusion of query RPC strings', () => {
+  test('should correctly consider inclusion of query RPC strings', () => {
     // Basically, the type Query {} must be defined and the Query RPC String
     // must be inside of it.
     const SEARCH_REGEXP = new RegExp(
@@ -225,7 +225,7 @@ describe(renderSchema, () => {
     expect(SEARCH_REGEXP.test(renderedSchema)).toBe(true);
   });
 
-  it('should correctly consider inclusion of mutation RPC strings', () => {
+  test('should correctly consider inclusion of mutation RPC strings', () => {
     // Basically, the type Query {} must be defined and the Query RPC String
     // must be inside of it.
     const SEARCH_REGEXP = new RegExp(
@@ -238,7 +238,7 @@ describe(renderSchema, () => {
     expect(SEARCH_REGEXP.test(renderedSchema)).toBe(true);
   });
 
-  it('should only return `query: Query` in schema statement when only query strings are sent', () => {
+  test('should only return `query: Query` in schema statement when only query strings are sent', () => {
     const EXPECTED_SCHEMA_STATEMENT = `schema {
   query: Query
 }`;
@@ -250,7 +250,7 @@ describe(renderSchema, () => {
     );
   });
 
-  it('should only return `mutation: Mutation` in schema statement when only mutation strings are sent', () => {
+  test('should only return `mutation: Mutation` in schema statement when only mutation strings are sent', () => {
     const EXPECTED_SCHEMA_STATEMENT = `schema {
   mutation: Mutation
 }`;
@@ -262,7 +262,7 @@ describe(renderSchema, () => {
     );
   });
 
-  it('should include complete schema statement when both query and mutation strings are passed', () => {
+  test('should include complete schema statement when both query and mutation strings are passed', () => {
     const EXPECTED_SCHEMA_STATEMENT = `schema {
   query: Query
   mutation: Mutation
@@ -280,7 +280,7 @@ describe(renderSchema, () => {
     );
   });
 
-  it('should include every type of argument passed by in the global string, with correct spacing', () => {
+  test('should include every type of argument passed by in the global string, with correct spacing', () => {
     const renderedSchema = renderSchema(
       [TEST_ENUM],
       [TEST_TYPE],

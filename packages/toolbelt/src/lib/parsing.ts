@@ -18,6 +18,8 @@ import {
   NamedTypeNode,
 } from 'graphql';
 
+import { UnknownTypeError, UnsupportedOperationError } from './errors';
+
 export const BLOSSOM_IMPLEMENTATION_DIRECTIVE = 'blossomImpl';
 export const BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME = 'type';
 
@@ -64,15 +66,10 @@ export type IntermediateDictionary = {
    */
   schema?: SchemaDefinitionNode;
   /**
-   * The key inside objects that containes the ObjectDefinitionNode for the
-   * query operation in the schema declaration.
+   * A dictionary that maps the operation in the SchemaDefinitionNode to the
+   * described type.
    */
-  queryType?: string;
-  /**
-   * The key inside objects that containes the ObjectDefinitionNode for the
-   * query operation in the schema declaration.
-   */
-  mutationType?: string;
+  operationNames: { [key in 'query' | 'mutation']?: string };
 };
 
 /**
@@ -200,9 +197,6 @@ export enum ObjectTypeKind {
   Input = 'Input',
 }
 
-// Extra operators can be added in the future.
-const SUPPORTED_OPERATION_TYPES = ['query', 'mutation'];
-
 /**
  * Receives a GraphQL.js document node and returns a data structure containing
  * all the parsed types and root values.
@@ -210,15 +204,24 @@ const SUPPORTED_OPERATION_TYPES = ['query', 'mutation'];
  * @param document DocumentNode coming from the parsed GraphQL schema.
  *
  * @param originFile Name of the file that was the origin for this definition.
+ *
+ * @param initialIntermediateDict If this is used to tranverse a file tree,
+ * pass the initialIntermediateDictionary here.
+ *
+ * @param parseSchema Should SchemaDefinitionNode type definitions be parsed?
  */
-export function parseDocumentNode(document: DocumentNode, originFile?: string) {
-  const intermediateDict: IntermediateDictionary = {
+export function parseDocumentNode(
+  document: DocumentNode,
+  originFile?: string,
+  initialIntermediateDict?: IntermediateDictionary,
+  parseSchema: boolean = true,
+) {
+  const intermediateDict: IntermediateDictionary = initialIntermediateDict || {
     objects: {},
     inputs: {},
     enums: {},
     schema: undefined,
-    queryType: undefined,
-    mutationType: undefined,
+    operationNames: {},
   };
 
   // Collapse parseable definitions into the IntermediateDictionary.
@@ -245,6 +248,7 @@ export function parseDocumentNode(document: DocumentNode, originFile?: string) {
           originFile,
         };
         break;
+      // TODO: Extra types go here.
       // Do nothing
       default:
         break;
@@ -255,36 +259,66 @@ export function parseDocumentNode(document: DocumentNode, originFile?: string) {
 
   // If there's a schema definition in the IntermediateDictionary, check that
   // the types are properly defined in the objects map.
-  intermediateDict.schema &&
+  if (parseSchema && intermediateDict.schema) {
     intermediateDict.schema.operationTypes.forEach(operation => {
-      if (!SUPPORTED_OPERATION_TYPES.includes(operation.operation)) {
-        throw new Error(`Unsupported operation type ${operation.operation}.`);
+      switch (operation.operation) {
+        case 'query':
+          intermediateDict.operationNames.query = operation.type.name.value;
+          break;
+        case 'mutation':
+          intermediateDict.operationNames.mutation = operation.type.name.value;
+          break;
+        default:
+          throw new UnsupportedOperationError(operation.operation);
       }
 
-      if (!intermediateDict.objects.hasOwnProperty(operation.type.name.value)) {
-        throw new Error(
-          `Type ${
-            operation.type.name.value
-          } not defined in this file for this schema.`,
-        );
-      }
-
-      // Send back to the corresponding type
-      if (operation.operation === 'query') {
-        intermediateDict.queryType = operation.type.name.value;
-      } else if (operation.operation === 'mutation') {
-        intermediateDict.mutationType = operation.type.name.value;
-      }
+      // TODO:
+      //
+      // (1) Check whether type is already defined.
+      //
+      // (2) Throw error if the type is nowhere to be found. Otherwise this
+      //     cannot be used to codegen RootValues signatures.
+      //
+      // This should be carefully done though, since definitions can be on other
+      // files. First all the consolidated imports must be included and just
+      // after that the checking can be performed.
     });
+  }
 
-  // Return the parsed AST for the objects
+  function nodeReducer(
+    accumulator: ObjectTypeDescription[],
+    object:
+      | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
+      | DocumentNodeDescriptor<InputObjectTypeDefinitionNode>,
+  ) {
+    // For object types, exclude those that are part of the schema declaration
+    // when parseSchema is disabled.
+    if (
+      !parseSchema &&
+      object.node.kind === 'ObjectTypeDefinition' &&
+      Object.values(intermediateDict.operationNames).includes(
+        object.node.name.value,
+      )
+    ) {
+      return accumulator;
+    }
+
+    const parsedResult = parseDocumentObjectType(object.node, intermediateDict);
+
+    if (parsedResult !== null) {
+      accumulator.push(parsedResult);
+    }
+
+    return accumulator;
+  }
+
+  // Return the parsed AST for the objects.
+  // TODO: Do something with enums.
+  // TODO: Do something with aliases.
   return {
-    objects: Object.values(intermediateDict.objects)
-      .map(object => parseDocumentObjectType(object.node, intermediateDict))
-      .filter(result => result !== null) as ObjectTypeDescription[],
-    inputs: Object.values(intermediateDict.inputs)
-      .map(input => parseDocumentObjectType(input.node, intermediateDict))
-      .filter(result => result !== null) as ObjectTypeDescription[],
+    objects: Object.values(intermediateDict.objects).reduce(nodeReducer, []),
+    inputs: Object.values(intermediateDict.inputs).reduce(nodeReducer, []),
+    intermediateDict,
   };
 }
 
@@ -343,20 +377,6 @@ export function thunkTypeFromDirectives(field: FieldDefinitionNode) {
     }
   } else {
     return defaultThunkValue;
-  }
-}
-
-/**
- * Error class thrown when a type definitions is required and is not found on the
- * intermediate dictionary.
- */
-export class UnknownTypeError extends Error {
-  constructor(name: string) {
-    super(
-      `Cannot find reference for type ${name}. Did you spell it correctly? ` +
-        `If this type is defined in another schema file, please import it on ` +
-        `top using an #import statement.`,
-    );
   }
 }
 

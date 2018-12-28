@@ -19,7 +19,7 @@ const batchFn = async (ids: number[]) => ids;
 
 describe(LoaderInstance, () => {
   describe('get', () => {
-    it('should create new Dataloader when key is not set', () => {
+    test('should create new Dataloader when key is not set', () => {
       const instance = newInstance();
 
       const loader = instance.get(batchFn);
@@ -29,7 +29,7 @@ describe(LoaderInstance, () => {
       expect(Dataloader).toHaveBeenCalledWith(batchFn);
     });
 
-    it('should properly cache loader instance', () => {
+    test('should properly cache loader instance', () => {
       const instance = newInstance();
 
       // The MUST be the exact same location in the heap.
@@ -39,14 +39,14 @@ describe(LoaderInstance, () => {
 });
 
 describe(createLoaderInstance, () => {
-  it('should return unique instances every time the function is invoked', () => {
+  test('should return unique instances every time the function is invoked', () => {
     const { instance: instance1 } = createLoaderInstance();
     const { instance: instance2 } = createLoaderInstance();
 
     expect(instance1).not.toBe(instance2);
   });
 
-  it('should instance.get() with correct arguments when getLoader() is invoked', () => {
+  test('should instance.get() with correct arguments when getLoader() is invoked', () => {
     const { getLoader, instance } = createLoaderInstance();
     const exampleLoader = new Dataloader(batchFn);
 

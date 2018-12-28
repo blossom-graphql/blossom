@@ -17,9 +17,11 @@ import {
   thunkTypeFromDirectives,
   ThunkType,
   ThunkImplementationType,
-  UnknownTypeError,
   parseDocumentObjectType,
+  parseDocumentNode,
 } from '../parsing';
+
+import { UnknownTypeError } from '../errors';
 
 describe(thunkTypeFromDirectives, () => {
   const baseField = {
@@ -70,7 +72,7 @@ describe(thunkTypeFromDirectives, () => {
     ],
   });
 
-  it('must return ThunkType.None when no arguments and directives are passed', () => {
+  test('must return ThunkType.None when no arguments and directives are passed', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -88,7 +90,7 @@ describe(thunkTypeFromDirectives, () => {
     ).toBe(ThunkType.None);
   });
 
-  it('must return ThunkType.Function when arguments are passed and no directives are passed', () => {
+  test('must return ThunkType.Function when arguments are passed and no directives are passed', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -106,7 +108,7 @@ describe(thunkTypeFromDirectives, () => {
     ).toBe(ThunkType.Function);
   });
 
-  it('must return ThunkType.None with no arguments and no blossom implementation directive', () => {
+  test('must return ThunkType.None with no arguments and no blossom implementation directive', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -124,7 +126,7 @@ describe(thunkTypeFromDirectives, () => {
     ).toBe(ThunkType.None);
   });
 
-  it('must return ThunkType.None with no arguments and blossom implementation directive (as None)', () => {
+  test('must return ThunkType.None with no arguments and blossom implementation directive (as None)', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -160,7 +162,7 @@ describe(thunkTypeFromDirectives, () => {
     ).toBe(ThunkType.None);
   });
 
-  it('must return ThunkType.Function with no arguments and blossom implementation directive (as Function)', () => {
+  test('must return ThunkType.Function with no arguments and blossom implementation directive (as Function)', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -196,7 +198,7 @@ describe(thunkTypeFromDirectives, () => {
     ).toBe(ThunkType.Function);
   });
 
-  it('must return ThunkType.AsyncFunction with no arguments and blossom implementation directive (as Async)', () => {
+  test('must return ThunkType.AsyncFunction with no arguments and blossom implementation directive (as Async)', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -238,7 +240,7 @@ describe(thunkTypeFromDirectives, () => {
     ).toBe(ThunkType.AsyncFunction);
   });
 
-  it('must return ThunkType.None with no arguments and blossom implementation directive (as another value)', () => {
+  test('must return ThunkType.None with no arguments and blossom implementation directive (as another value)', () => {
     expect(
       thunkTypeFromDirectives({
         ...baseField,
@@ -266,9 +268,10 @@ describe(parseFieldType, () => {
     objects: {},
     inputs: {},
     enums: {},
+    operationNames: {},
   };
 
-  it('must return KnownScalarTypes.String for GraphQL ID type', () => {
+  test('must return KnownScalarTypes.String for GraphQL ID type', () => {
     expect(
       parseFieldType(
         ObjectTypeKind.Object, // whatever, shouldn't matter for this case
@@ -287,7 +290,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return KnownScalarTypes.String for GraphQL String type', () => {
+  test('must return KnownScalarTypes.String for GraphQL String type', () => {
     expect(
       parseFieldType(
         ObjectTypeKind.Object, // whatever, shouldn't matter for this case
@@ -306,7 +309,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return KnownScalarTypes.Number for GraphQL Int type', () => {
+  test('must return KnownScalarTypes.Number for GraphQL Int type', () => {
     expect(
       parseFieldType(
         ObjectTypeKind.Object, // whatever, shouldn't matter for this case
@@ -325,7 +328,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return KnownScalarTypes.Number for GraphQL Float type', () => {
+  test('must return KnownScalarTypes.Number for GraphQL Float type', () => {
     expect(
       parseFieldType(
         ObjectTypeKind.Object, // whatever, shouldn't matter for this case
@@ -344,7 +347,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return KnownScalarTypes.Boolean for GraphQL Boolean type', () => {
+  test('must return KnownScalarTypes.Boolean for GraphQL Boolean type', () => {
     expect(
       parseFieldType(
         ObjectTypeKind.Object, // whatever, shouldn't matter for this case
@@ -363,7 +366,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must throw UnknownTypeError when a referenced type is not available in the intermediate dictionary', () => {
+  test('must throw UnknownTypeError when a referenced type is not available in the intermediate dictionary', () => {
     expect(() =>
       parseFieldType(
         ObjectTypeKind.Object, // whatever, shouldn't matter for this case
@@ -393,7 +396,7 @@ describe(parseFieldType, () => {
     ).toThrowError(UnknownTypeError);
   });
 
-  it('must return correct referenced type when the definition is available in objects', () => {
+  test('must return correct referenced type when the definition is available in objects', () => {
     const intermediateDictWithObject: IntermediateDictionary = {
       objects: {
         TestObject: {
@@ -409,6 +412,7 @@ describe(parseFieldType, () => {
       },
       inputs: {},
       enums: {},
+      operationNames: {},
     };
 
     expect(
@@ -429,7 +433,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return correct referenced type when the definition is available in enums', () => {
+  test('must return correct referenced type when the definition is available in enums', () => {
     const intermediateDictWithEnum: IntermediateDictionary = {
       objects: {},
       inputs: {},
@@ -445,6 +449,7 @@ describe(parseFieldType, () => {
           },
         },
       },
+      operationNames: {},
     };
 
     expect(
@@ -482,7 +487,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return correct referenced type when the definition is available in inputs', () => {
+  test('must return correct referenced type when the definition is available in inputs', () => {
     const intermediateDictWithInput: IntermediateDictionary = {
       objects: {},
       inputs: {
@@ -498,6 +503,7 @@ describe(parseFieldType, () => {
         },
       },
       enums: {},
+      operationNames: {},
     };
 
     expect(
@@ -518,7 +524,7 @@ describe(parseFieldType, () => {
     });
   });
 
-  it('must return throw UnknownTypeError when referenced type is in inputs', () => {
+  test('must return throw UnknownTypeError when referenced type is in inputs', () => {
     const intermediateDictWithInput: IntermediateDictionary = {
       objects: {},
       inputs: {
@@ -534,6 +540,7 @@ describe(parseFieldType, () => {
         },
       },
       enums: {},
+      operationNames: {},
     };
 
     expect(() =>
@@ -551,7 +558,7 @@ describe(parseFieldType, () => {
     ).toThrowError(UnknownTypeError);
   });
 
-  it('must return throw UnknownTypeError when referenced type is in objects', () => {
+  test('must return throw UnknownTypeError when referenced type is in objects', () => {
     const intermediateDictWithInput: IntermediateDictionary = {
       objects: {
         TestObject: {
@@ -567,6 +574,7 @@ describe(parseFieldType, () => {
       },
       inputs: {},
       enums: {},
+      operationNames: {},
     };
 
     expect(() =>
@@ -610,6 +618,7 @@ describe(parseFieldDefinitionNode, () => {
       },
     },
     enums: {},
+    operationNames: {},
   };
 
   const fieldTypeReturn = {
@@ -617,7 +626,7 @@ describe(parseFieldDefinitionNode, () => {
     name: 'TestType',
   };
 
-  it('must return correct values when definiton has a NamedType kind', () => {
+  test('must return correct values when definiton has a NamedType kind', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -639,7 +648,7 @@ describe(parseFieldDefinitionNode, () => {
     });
   });
 
-  it('must return correct values when definiton has a NonNullType kind', () => {
+  test('must return correct values when definiton has a NonNullType kind', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -664,7 +673,7 @@ describe(parseFieldDefinitionNode, () => {
     });
   });
 
-  it('must return correct values when definiton has a ListType kind', () => {
+  test('must return correct values when definiton has a ListType kind', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -698,7 +707,7 @@ describe(parseFieldDefinitionNode, () => {
   // FieldDefinition - no arguments - directive
   // => arguments list MUST be empty
   // => ThunkType must be Function
-  it('must return correct value for FieldDefinition / No Arguments / Implementation Directive', () => {
+  test('must return correct value for FieldDefinition / No Arguments / Implementation Directive', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -762,7 +771,7 @@ describe(parseFieldDefinitionNode, () => {
   // FieldDefinition - no arguments - no directives
   // => arguments list MUST be empty
   // => ThunkType must be None
-  it('must return correct value for FieldDefinition / No Arguments / No Directives', () => {
+  test('must return correct value for FieldDefinition / No Arguments / No Directives', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -804,7 +813,7 @@ describe(parseFieldDefinitionNode, () => {
   // FieldDefinition - arguments - no directives
   // => arguments list MUST NOT be empty
   // => ThunkType must be Function (because of arguments)
-  it('must return correct value for FieldDefinition / Arguments / No Directives', () => {
+  test('must return correct value for FieldDefinition / Arguments / No Directives', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -876,7 +885,7 @@ describe(parseFieldDefinitionNode, () => {
   // InputValueDefinition - no arguments - directive
   // => arguments list MUST NOT be empty
   // => ThunkType must be None (we don't care about directives here)
-  it('must return correct value for InputTypeDefinition / No Arguments / Implementation Directive', () => {
+  test('must return correct value for InputTypeDefinition / No Arguments / Implementation Directive', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -940,7 +949,7 @@ describe(parseFieldDefinitionNode, () => {
   // InputValueDefinition - no arguments - no directives
   // => arguments list MUST be empty
   // => ThunkType must be None
-  it('must return correct value for InputValueDefinition / No Arguments / No Directives', () => {
+  test('must return correct value for InputValueDefinition / No Arguments / No Directives', () => {
     expect(
       parseFieldDefinitionNode(
         {
@@ -980,17 +989,18 @@ describe(parseFieldDefinitionNode, () => {
   });
 });
 
+const OBJECT_NAME = 'TestObject';
+const DESCRIPTION = 'Test description';
+
 describe(parseDocumentObjectType, () => {
   const EMPTY_INTERMEDIATE_DICT: IntermediateDictionary = {
     objects: {},
     inputs: {},
     enums: {},
+    operationNames: {},
   };
 
-  const OBJECT_NAME = 'TestObject';
-  const DESCRIPTION = 'Test description';
-
-  it('must return correct values for an ObjectTypeDefinition with no fields', () => {
+  test('must return correct values for an ObjectTypeDefinition with no fields', () => {
     expect(
       parseDocumentObjectType(
         {
@@ -1012,4 +1022,162 @@ describe(parseDocumentObjectType, () => {
       fields: [],
     });
   });
+
+  test('must return correct values for an ObjectTypeDefinition with fields', () => {
+    expect(
+      parseDocumentObjectType(
+        {
+          kind: 'ObjectTypeDefinition',
+          description: {
+            kind: 'StringValue',
+            value: DESCRIPTION,
+          },
+          name: {
+            kind: 'Name',
+            value: OBJECT_NAME,
+          },
+          fields: [
+            {
+              kind: 'FieldDefinition',
+              name: {
+                kind: 'Name',
+                value: 'testField',
+              },
+              type: {
+                kind: 'NamedType',
+                name: { kind: 'Name', value: 'String' },
+              },
+            },
+          ],
+        },
+        EMPTY_INTERMEDIATE_DICT,
+      ),
+    ).toEqual({
+      name: OBJECT_NAME,
+      comments: DESCRIPTION,
+      fields: [
+        {
+          array: false,
+          required: false,
+          name: 'testField',
+          comments: undefined,
+          elementDescriptor: undefined,
+          thunkType: ThunkType.None,
+          type: {
+            kind: 'KnownScalarType',
+            type: KnownScalarTypes.String,
+          },
+          arguments: [],
+        },
+      ],
+    });
+  });
+
+  test('must return correct values for an InputObjectTypeDefinition with fields', () => {
+    expect(
+      parseDocumentObjectType(
+        {
+          kind: 'InputObjectTypeDefinition',
+          description: {
+            kind: 'StringValue',
+            value: DESCRIPTION,
+          },
+          name: {
+            kind: 'Name',
+            value: OBJECT_NAME,
+          },
+          fields: [
+            {
+              kind: 'InputValueDefinition',
+              name: {
+                kind: 'Name',
+                value: 'testField',
+              },
+              type: {
+                kind: 'NamedType',
+                name: { kind: 'Name', value: 'String' },
+              },
+            },
+          ],
+        },
+        EMPTY_INTERMEDIATE_DICT,
+      ),
+    ).toEqual({
+      name: OBJECT_NAME,
+      comments: DESCRIPTION,
+      fields: [
+        {
+          array: false,
+          required: false,
+          name: 'testField',
+          comments: undefined,
+          elementDescriptor: undefined,
+          thunkType: ThunkType.None,
+          type: {
+            kind: 'KnownScalarType',
+            type: KnownScalarTypes.String,
+          },
+          arguments: [],
+        },
+      ],
+    });
+  });
+});
+
+describe(parseDocumentNode, () => {
+  test('must return a correctly parsed object', () => {
+    const result = parseDocumentNode({
+      kind: 'Document',
+      definitions: [
+        {
+          kind: 'ObjectTypeDefinition',
+          description: {
+            kind: 'StringValue',
+            value: DESCRIPTION,
+          },
+          name: {
+            kind: 'Name',
+            value: OBJECT_NAME,
+          },
+        },
+      ],
+    });
+
+    expect(result.objects).toEqual([
+      {
+        name: OBJECT_NAME,
+        comments: DESCRIPTION,
+        fields: [],
+      },
+    ]);
+  });
+
+  test('must return a correctly parsed input', () => {
+    const result = parseDocumentNode({
+      kind: 'Document',
+      definitions: [
+        {
+          kind: 'InputObjectTypeDefinition',
+          description: {
+            kind: 'StringValue',
+            value: DESCRIPTION,
+          },
+          name: {
+            kind: 'Name',
+            value: OBJECT_NAME,
+          },
+        },
+      ],
+    });
+
+    expect(result.inputs).toEqual([
+      {
+        name: OBJECT_NAME,
+        comments: DESCRIPTION,
+        fields: [],
+      },
+    ]);
+  });
+
+  test('must consolidate SchemaDefinitions in schema field when parseSchema is true', () => {});
 });
