@@ -33,14 +33,22 @@ export class UnknownTypeError extends Error {
   }
 }
 
+/**
+ * Used to indicate that a schema declaration is already defined in the
+ * intermediateDict.
+ */
 export class SchemaCollisionError extends Error {
   constructor() {
     super('Schema definition already defined in intermediateDict.');
   }
 }
 
+/**
+ * Used to indicate that an operation type is already defined in the
+ * intermediateDict.
+ */
 export class OperationTypeCollisionError extends Error {
-  constructor(key: string) {
-    super(`Operation ${key} already defined in intermediateDict.`);
+  constructor() {
+    super(`Operation types already defined in intermediateDict.`);
   }
 }

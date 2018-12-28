@@ -308,10 +308,13 @@ export function parseDocumentNode(
     }
     intermediateDict.schema = schemaDefinition;
 
+    if (
+      Object.keys(intermediateDict.operationNames).length > 0 &&
+      Object.keys(operationTypes).length > 0
+    ) {
+      throw new OperationTypeCollisionError();
+    }
     Object.entries(operationTypes).forEach(([key, value]) => {
-      if (intermediateDict.operationNames.hasOwnProperty(key)) {
-        throw new OperationTypeCollisionError(key);
-      }
       (intermediateDict.operationNames as any)[key] = value;
     });
   }
@@ -333,13 +336,18 @@ export function parseDocumentNode(
   ) {
     // For object types, exclude those that are part of the schema declaration
     // when parseSchema is disabled.
-    if (
-      !parseSchema &&
-      object.node.kind === 'ObjectTypeDefinition' &&
-      Object.values(operationTypes).includes(object.node.name.value)
-    ) {
-      return accumulator;
-    }
+    //
+    // ! Should really do this? What happens if the developer wants to use
+    // ! the type anyways?
+    // !
+    // ! Disabled at the moment.
+    // if (
+    //   !parseSchema &&
+    //   object.node.kind === 'ObjectTypeDefinition' &&
+    //   Object.values(operationTypes).includes(object.node.name.value)
+    // ) {
+    //   return accumulator;
+    // }
 
     const parsedResult = parseDocumentObjectType(object.node, intermediateDict);
 

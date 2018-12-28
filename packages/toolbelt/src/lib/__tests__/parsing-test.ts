@@ -28,7 +28,12 @@ import {
   parseDocumentObjectType,
   parseDocumentNode,
 } from '../parsing';
-import { UnknownTypeError, UnsupportedOperationError } from '../errors';
+import {
+  UnknownTypeError,
+  UnsupportedOperationError,
+  SchemaCollisionError,
+  OperationTypeCollisionError,
+} from '../errors';
 
 describe(thunkTypeFromDirectives, () => {
   const baseField = {
@@ -127,6 +132,34 @@ describe(thunkTypeFromDirectives, () => {
               kind: 'Name',
               value: 'testDirective',
             },
+          },
+        ],
+      }),
+    ).toBe(ThunkType.None);
+  });
+
+  test('must return ThunkType.None when no arguments are passed and directive has wrong argument', () => {
+    expect(
+      thunkTypeFromDirectives({
+        ...baseField,
+        arguments: undefined,
+        directives: [
+          {
+            kind: 'Directive' as 'Directive',
+            name: {
+              kind: 'Name' as 'Name',
+              value: BLOSSOM_IMPLEMENTATION_DIRECTIVE,
+            },
+            arguments: [
+              {
+                kind: 'Argument' as 'Argument',
+                name: {
+                  kind: 'Name' as 'Name',
+                  value: BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME + 'WRONG',
+                },
+                value: { kind: 'StringValue', value: 'whatever' },
+              },
+            ],
           },
         ],
       }),
@@ -1241,8 +1274,6 @@ describe(parseDocumentNode, () => {
     expect(result.intermediateDict.schema).toEqual(definition);
   });
 
-  // test('must exclude object type definitions that are on ')
-
   test('must NOT consolidate SchemaDefinitions in schema field when parseSchema is false', () => {
     const definition: SchemaDefinitionNode = {
       kind: 'SchemaDefinition',
@@ -1461,5 +1492,84 @@ describe(parseDocumentNode, () => {
         false,
       ),
     ).not.toThrowError(UnsupportedOperationError);
+  });
+
+  test('must throw SchemaCollisionError when parseSchema is true and a new schema is sent', () => {
+    expect(() =>
+      parseDocumentNode(
+        {
+          kind: 'Document',
+          definitions: [
+            {
+              kind: 'SchemaDefinition',
+              operationTypes: [
+                {
+                  kind: 'OperationTypeDefinition',
+                  operation: 'query',
+                  type: {
+                    kind: 'NamedType',
+                    name: {
+                      kind: 'Name',
+                      value: 'TestQuery',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        undefined,
+        {
+          objects: {},
+          inputs: {},
+          enums: {},
+          operationNames: {},
+          schema: {
+            kind: 'SchemaDefinition',
+            operationTypes: [],
+          },
+        },
+        true,
+      ),
+    ).toThrowError(SchemaCollisionError);
+  });
+
+  test('must throw OperationTypeCollisionError when parseSchema is true and operationTypes are already defined', () => {
+    expect(() =>
+      parseDocumentNode(
+        {
+          kind: 'Document',
+          definitions: [
+            {
+              kind: 'SchemaDefinition',
+              operationTypes: [
+                {
+                  kind: 'OperationTypeDefinition',
+                  operation: 'query',
+                  type: {
+                    kind: 'NamedType',
+                    name: {
+                      kind: 'Name',
+                      value: 'TestQuery',
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        undefined,
+        {
+          objects: {},
+          inputs: {},
+          enums: {},
+          operationNames: {
+            // This is on purposes. Even another definition must trigger it.
+            mutation: 'TestMutation',
+          },
+        },
+        true,
+      ),
+    ).toThrowError(OperationTypeCollisionError);
   });
 });
