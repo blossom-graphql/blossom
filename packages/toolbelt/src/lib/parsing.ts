@@ -240,7 +240,7 @@ export function parseDocumentNode(
         };
         break;
       case 'SchemaDefinition':
-        intermediateDict.schema = definition;
+        parseSchema && (intermediateDict.schema = definition);
         break;
       case 'EnumTypeDefinition':
         intermediateDict.enums[definition.name.value] = {
@@ -249,8 +249,9 @@ export function parseDocumentNode(
         };
         break;
       // TODO: Extra types go here.
-      // Do nothing
       default:
+        // Do nothing
+        // TODO: Logger.
         break;
     }
   });
@@ -285,6 +286,15 @@ export function parseDocumentNode(
     });
   }
 
+  /**
+   * Reducer meant to be used for mapping DocumentNodeDescriptors and, when
+   * the return is not null, incorporating the descriptor to the cumulative
+   * array.
+   *
+   * @param accumulator Accumulated array of ObjectTypeDescriptions.
+   *
+   * @param object Descriptor of the Object / Input.
+   */
   function nodeReducer(
     accumulator: ObjectTypeDescription[],
     object:

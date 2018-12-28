@@ -7,6 +7,13 @@
  */
 
 import {
+  EnumTypeDefinitionNode,
+  InputObjectTypeDefinitionNode,
+  ObjectTypeDefinitionNode,
+  SchemaDefinitionNode,
+} from 'graphql';
+
+import {
   BLOSSOM_IMPLEMENTATION_DIRECTIVE,
   BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
   IntermediateDictionary,
@@ -20,7 +27,6 @@ import {
   parseDocumentObjectType,
   parseDocumentNode,
 } from '../parsing';
-
 import { UnknownTypeError } from '../errors';
 
 describe(thunkTypeFromDirectives, () => {
@@ -1126,21 +1132,21 @@ describe(parseDocumentObjectType, () => {
 
 describe(parseDocumentNode, () => {
   test('must return a correctly parsed object', () => {
+    const definition: ObjectTypeDefinitionNode = {
+      kind: 'ObjectTypeDefinition',
+      description: {
+        kind: 'StringValue',
+        value: DESCRIPTION,
+      },
+      name: {
+        kind: 'Name',
+        value: OBJECT_NAME,
+      },
+    };
+
     const result = parseDocumentNode({
       kind: 'Document',
-      definitions: [
-        {
-          kind: 'ObjectTypeDefinition',
-          description: {
-            kind: 'StringValue',
-            value: DESCRIPTION,
-          },
-          name: {
-            kind: 'Name',
-            value: OBJECT_NAME,
-          },
-        },
-      ],
+      definitions: [definition],
     });
 
     expect(result.objects).toEqual([
@@ -1150,24 +1156,28 @@ describe(parseDocumentNode, () => {
         fields: [],
       },
     ]);
+
+    expect(result.intermediateDict.objects[OBJECT_NAME].node).toEqual(
+      definition,
+    );
   });
 
   test('must return a correctly parsed input', () => {
+    const definition: InputObjectTypeDefinitionNode = {
+      kind: 'InputObjectTypeDefinition',
+      description: {
+        kind: 'StringValue',
+        value: DESCRIPTION,
+      },
+      name: {
+        kind: 'Name',
+        value: OBJECT_NAME,
+      },
+    };
+
     const result = parseDocumentNode({
       kind: 'Document',
-      definitions: [
-        {
-          kind: 'InputObjectTypeDefinition',
-          description: {
-            kind: 'StringValue',
-            value: DESCRIPTION,
-          },
-          name: {
-            kind: 'Name',
-            value: OBJECT_NAME,
-          },
-        },
-      ],
+      definitions: [definition],
     });
 
     expect(result.inputs).toEqual([
@@ -1177,7 +1187,208 @@ describe(parseDocumentNode, () => {
         fields: [],
       },
     ]);
+
+    expect(result.intermediateDict.inputs[OBJECT_NAME].node).toEqual(
+      definition,
+    );
   });
 
-  test('must consolidate SchemaDefinitions in schema field when parseSchema is true', () => {});
+  test('must consolidate SchemaDefinitions in schema field when parseSchema is true', () => {
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'query',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Test' } },
+        },
+      ],
+    };
+
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [definition],
+      },
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(result.intermediateDict.schema).toEqual(definition);
+  });
+
+  test('must NOT consolidate SchemaDefinitions in schema field when parseSchema is false', () => {
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'query',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: 'Test' } },
+        },
+      ],
+    };
+
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [definition],
+      },
+      undefined,
+      undefined,
+      false,
+    );
+
+    // Must be undefined since we are starting from an empty intermediate dict
+    expect(result.intermediateDict.schema).not.toBeDefined();
+  });
+
+  test('must consolidate enums on intermediateDictionary', () => {
+    const definition: EnumTypeDefinitionNode = {
+      kind: 'EnumTypeDefinition',
+      name: {
+        kind: 'Name',
+        value: 'TestEnum',
+      },
+    };
+
+    const result = parseDocumentNode({
+      kind: 'Document',
+      definitions: [definition],
+    });
+
+    expect(result.intermediateDict.enums['TestEnum'].node).toEqual(definition);
+  });
+
+  test('must not set operationNames when no definitions are passed', () => {
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [],
+      },
+      undefined,
+      undefined,
+      false,
+    );
+
+    expect(result.intermediateDict.operationNames.query).toBeUndefined();
+    expect(result.intermediateDict.operationNames.mutation).toBeUndefined();
+  });
+
+  test('must set operationNames for query when is defined and parseSchema is true', () => {
+    const NAME = 'Test';
+
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'query',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: NAME } },
+        },
+      ],
+    };
+
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [definition],
+      },
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(result.intermediateDict.operationNames.query).toEqual(NAME);
+  });
+
+  test('must NOT set operationNames for query when is defined and parseSchema is false', () => {
+    const NAME = 'Test';
+
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'query',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: NAME } },
+        },
+      ],
+    };
+
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [definition],
+      },
+      undefined,
+      undefined,
+      false,
+    );
+
+    expect(result.intermediateDict.operationNames.query).toBeUndefined();
+  });
+
+  test('must set operationNames for mutation when is defined and parseSchema is true', () => {
+    const NAME = 'Test';
+
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'mutation',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: NAME } },
+        },
+      ],
+    };
+
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [definition],
+      },
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(result.intermediateDict.operationNames.mutation).toEqual(NAME);
+  });
+
+  test('must NOT set operationNames for mutation when is defined and parseSchema is false', () => {
+    const NAME = 'Test';
+
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'mutation',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: NAME } },
+        },
+      ],
+    };
+
+    const result = parseDocumentNode(
+      {
+        kind: 'Document',
+        definitions: [definition],
+      },
+      undefined,
+      undefined,
+      false,
+    );
+
+    expect(result.intermediateDict.operationNames.mutation).toBeUndefined();
+  });
+
+  // test('must throw UnsupportedOperationError when operation is not supported and parseSchema is true', () => {
+  //   throw new Error('Implement me');
+  // });
+
+  // test('must NOT throw UnsupportedOperationError when operation is not supported and parseSchema is false', () => {
+  //   throw new Error('Implement me');
+  // });
 });
