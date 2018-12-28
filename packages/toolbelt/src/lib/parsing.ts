@@ -18,7 +18,12 @@ import {
   NamedTypeNode,
 } from 'graphql';
 
-import { UnknownTypeError, UnsupportedOperationError } from './errors';
+import {
+  UnknownTypeError,
+  UnsupportedOperationError,
+  OperationTypeCollisionError,
+  SchemaCollisionError,
+} from './errors';
 
 export const BLOSSOM_IMPLEMENTATION_DIRECTIVE = 'blossomImpl';
 export const BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME = 'type';
@@ -42,6 +47,8 @@ type DocumentNodeDescriptor<T> = {
  * including the node and the file where it was defined.
  */
 type DocumentNameMap<T> = { [key: string]: DocumentNodeDescriptor<T> };
+
+type OperationNames = { [key in 'query' | 'mutation']?: string };
 
 /**
  * An intermediate dictionary where all the types described in the file are
@@ -69,7 +76,7 @@ export type IntermediateDictionary = {
    * A dictionary that maps the operation in the SchemaDefinitionNode to the
    * described type.
    */
-  operationNames: { [key in 'query' | 'mutation']?: string };
+  operationNames: OperationNames;
 };
 
 /**
@@ -224,6 +231,8 @@ export function parseDocumentNode(
     operationNames: {},
   };
 
+  let schemaDefinition: SchemaDefinitionNode | undefined;
+
   // Collapse parseable definitions into the IntermediateDictionary.
   document.definitions.forEach(definition => {
     switch (definition.kind) {
@@ -240,7 +249,7 @@ export function parseDocumentNode(
         };
         break;
       case 'SchemaDefinition':
-        parseSchema && (intermediateDict.schema = definition);
+        schemaDefinition = definition;
         break;
       case 'EnumTypeDefinition':
         intermediateDict.enums[definition.name.value] = {
@@ -260,17 +269,22 @@ export function parseDocumentNode(
 
   // If there's a schema definition in the IntermediateDictionary, check that
   // the types are properly defined in the objects map.
-  if (parseSchema && intermediateDict.schema) {
-    intermediateDict.schema.operationTypes.forEach(operation => {
+  //
+  // We always parse it because it's required in nodeReducer.
+  const operationTypes: OperationNames = {};
+
+  if (schemaDefinition) {
+    schemaDefinition.operationTypes.forEach(operation => {
       switch (operation.operation) {
         case 'query':
-          intermediateDict.operationNames.query = operation.type.name.value;
+          operationTypes.query = operation.type.name.value;
           break;
         case 'mutation':
-          intermediateDict.operationNames.mutation = operation.type.name.value;
+          operationTypes.mutation = operation.type.name.value;
           break;
         default:
-          throw new UnsupportedOperationError(operation.operation);
+          if (parseSchema)
+            throw new UnsupportedOperationError(operation.operation);
       }
 
       // TODO:
@@ -283,6 +297,22 @@ export function parseDocumentNode(
       // This should be carefully done though, since definitions can be on other
       // files. First all the consolidated imports must be included and just
       // after that the checking can be performed.
+    });
+  }
+
+  // If parseSchema is set to true, we need to validate that neither of the
+  // involved keys is defined and then we merge them.
+  if (parseSchema) {
+    if (intermediateDict.schema && schemaDefinition) {
+      throw new SchemaCollisionError();
+    }
+    intermediateDict.schema = schemaDefinition;
+
+    Object.entries(operationTypes).forEach(([key, value]) => {
+      if (intermediateDict.operationNames.hasOwnProperty(key)) {
+        throw new OperationTypeCollisionError(key);
+      }
+      (intermediateDict.operationNames as any)[key] = value;
     });
   }
 
@@ -306,9 +336,7 @@ export function parseDocumentNode(
     if (
       !parseSchema &&
       object.node.kind === 'ObjectTypeDefinition' &&
-      Object.values(intermediateDict.operationNames).includes(
-        object.node.name.value,
-      )
+      Object.values(operationTypes).includes(object.node.name.value)
     ) {
       return accumulator;
     }

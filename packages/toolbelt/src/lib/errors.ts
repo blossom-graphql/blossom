@@ -32,3 +32,15 @@ export class UnknownTypeError extends Error {
     );
   }
 }
+
+export class SchemaCollisionError extends Error {
+  constructor() {
+    super('Schema definition already defined in intermediateDict.');
+  }
+}
+
+export class OperationTypeCollisionError extends Error {
+  constructor(key: string) {
+    super(`Operation ${key} already defined in intermediateDict.`);
+  }
+}

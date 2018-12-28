@@ -11,6 +11,7 @@ import {
   InputObjectTypeDefinitionNode,
   ObjectTypeDefinitionNode,
   SchemaDefinitionNode,
+  InterfaceTypeDefinitionNode,
 } from 'graphql';
 
 import {
@@ -27,7 +28,7 @@ import {
   parseDocumentObjectType,
   parseDocumentNode,
 } from '../parsing';
-import { UnknownTypeError } from '../errors';
+import { UnknownTypeError, UnsupportedOperationError } from '../errors';
 
 describe(thunkTypeFromDirectives, () => {
   const baseField = {
@@ -1193,6 +1194,28 @@ describe(parseDocumentNode, () => {
     );
   });
 
+  test('must do nothing with an unhandled DefinitionNode', () => {
+    // Not planned to be supported anytime soon.
+    const definition: InterfaceTypeDefinitionNode = {
+      kind: 'InterfaceTypeDefinition',
+      name: {
+        kind: 'Name',
+        value: 'TestInterface',
+      },
+    };
+
+    const result = parseDocumentNode({
+      kind: 'Document',
+      definitions: [definition],
+    });
+
+    expect(result.intermediateDict.objects).toEqual({});
+    expect(result.intermediateDict.inputs).toEqual({});
+    expect(result.intermediateDict.enums).toEqual({});
+    expect(result.intermediateDict.schema).toBeUndefined();
+    expect(result.intermediateDict.operationNames).toEqual({});
+  });
+
   test('must consolidate SchemaDefinitions in schema field when parseSchema is true', () => {
     const definition: SchemaDefinitionNode = {
       kind: 'SchemaDefinition',
@@ -1217,6 +1240,8 @@ describe(parseDocumentNode, () => {
 
     expect(result.intermediateDict.schema).toEqual(definition);
   });
+
+  // test('must exclude object type definitions that are on ')
 
   test('must NOT consolidate SchemaDefinitions in schema field when parseSchema is false', () => {
     const definition: SchemaDefinitionNode = {
@@ -1384,11 +1409,57 @@ describe(parseDocumentNode, () => {
     expect(result.intermediateDict.operationNames.mutation).toBeUndefined();
   });
 
-  // test('must throw UnsupportedOperationError when operation is not supported and parseSchema is true', () => {
-  //   throw new Error('Implement me');
-  // });
+  test('must throw UnsupportedOperationError when operation is not supported and parseSchema is true', () => {
+    const NAME = 'Test';
 
-  // test('must NOT throw UnsupportedOperationError when operation is not supported and parseSchema is false', () => {
-  //   throw new Error('Implement me');
-  // });
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'subscription',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: NAME } },
+        },
+      ],
+    };
+
+    expect(() =>
+      parseDocumentNode(
+        {
+          kind: 'Document',
+          definitions: [definition],
+        },
+        undefined,
+        undefined,
+        true,
+      ),
+    ).toThrowError(UnsupportedOperationError);
+  });
+
+  test('must NOT throw UnsupportedOperationError when operation is not supported and parseSchema is false', () => {
+    const NAME = 'Test';
+
+    const definition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes: [
+        {
+          kind: 'OperationTypeDefinition',
+          operation: 'subscription',
+          type: { kind: 'NamedType', name: { kind: 'Name', value: NAME } },
+        },
+      ],
+    };
+
+    expect(() =>
+      parseDocumentNode(
+        {
+          kind: 'Document',
+          definitions: [definition],
+        },
+        undefined,
+        undefined,
+        false,
+      ),
+    ).not.toThrowError(UnsupportedOperationError);
+  });
 });
