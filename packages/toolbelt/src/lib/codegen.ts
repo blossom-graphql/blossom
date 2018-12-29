@@ -131,9 +131,7 @@ export function wrapInOptionalType(
   if (required) {
     return typeNode;
   } else {
-    return ts.createTypeReferenceNode(ts.createIdentifier('Nullable'), [
-      typeNode,
-    ]);
+    return ts.createTypeReferenceNode(ts.createIdentifier('Maybe'), [typeNode]);
   }
 }
 
