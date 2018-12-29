@@ -15,6 +15,13 @@ import {
   KnownScalarTypes,
 } from './parsing';
 
+/**
+ * Receives a list of arguments and generates a type literal with the arguments
+ * collapsed in an object-like structure. This is meant to be used as the
+ * first argument in a resolver function.
+ *
+ * @param args List of arguments, if any, as FieldDescriptor structures.
+ */
 export function generateArgumentsTypeLiteral(
   args: FieldDescriptor[] | undefined,
 ): ts.ParameterDeclaration {
@@ -41,6 +48,13 @@ export function generateArgumentsTypeLiteral(
   );
 }
 
+/**
+ * Generates a function type node, to be part of the type alias declaration.
+ *
+ * @param terminalType TypeNode of the return value.
+ * @param args List of arguments, if any.
+ * @param isAsync Should this be an async function?
+ */
 export function generateFunctionTypeNode(
   terminalType: ts.TypeNode,
   args: FieldDescriptor[] | undefined,
@@ -81,9 +95,17 @@ export function generateFunctionTypeNode(
   return ts.createFunctionTypeNode(undefined, signatureArgs, outputType);
 }
 
+/**
+ * Receives a ts.Node element and attaches JSDoc comments.
+ *
+ * @param declaration TypeScript Node element that must have a JSDoc statement
+ * added.
+ *
+ * @param text Text to be added.
+ */
 export function appendJSDocComments(declaration: ts.Node, text: string) {
   const appendedLines = text
-    .spltest('\n')
+    .split('\n')
     .map(line => `* ${line}`)
     .join('\n');
 
@@ -95,6 +117,13 @@ export function appendJSDocComments(declaration: ts.Node, text: string) {
   );
 }
 
+/**
+ * Receives a TypeNode and a boolean. When the boolean is false, wraps the
+ * typeNode in a Nullable generic.
+ *
+ * @param typeNode TypeScript API TypeNode element.
+ * @param required Is it required?
+ */
 export function wrapInOptionalType(
   typeNode: ts.TypeNode,
   required: boolean,
@@ -108,6 +137,13 @@ export function wrapInOptionalType(
   }
 }
 
+/**
+ * Given a field descriptor, which can be thunked, computes terminal element
+ * that must be returned in the field descriptor.
+ *
+ * @param field Descriptor of the field where the terminal type needs to be
+ * computed.
+ */
 export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
   // If it's an array, then we must recurse based on the element descriptor
   if (field.array) {
@@ -146,6 +182,12 @@ export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
   return wrapInOptionalType(terminalType, field.required);
 }
 
+/**
+ * Given a field descriptor, generates the type element which is going to be
+ * a member of the type alias declaration.
+ *
+ * @param field Descriptor of the field to generate.
+ */
 export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   let typeNode: ts.TypeNode;
   let requiredSignature: ts.Token<ts.SyntaxKind.QuestionToken> | undefined;
@@ -188,6 +230,12 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   return declaration;
 }
 
+/**
+ * Given a type descriptor, generates a type alias declaration which can be
+ * used by the TypeScript API to autogenerate files.
+ *
+ * @param descriptor Object containing the type descriptor.
+ */
 export function generateTypeAlias(
   descriptor: ObjectTypeDescription,
 ): ts.TypeAliasDeclaration {
