@@ -68,3 +68,6 @@ dist
 
 # Ignore test directory
 packages/test-*
+
+# Testing folders inside packages
+test/
