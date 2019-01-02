@@ -18,15 +18,14 @@ import {
   NamedTypeNode,
 } from 'graphql';
 
-import {
-  UnknownTypeError,
-  UnsupportedOperationError,
-  OperationTypeCollisionError,
-  SchemaCollisionError,
-} from './errors';
+import { UnknownTypeError, UnsupportedOperationError } from './errors';
+import { appPath, APP_DIR } from './paths';
 
 export const BLOSSOM_IMPLEMENTATION_DIRECTIVE = 'blossomImpl';
 export const BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME = 'type';
+
+const PATH_REGEX = `[^'"]+`;
+const IMPORT_MATCH_REGEX = `^#\s?import\s+(?<imported>.+\s+from\s+)?(?<quote>['"])(?<path>${PATH_REGEX})(\k<quote>);?$`;
 
 /**
  * Descriptor of a document node.
@@ -36,10 +35,6 @@ type DocumentNodeDescriptor<T> = {
    * Full descriptor.
    */
   node: T;
-  /**
-   * **Absolute** path of the file where this definition can be found.
-   */
-  originFile?: string;
 };
 
 /**
@@ -48,6 +43,9 @@ type DocumentNodeDescriptor<T> = {
  */
 type DocumentNameMap<T> = { [key: string]: DocumentNodeDescriptor<T> };
 
+/**
+ * Map to represent the operation names and their associated types.
+ */
 type OperationNames = { [key in 'query' | 'mutation']?: string };
 
 /**
@@ -76,6 +74,16 @@ export type IntermediateDictionary = {
    * A dictionary that maps the operation in the SchemaDefinitionNode to the
    * described type.
    */
+  operationNames: OperationNames;
+};
+
+/**
+ * Associates a full pathname to the intermediate dictionary resulting of its
+ * parsing.
+ */
+export type ParsingOuput = {
+  objects: ObjectTypeDescription[];
+  inputs: ObjectTypeDescription[];
   operationNames: OperationNames;
 };
 
@@ -204,26 +212,50 @@ export enum ObjectTypeKind {
   Input = 'Input',
 }
 
+export type ImportResolutionMap = { [key: string]: '*' | Set<string> };
+
+export function getSchemaImports(
+  schema: string,
+  basePath: string = APP_DIR,
+): ImportResolutionMap {
+  const lines = schema.split('\n');
+  const accumulatedImports: ImportResolutionMap = {};
+
+  lines.forEach(line => {
+    // Start with a RegExp object from scratch to avoid collisions
+    const regex = new RegExp(IMPORT_MATCH_REGEX);
+    const result = regex.exec(line);
+
+    // Skip this line if the necessary information is not implemented
+    if (!result || !result.groups || !result.groups.path) return;
+
+    // TODO: Provide the Set case to allow importing specific paths.
+    const realPath = appPath(result.groups.path, basePath);
+    accumulatedImports[realPath] = '*';
+  });
+
+  return accumulatedImports;
+}
+
+type PathSchemaMap = Map<string, string>;
+
+export function getParsingMap(path: string, accumulated?: PathSchemaMap) {
+  // Return accumulator if path is in accumulator
+  // Read file
+  // Create new accumulator with path
+  // Call getSchemaImports()
+  // For each of the imports call getParsingMap with path and accumulator.
+  // If accumulator is different, merge with results.
+}
+
 /**
  * Receives a GraphQL.js document node and returns a data structure containing
  * all the parsed types and root values.
  *
  * @param document DocumentNode coming from the parsed GraphQL schema.
- *
- * @param originFile Name of the file that was the origin for this definition.
- *
- * @param initialIntermediateDict If this is used to tranverse a file tree,
- * pass the initialIntermediateDictionary here.
- *
- * @param parseSchema Should SchemaDefinitionNode type definitions be parsed?
  */
-export function parseDocumentNode(
-  document: DocumentNode,
-  originFile?: string,
-  initialIntermediateDict?: IntermediateDictionary,
-  parseSchema: boolean = true,
-) {
-  const intermediateDict: IntermediateDictionary = initialIntermediateDict || {
+export function parseDocumentNode(document: DocumentNode): ParsingOuput {
+  const intermediateDict: IntermediateDictionary = {
     objects: {},
     inputs: {},
     enums: {},
@@ -239,13 +271,11 @@ export function parseDocumentNode(
       case 'ObjectTypeDefinition':
         intermediateDict.objects[definition.name.value] = {
           node: definition,
-          originFile,
         };
         break;
       case 'InputObjectTypeDefinition':
         intermediateDict.inputs[definition.name.value] = {
           node: definition,
-          originFile,
         };
         break;
       case 'SchemaDefinition':
@@ -254,7 +284,6 @@ export function parseDocumentNode(
       case 'EnumTypeDefinition':
         intermediateDict.enums[definition.name.value] = {
           node: definition,
-          originFile,
         };
         break;
       // TODO: Extra types go here.
@@ -283,39 +312,8 @@ export function parseDocumentNode(
           operationTypes.mutation = operation.type.name.value;
           break;
         default:
-          if (parseSchema)
-            throw new UnsupportedOperationError(operation.operation);
+          throw new UnsupportedOperationError(operation.operation);
       }
-
-      // TODO:
-      //
-      // (1) Check whether type is already defined.
-      //
-      // (2) Throw error if the type is nowhere to be found. Otherwise this
-      //     cannot be used to codegen RootValues signatures.
-      //
-      // This should be carefully done though, since definitions can be on other
-      // files. First all the consolidated imports must be included and just
-      // after that the checking can be performed.
-    });
-  }
-
-  // If parseSchema is set to true, we need to validate that neither of the
-  // involved keys is defined and then we merge them.
-  if (parseSchema) {
-    if (intermediateDict.schema && schemaDefinition) {
-      throw new SchemaCollisionError();
-    }
-    intermediateDict.schema = schemaDefinition;
-
-    if (
-      Object.keys(intermediateDict.operationNames).length > 0 &&
-      Object.keys(operationTypes).length > 0
-    ) {
-      throw new OperationTypeCollisionError();
-    }
-    Object.entries(operationTypes).forEach(([key, value]) => {
-      (intermediateDict.operationNames as any)[key] = value;
     });
   }
 
@@ -334,21 +332,6 @@ export function parseDocumentNode(
       | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
       | DocumentNodeDescriptor<InputObjectTypeDefinitionNode>,
   ) {
-    // For object types, exclude those that are part of the schema declaration
-    // when parseSchema is disabled.
-    //
-    // ! Should really do this? What happens if the developer wants to use
-    // ! the type anyways?
-    // !
-    // ! Disabled at the moment.
-    // if (
-    //   !parseSchema &&
-    //   object.node.kind === 'ObjectTypeDefinition' &&
-    //   Object.values(operationTypes).includes(object.node.name.value)
-    // ) {
-    //   return accumulator;
-    // }
-
     const parsedResult = parseDocumentObjectType(object.node, intermediateDict);
 
     if (parsedResult !== null) {
@@ -364,7 +347,7 @@ export function parseDocumentNode(
   return {
     objects: Object.values(intermediateDict.objects).reduce(nodeReducer, []),
     inputs: Object.values(intermediateDict.inputs).reduce(nodeReducer, []),
-    intermediateDict,
+    operationNames: intermediateDict.operationNames,
   };
 }
 
