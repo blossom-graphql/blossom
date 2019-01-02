@@ -18,9 +18,10 @@ import {
   TypeNode,
   InputValueDefinitionNode,
   NamedTypeNode,
+  parse,
 } from 'graphql';
 
-import { UnknownTypeError, UnsupportedOperationError } from './errors';
+import { ImportParsingError, UnsupportedOperationError } from './errors';
 import { appPath, APP_DIR } from './paths';
 
 export const BLOSSOM_IMPLEMENTATION_DIRECTIVE = 'blossomImpl';
@@ -83,7 +84,7 @@ export type IntermediateDictionary = {
  * Associates a full pathname to the intermediate dictionary resulting of its
  * parsing.
  */
-export type ParsingOuput = {
+export type DocumentParsingOuput = {
   objects: ObjectTypeDescription[];
   inputs: ObjectTypeDescription[];
   operationNames: OperationNames;
@@ -221,6 +222,52 @@ export enum ObjectTypeKind {
 export type ImportResolutionMap = Map<string, '*' | Set<string>>;
 
 /**
+ * Structure to represent the parsing result of a schema and its dependencies.
+ */
+type ParsedSchemaReferences = {
+  /**
+   * Full string for the schema.
+   */
+  schema: string;
+  /**
+   * Map containing the full path of the imported files and a list of the
+   * required dependencies.
+   */
+  references: ImportResolutionMap;
+};
+
+/**
+ * Map from a full path to the ParsedSchema reference structure.
+ */
+type PathSchemaMap = Map<string, ParsedSchemaReferences>;
+
+export type ParsedFileGraph = Map<
+  string,
+  ParsedSchemaReferences & { parsedDocument: DocumentParsingOuput }
+>;
+
+export async function parseFileGraph(
+  filePath: string,
+): Promise<ParsedFileGraph> {
+  // TODO: Display errors.
+  const parsingMap = await getParsingMap(filePath);
+  const result: ParsedFileGraph = new Map();
+
+  // For each of the files, parse the documents
+  for (const [path, parsedSchema] of parsingMap) {
+    const document = parse(parsedSchema.schema);
+
+    // TODO: Collapse and display parsing errors on parseDocumentNode.
+    result.set(path, {
+      ...parsedSchema,
+      parsedDocument: parseDocumentNode(document),
+    });
+  }
+
+  return result;
+}
+
+/**
  * Given a schema string, reads all the import statements and returns a map
  * with all the absolute paths of the imports and the types that must be
  * imported from the referenced file.
@@ -270,26 +317,6 @@ export function getSchemaImports(
 }
 
 /**
- * Structure to represent the parsing result of a schema and its dependencies.
- */
-type ParsedSchemaReferences = {
-  /**
-   * Full string for the schema.
-   */
-  schema: string;
-  /**
-   * Map containing the full path of the imported files and a list of the
-   * required dependencies.
-   */
-  references: ImportResolutionMap;
-};
-
-/**
- * Map from a full path to the ParsedSchema reference structure.
- */
-type PathSchemaMap = Map<string, ParsedSchemaReferences>;
-
-/**
  * Given a full GraphQL file path, reads the file to retrieve the schema and
  * recursively parses the imports from other files. The result is map from the
  * full path file to a structure that contains the schema contents and the
@@ -311,7 +338,14 @@ export async function getParsingMap(
   const accumulator: PathSchemaMap = accumulated
     ? new Map(accumulated)
     : new Map();
-  const fileContents = await fs.promises.readFile(filePath);
+  let fileContents: Buffer;
+
+  try {
+    fileContents = await fs.promises.readFile(filePath);
+  } catch (error) {
+    throw new ImportParsingError(filePath, error);
+  }
+
   const schema = fileContents.toString('utf-8');
   const parsedPath = path.parse(filePath);
 
@@ -345,7 +379,9 @@ export async function getParsingMap(
  *
  * @param document DocumentNode coming from the parsed GraphQL schema.
  */
-export function parseDocumentNode(document: DocumentNode): ParsingOuput {
+export function parseDocumentNode(
+  document: DocumentNode,
+): DocumentParsingOuput {
   const intermediateDict: IntermediateDictionary = {
     objects: {},
     inputs: {},
@@ -508,18 +544,10 @@ export function thunkTypeFromDirectives(field: FieldDefinitionNode) {
  * If it's not a known type and the definition is not available on the
  * intermediate dictionary, then a TypeNotFound exception will be thrown.
  *
- * @param kind The kind of field. This will be used to access the
- * intermediateDict and find whether the type will be available on the file.
- *
  * @param type Definition of the type.
- *
- * @param intermediateDict Intermediate dictionary with all the available
- * definitions for this document parsing.
  */
 export function parseFieldType(
-  kind: ObjectTypeKind,
   type: NamedTypeNode,
-  intermediateDict: IntermediateDictionary,
 ): KnownScalarTypeDescriptor | ReferencedTypeDescriptor {
   const name = type.name.value;
 
@@ -533,18 +561,6 @@ export function parseFieldType(
     case 'Boolean':
       return { kind: 'KnownScalarType', type: KnownScalarTypes.Boolean };
     default:
-      const typeNotFound =
-        (kind === ObjectTypeKind.Object &&
-          !intermediateDict.objects.hasOwnProperty(name) &&
-          !intermediateDict.enums.hasOwnProperty(name)) ||
-        (kind === ObjectTypeKind.Input &&
-          !intermediateDict.inputs.hasOwnProperty(name) &&
-          !intermediateDict.enums.hasOwnProperty(name));
-
-      if (typeNotFound) {
-        throw new UnknownTypeError(name);
-      }
-
       return { kind: 'ReferencedType', name: type.name.value };
   }
 }
@@ -606,7 +622,7 @@ export function parseFieldDefinitionNode(
 
     return {
       name: definition.name.value,
-      type: parseFieldType(kind, definition, intermediateDict),
+      type: parseFieldType(definition),
       thunkType: ThunkType.None,
       array: false,
       required: false,

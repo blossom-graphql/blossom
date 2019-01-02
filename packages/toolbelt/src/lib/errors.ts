@@ -52,3 +52,20 @@ export class OperationTypeCollisionError extends Error {
     super(`Operation types already defined in intermediateDict.`);
   }
 }
+
+export class ImportParsingError extends Error {
+  name = 'ImportParsingError';
+  filePath: string;
+  originalError: Error;
+
+  constructor(filePath: string, originalError: Error) {
+    super(
+      `Error while parsing file ${filePath}: ${
+        originalError.message
+      }. Expand originalError for more info.`,
+    );
+
+    this.filePath = filePath;
+    this.originalError = originalError;
+  }
+}
