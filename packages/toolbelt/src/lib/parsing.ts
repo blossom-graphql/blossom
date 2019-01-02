@@ -85,8 +85,8 @@ export type IntermediateDictionary = {
  * parsing.
  */
 export type DocumentParsingOuput = {
-  objects: ObjectTypeDescription[];
-  inputs: ObjectTypeDescription[];
+  objects: Map<string, ObjectTypeDescription>;
+  inputs: Map<string, ObjectTypeDescription>;
   operationNames: OperationNames;
 };
 
@@ -454,7 +454,7 @@ export function parseDocumentNode(
    * @param object Descriptor of the Object / Input.
    */
   function nodeReducer(
-    accumulator: ObjectTypeDescription[],
+    accumulator: Map<string, ObjectTypeDescription>,
     object:
       | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
       | DocumentNodeDescriptor<InputObjectTypeDefinitionNode>,
@@ -462,7 +462,7 @@ export function parseDocumentNode(
     const parsedResult = parseDocumentObjectType(object.node, intermediateDict);
 
     if (parsedResult !== null) {
-      accumulator.push(parsedResult);
+      accumulator.set(parsedResult.name, parsedResult);
     }
 
     return accumulator;
@@ -472,8 +472,14 @@ export function parseDocumentNode(
   // TODO: Do something with enums.
   // TODO: Do something with aliases.
   return {
-    objects: Object.values(intermediateDict.objects).reduce(nodeReducer, []),
-    inputs: Object.values(intermediateDict.inputs).reduce(nodeReducer, []),
+    objects: Object.values(intermediateDict.objects).reduce(
+      nodeReducer,
+      new Map(),
+    ),
+    inputs: Object.values(intermediateDict.inputs).reduce(
+      nodeReducer,
+      new Map(),
+    ),
     operationNames: intermediateDict.operationNames,
   };
 }
