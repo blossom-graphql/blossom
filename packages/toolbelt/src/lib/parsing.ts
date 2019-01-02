@@ -6,6 +6,8 @@
  *
  */
 
+import fs from 'fs';
+import path from 'path';
 import {
   ObjectTypeDefinitionNode,
   InputObjectTypeDefinitionNode,
@@ -25,7 +27,7 @@ export const BLOSSOM_IMPLEMENTATION_DIRECTIVE = 'blossomImpl';
 export const BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME = 'type';
 
 const PATH_REGEX = `[^'"]+`;
-const IMPORT_MATCH_REGEX = `^#\s?import\s+(?<imported>.+\s+from\s+)?(?<quote>['"])(?<path>${PATH_REGEX})(\k<quote>);?$`;
+const IMPORT_MATCH_REGEX = `^#\\s?import\\s+(?<imported>.+\\s+from\\s+)?(?<quote>['"])(?<path>${PATH_REGEX})(\\k<quote>);?$`;
 
 /**
  * Descriptor of a document node.
@@ -212,14 +214,27 @@ export enum ObjectTypeKind {
   Input = 'Input',
 }
 
-export type ImportResolutionMap = { [key: string]: '*' | Set<string> };
+/**
+ * Maps a full path to a wildcard to indicate that everything should be imported
+ * or only a list of types.
+ */
+export type ImportResolutionMap = Map<string, '*' | Set<string>>;
 
+/**
+ * Given a schema string, reads all the import statements and returns a map
+ * with all the absolute paths of the imports and the types that must be
+ * imported from the referenced file.
+ *
+ * @param schema String of the schema to be parsed.
+ *
+ * @param basePath Base path to resolve the relative paths.
+ */
 export function getSchemaImports(
   schema: string,
   basePath: string = APP_DIR,
 ): ImportResolutionMap {
   const lines = schema.split('\n');
-  const accumulatedImports: ImportResolutionMap = {};
+  const accumulatedImports: ImportResolutionMap = new Map();
 
   lines.forEach(line => {
     // Start with a RegExp object from scratch to avoid collisions
@@ -229,23 +244,99 @@ export function getSchemaImports(
     // Skip this line if the necessary information is not implemented
     if (!result || !result.groups || !result.groups.path) return;
 
-    // TODO: Provide the Set case to allow importing specific paths.
     const realPath = appPath(result.groups.path, basePath);
-    accumulatedImports[realPath] = '*';
+    const currentValue = accumulatedImports.get(realPath);
+
+    // TODO: Provide the Set case to allow importing specific paths.
+    // At the moment it's wired to '*'
+    const parsedValue: '*' | Set<string> = '*';
+
+    if (!currentValue) {
+      accumulatedImports.set(realPath, parsedValue);
+    } else if (currentValue === '*') {
+      // Do nothing. We're already importing everything.
+      // TODO: Log message.
+    } else {
+      accumulatedImports.set(
+        realPath,
+        parsedValue !== '*'
+          ? new Set([/* ...parsedValue, */ ...currentValue])
+          : '*',
+      );
+    }
   });
 
   return accumulatedImports;
 }
 
-type PathSchemaMap = Map<string, string>;
+/**
+ * Structure to represent the parsing result of a schema and its dependencies.
+ */
+type ParsedSchemaReferences = {
+  /**
+   * Full string for the schema.
+   */
+  schema: string;
+  /**
+   * Map containing the full path of the imported files and a list of the
+   * required dependencies.
+   */
+  references: ImportResolutionMap;
+};
 
-export function getParsingMap(path: string, accumulated?: PathSchemaMap) {
-  // Return accumulator if path is in accumulator
-  // Read file
-  // Create new accumulator with path
-  // Call getSchemaImports()
+/**
+ * Map from a full path to the ParsedSchema reference structure.
+ */
+type PathSchemaMap = Map<string, ParsedSchemaReferences>;
+
+/**
+ * Given a full GraphQL file path, reads the file to retrieve the schema and
+ * recursively parses the imports from other files. The result is map from the
+ * full path file to a structure that contains the schema contents and the
+ * parsed references.
+ *
+ * @param filePath Full resolved path of the file to be read.
+ *
+ * @param accumulated Accumulated map of the already parsed results. If null,
+ * a new one will be created.
+ */
+export async function getParsingMap(
+  filePath: string,
+  accumulated?: PathSchemaMap,
+) {
+  // Base case: Return accumulator if path is in accumulator
+  if (accumulated && accumulated.has(filePath)) return accumulated;
+
+  // Read file + Create new accumulator with path
+  const accumulator: PathSchemaMap = accumulated
+    ? new Map(accumulated)
+    : new Map();
+  const fileContents = await fs.promises.readFile(filePath);
+  const schema = fileContents.toString('utf-8');
+  const parsedPath = path.parse(filePath);
+
+  // Call getSchemaImports() with the retrieved schema.
+  const imports = getSchemaImports(schema, parsedPath.dir);
+
+  // Update the accumulator with the new result
+  accumulator.set(filePath, {
+    schema,
+    references: imports,
+  });
+
+  // Get a binding of the accumulator
+  let accumulatorRef = accumulator;
+
   // For each of the imports call getParsingMap with path and accumulator.
   // If accumulator is different, merge with results.
+  for (const [importPath] of imports) {
+    const newAccumulator = await getParsingMap(importPath, accumulatorRef);
+
+    // If there's a new reference, then we update the pointer
+    if (newAccumulator !== accumulatorRef) accumulatorRef = newAccumulator;
+  }
+
+  return accumulatorRef;
 }
 
 /**
