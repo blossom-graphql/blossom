@@ -13,7 +13,7 @@ const CORE_PACKAGE_NAME = '@blossom-gql/core';
 
 type ImportMembersMap = Map<'default' | string, string | undefined>;
 
-type ImportDescription = VendorImportDescription | FileImportDescription;
+export type ImportDescription = VendorImportDescription | FileImportDescription;
 
 type VendorImportDescription = {
   kind: 'VendorImport';
@@ -92,6 +92,7 @@ export function linkTypesFile(
         field => field.thunkType !== ThunkType.None,
       );
 
+    // Ensure that dependencies can be satisfied for each field.
     descriptor.referencedTypes.forEach(field => {
       // 1. Search in the object.
       if (parsedDocument.objects.has(field)) {
@@ -143,8 +144,12 @@ export function linkTypesFile(
         }
       }
     });
+
+    // Append to the list of type declarations.
+    result.typeDeclarations.push(descriptor);
   });
 
+  // If we have any thunked schema file, add the corresponding imports.
   if (requiresThunkImports) {
     addImport(
       result.vendorImports,
@@ -161,6 +166,7 @@ export function linkTypesFile(
     );
   }
 
+  // If we have any optional type, import Maybe type definition.
   if (requiresMaybe) {
     addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
   }

@@ -6,7 +6,10 @@
  *
  */
 
-import * as ts from 'typescript';
+import path from 'path';
+
+import ts from 'typescript';
+import { camelCase } from 'lodash';
 
 import {
   FieldDescriptor,
@@ -14,6 +17,8 @@ import {
   ThunkType,
   KnownScalarTypes,
 } from './parsing';
+import { TypesFileContents, ImportDescription } from './linking';
+import { projectImportPath } from './paths';
 
 /**
  * Receives a list of arguments and generates a type literal with the arguments
@@ -254,4 +259,81 @@ export function generateTypeAlias(
   }
 
   return declaration;
+}
+
+export function defaultImportName(description: ImportDescription): string {
+  if (description.kind === 'VendorImport') {
+    const arr = description.moduleName.split('/');
+    return arr[arr.length - 1];
+  } else {
+    const parsed = path.parse(description.fullPath);
+
+    return camelCase(parsed.name);
+  }
+}
+
+export function createImportDeclaration(importDescription: ImportDescription) {
+  const importModuleName =
+    importDescription.kind !== 'VendorImport'
+      ? projectImportPath(importDescription.fullPath)
+      : importDescription.moduleName;
+
+  let defaultClause: ts.Identifier | undefined = undefined;
+
+  const members = [...importDescription.membersMap.entries()];
+  const importSpecifiers = members.reduce(
+    (acc: ts.ImportSpecifier[], [name, alias]) => {
+      if (name === 'default') {
+        defaultClause = ts.createIdentifier(
+          defaultImportName(importDescription),
+        );
+
+        return acc;
+      }
+
+      if (alias) {
+        acc.push(
+          ts.createImportSpecifier(
+            ts.createIdentifier(name),
+            ts.createIdentifier(alias),
+          ),
+        );
+      } else {
+        acc.push(
+          ts.createImportSpecifier(undefined, ts.createIdentifier(name)),
+        );
+      }
+
+      return acc;
+    },
+    [],
+  );
+
+  return ts.createImportDeclaration(
+    undefined,
+    undefined,
+    ts.createImportClause(
+      defaultClause,
+      ts.createNamedImports(importSpecifiers),
+    ),
+    ts.createStringLiteral(importModuleName),
+  );
+}
+
+export function generateTypesFileNodes(
+  contents: TypesFileContents,
+): ReadonlyArray<ts.Node> {
+  const vendorImports = [...contents.vendorImports.values()].map(
+    createImportDeclaration,
+  );
+
+  const fileImports = [...contents.fileImports.values()].map(
+    createImportDeclaration,
+  );
+
+  const typeDeclarations = [...contents.typeDeclarations.values()].map(
+    generateTypeAlias,
+  );
+
+  return [...vendorImports, ...fileImports, ...typeDeclarations];
 }

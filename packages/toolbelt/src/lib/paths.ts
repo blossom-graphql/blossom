@@ -32,3 +32,10 @@ export function typesFilePath(schemaFilePath: string): string {
 export function blossomInstancePath(): string {
   return appPath('./blossom-instance.ts');
 }
+
+export function projectImportPath(fullPath: string): string {
+  const parsed = path.parse(fullPath);
+  const noExtensionPath = path.join(parsed.dir, parsed.name);
+
+  return path.relative(APP_DIR, noExtensionPath);
+}
