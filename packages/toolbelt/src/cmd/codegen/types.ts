@@ -14,11 +14,10 @@ import { DocumentNode, parse } from 'graphql';
 import cosmiconfig from 'cosmiconfig';
 import prettier from 'prettier';
 
+import VERSION from '../../version';
 import { parseDocumentNode } from '../../lib/parsing';
 import { generateTypeAlias } from '../../lib/codegen';
-
-import { appPath } from '../../lib/paths';
-import VERSION from '../../version';
+import { appPath, typesFilePath } from '../../lib/paths';
 
 function getDocument(file: string): DocumentNode | undefined {
   try {
@@ -31,13 +30,6 @@ function getDocument(file: string): DocumentNode | undefined {
       throw error;
     }
   }
-}
-
-function defaultOutputFile(originalFilePath: string): string {
-  const parsedPath = path.parse(originalFilePath);
-  const baseFileName = parsedPath.name.split('.')[0];
-
-  return path.join(parsedPath.dir, `${baseFileName}.types.ts`);
 }
 
 export default async function generateTypes(options: {
@@ -123,6 +115,6 @@ import { Maybe } from '@blossom-gql/core';
   if (options.stdout) {
     console.log(formattedFile);
   } else {
-    writeFileSync(defaultOutputFile(fullInputFilePath), formattedFile);
+    writeFileSync(typesFilePath(fullInputFilePath), formattedFile);
   }
 }

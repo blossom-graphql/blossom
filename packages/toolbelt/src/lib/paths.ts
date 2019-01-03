@@ -6,11 +6,11 @@
  *
  */
 
-import { realpathSync } from 'fs';
-import { resolve } from 'path';
+import fs from 'fs';
+import path from 'path';
 
 // Real path of the current working directory, including resolution of symlinks.
-export const APP_DIR = realpathSync(process.cwd());
+export const APP_DIR = fs.realpathSync(process.cwd());
 
 /**
  * Given a relative path, returns the absolute path on the current running
@@ -19,5 +19,16 @@ export const APP_DIR = realpathSync(process.cwd());
  * @param relativePath Relative path in the current Blossom project.
  */
 export function appPath(relativePath: string, basePath = APP_DIR): string {
-  return resolve(basePath, relativePath);
+  return path.resolve(basePath, relativePath);
+}
+
+export function typesFilePath(schemaFilePath: string): string {
+  const parsedPath = path.parse(schemaFilePath);
+  const baseFileName = parsedPath.name.split('.')[0];
+
+  return path.join(parsedPath.dir, `${baseFileName}.types.ts`);
+}
+
+export function blossomInstancePath(): string {
+  return appPath('./blossom-instance.ts');
 }

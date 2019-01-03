@@ -67,5 +67,6 @@ export class ImportParsingError extends Error {
 
     this.filePath = filePath;
     this.originalError = originalError;
+    this.stack = originalError.stack;
   }
 }

@@ -199,6 +199,7 @@ export type ObjectTypeDescription = {
   name: string;
   comments?: string;
   fields: FieldDescriptor[];
+  referencedTypes: ReferencedTypeList;
 };
 
 /**
@@ -219,7 +220,10 @@ export enum ObjectTypeKind {
  * Maps a full path to a wildcard to indicate that everything should be imported
  * or only a list of types.
  */
-export type ImportResolutionMap = Map<string, '*' | Set<string>>;
+export type ImportResolutionMap = {
+  full: Set<string>;
+  named: Map<string, Set<string>>;
+};
 
 /**
  * Structure to represent the parsing result of a schema and its dependencies.
@@ -246,6 +250,8 @@ export type ParsedFileGraph = Map<
   ParsedSchemaReferences & { parsedDocument: DocumentParsingOuput }
 >;
 
+export type ReferencedTypeList = Set<string>;
+
 export async function parseFileGraph(
   filePath: string,
 ): Promise<ParsedFileGraph> {
@@ -267,6 +273,12 @@ export async function parseFileGraph(
   return result;
 }
 
+export function getImportStatementNames(_: string): '*' | Set<string> {
+  // TODO: Provide the Set case to allow importing specific paths.
+  // At the moment it's wired to '*'
+  return '*';
+}
+
 /**
  * Given a schema string, reads all the import statements and returns a map
  * with all the absolute paths of the imports and the types that must be
@@ -281,7 +293,10 @@ export function getSchemaImports(
   basePath: string = APP_DIR,
 ): ImportResolutionMap {
   const lines = schema.split('\n');
-  const accumulatedImports: ImportResolutionMap = new Map();
+  const accumulatedImports: ImportResolutionMap = {
+    full: new Set(),
+    named: new Map(),
+  };
 
   lines.forEach(line => {
     // Start with a RegExp object from scratch to avoid collisions
@@ -292,24 +307,38 @@ export function getSchemaImports(
     if (!result || !result.groups || !result.groups.path) return;
 
     const realPath = appPath(result.groups.path, basePath);
-    const currentValue = accumulatedImports.get(realPath);
+    const fullValue = accumulatedImports.full.has(realPath);
+    const namedValue = accumulatedImports.named.get(realPath);
 
-    // TODO: Provide the Set case to allow importing specific paths.
-    // At the moment it's wired to '*'
-    const parsedValue: '*' | Set<string> = '*';
+    const parsedValue = getImportStatementNames(line);
 
-    if (!currentValue) {
-      accumulatedImports.set(realPath, parsedValue);
-    } else if (currentValue === '*') {
-      // Do nothing. We're already importing everything.
-      // TODO: Log message.
-    } else {
-      accumulatedImports.set(
-        realPath,
-        parsedValue !== '*'
-          ? new Set([/* ...parsedValue, */ ...currentValue])
-          : '*',
-      );
+    /**
+     * This behavior can be easily understood with a truth table:
+     *
+     * p: parsedValue is wildcard = T if pV == '*' | false
+     * f: fullValue is present    = T/F
+     * n: namedValue is present   = T/F
+     *
+     * p\fn:  F F       F T         T T         T F
+     *  T     set full  do nothing  do nothing  do nothing
+     *  F     set named do nothing  do nothing  do nothing
+     */
+    if (!fullValue && parsedValue === '*') {
+      // i.e. set full
+      accumulatedImports.full.add(realPath);
+
+      // remove references from named imports as well
+      accumulatedImports.named.delete(realPath);
+    } else if (!fullValue && parsedValue !== '*') {
+      // i.e. set named
+      if (!namedValue) {
+        accumulatedImports.named.set(realPath, new Set([...parsedValue]));
+      } else {
+        accumulatedImports.named.set(
+          realPath,
+          new Set([...namedValue, ...parsedValue]),
+        );
+      }
     }
   });
 
@@ -363,7 +392,7 @@ export async function getParsingMap(
 
   // For each of the imports call getParsingMap with path and accumulator.
   // If accumulator is different, merge with results.
-  for (const [importPath] of imports) {
+  for (const importPath of [...imports.full, ...imports.named.keys()]) {
     const newAccumulator = await getParsingMap(importPath, accumulatorRef);
 
     // If there's a new reference, then we update the pointer
@@ -459,7 +488,7 @@ export function parseDocumentNode(
       | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
       | DocumentNodeDescriptor<InputObjectTypeDefinitionNode>,
   ) {
-    const parsedResult = parseDocumentObjectType(object.node, intermediateDict);
+    const parsedResult = parseDocumentObjectType(object.node);
 
     if (parsedResult !== null) {
       accumulator.set(parsedResult.name, parsedResult);
@@ -551,9 +580,13 @@ export function thunkTypeFromDirectives(field: FieldDefinitionNode) {
  * intermediate dictionary, then a TypeNotFound exception will be thrown.
  *
  * @param type Definition of the type.
+ *
+ * @param referencedTypes Set of the referenced names for the parsing of this
+ * field.
  */
 export function parseFieldType(
   type: NamedTypeNode,
+  referencedTypes: ReferencedTypeList,
 ): KnownScalarTypeDescriptor | ReferencedTypeDescriptor {
   const name = type.name.value;
 
@@ -567,6 +600,7 @@ export function parseFieldType(
     case 'Boolean':
       return { kind: 'KnownScalarType', type: KnownScalarTypes.Boolean };
     default:
+      referencedTypes.add(type.name.value);
       return { kind: 'ReferencedType', name: type.name.value };
   }
 }
@@ -590,7 +624,7 @@ export function parseFieldType(
 export function parseFieldDefinitionNode(
   definition: FieldDefinitionNode | InputValueDefinitionNode | TypeNode,
   kind: ObjectTypeKind,
-  intermediateDict: IntermediateDictionary,
+  referencedTypes: ReferencedTypeList,
 ): FieldDescriptor {
   if (definition.kind === 'ListType') {
     // A list. We must enforce that array is true in this case and then recurse
@@ -598,7 +632,7 @@ export function parseFieldDefinitionNode(
     const result = parseFieldDefinitionNode(
       definition.type,
       kind,
-      intermediateDict,
+      referencedTypes,
     ) as FieldDescriptor;
 
     return {
@@ -615,7 +649,7 @@ export function parseFieldDefinitionNode(
     const result = parseFieldDefinitionNode(
       definition.type,
       kind,
-      intermediateDict,
+      referencedTypes,
     ) as FieldDescriptor;
 
     return {
@@ -628,7 +662,7 @@ export function parseFieldDefinitionNode(
 
     return {
       name: definition.name.value,
-      type: parseFieldType(definition),
+      type: parseFieldType(definition, referencedTypes),
       thunkType: ThunkType.None,
       array: false,
       required: false,
@@ -650,7 +684,7 @@ export function parseFieldDefinitionNode(
         parseFieldDefinitionNode(
           argument,
           ObjectTypeKind.Input,
-          intermediateDict,
+          referencedTypes,
         ),
       );
     } else {
@@ -681,7 +715,7 @@ export function parseFieldDefinitionNode(
     const result = parseFieldDefinitionNode(
       definition.type,
       kind,
-      intermediateDict,
+      referencedTypes,
     ) as FieldDescriptor;
 
     return {
@@ -698,14 +732,12 @@ export function parseFieldDefinitionNode(
  * structure for codegen purposes.
  *
  * @param type Definition structure of the object / input object type.
- *
- * @param intermediateDict Intermediate dictionary where all the parsed
- * definitions of all the involved files are collapsed into a Map.
  */
 export function parseDocumentObjectType(
   type: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
-  intermediateDict: IntermediateDictionary,
 ): ObjectTypeDescription | null {
+  const referencedTypes: ReferencedTypeList = new Set();
+
   /**
    * Receives a FieldDefinitionNode or a InputValueDefinitionNode an maps it
    * to a FieldDescriptor, the intermediate Blossom structure used for analysis
@@ -724,13 +756,13 @@ export function parseDocumentObjectType(
       return parseFieldDefinitionNode(
         field,
         ObjectTypeKind.Object,
-        intermediateDict,
+        referencedTypes,
       );
     } else {
       return parseFieldDefinitionNode(
         field,
         ObjectTypeKind.Input,
-        intermediateDict,
+        referencedTypes,
       );
     }
   }
@@ -753,5 +785,6 @@ export function parseDocumentObjectType(
     name: type.name.value,
     comments: type.description && type.description.value,
     fields,
+    referencedTypes,
   };
 }
