@@ -6,6 +6,8 @@
  *
  */
 
+import { OriginKind } from './linking';
+
 /**
  * Error thrown when an operation name in SchemaDefinitionNode of the GraphQL
  * parsed Document is not supported in this library.
@@ -68,5 +70,29 @@ export class ImportParsingError extends Error {
     this.filePath = filePath;
     this.originalError = originalError;
     this.stack = originalError.stack;
+  }
+}
+
+export class FileNotFoundInGraph extends Error {
+  constructor(filePath: string) {
+    super(
+      `File ${filePath} not found among the referenced parsed files. This is an internal error.`,
+    );
+  }
+}
+
+export class InvalidReferenceError extends Error {
+  constructor(field: string, filePath: string, kind: OriginKind) {
+    super(
+      `Reference to ${field} in file ${filePath} is invalid. ${field} cannot be referenced from kind ${kind}`,
+    );
+  }
+}
+
+export class ReferenceNotFoundError extends Error {
+  constructor(field: string, filePath: string) {
+    super(
+      `Reference ${field} required by file ${filePath} was nowhere to be found. Did you forget an # import statement?`,
+    );
   }
 }

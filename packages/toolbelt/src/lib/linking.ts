@@ -6,10 +6,24 @@
  *
  */
 
-import { ParsedFileGraph, ObjectTypeDescription, ThunkType } from './parsing';
+import {
+  ParsedFileGraph,
+  ObjectTypeDescription,
+  ThunkType,
+  DocumentParsingOuput,
+  ParsedFileDescriptor,
+} from './parsing';
 import { typesFilePath, blossomInstancePath } from './paths';
+import {
+  FileNotFoundInGraph,
+  InvalidReferenceError,
+  ReferenceNotFoundError,
+} from './errors';
+import { forEachWithErrors } from './utils';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
+const MAYBE_DEP_NAME = 'Maybe';
+const THUNK_IMPORTS_DEP_NAME = 'ThunkImports';
 
 type ImportMembersMap = Map<'default' | string, string | undefined>;
 
@@ -32,6 +46,7 @@ type ImportGroupMap = Map<string, ImportDescription>;
 export type TypesFileContents = {
   vendorImports: ImportGroupMap;
   fileImports: ImportGroupMap;
+  requiredDeps: Set<string>;
   typeDeclarations: ObjectTypeDescription[];
 };
 
@@ -64,49 +79,164 @@ export function addImport(
   }
 }
 
-export function linkTypesFile(
-  file: string,
-  fileGraph: ParsedFileGraph,
-): TypesFileContents {
-  const parsedFile = fileGraph.get(file);
-  if (!parsedFile) {
-    throw new Error(`Parsing for file ${parsedFile} not found in fileGraph.`);
-  }
+export enum OriginKind {
+  Object = 'Object',
+  Input = 'Input',
+  Alias = 'Alias',
+}
 
-  const result: TypesFileContents = {
-    vendorImports: new Map(),
-    fileImports: new Map(),
-    typeDeclarations: [],
+export enum PresenceResult {
+  Present = 'Present',
+  Invalid = 'Invalid',
+  NotPresent = 'NotPresent',
+}
+
+export function requirePresence(presenceMap: any, keys: string[]) {
+  const hasValidKey = !!keys.find(key => presenceMap[key]);
+  if (hasValidKey) return PresenceResult.Present;
+
+  if (keys.length > Object.keys(presenceMap).length) {
+    return PresenceResult.NotPresent;
+  } else if (Object.values(presenceMap).find(value => !!value)) {
+    return PresenceResult.Invalid;
+  } else {
+    return PresenceResult.NotPresent;
+  }
+}
+
+export function documentHasReference(
+  document: DocumentParsingOuput,
+  originKind: OriginKind,
+  field: string,
+): PresenceResult {
+  // Only one of these should be true. If there's more than one, that's a parsing
+  // bug for sure.
+  const presenceMap = {
+    objects: document.objects.has(field),
+    inputs: document.inputs.has(field),
+    enums: false, // document.enums.has(field)
+    aliases: false, // document.aliases.has(field)
   };
 
-  let requiresMaybe: boolean = false;
-  let requiresThunkImports: boolean = false;
+  switch (originKind) {
+    case OriginKind.Object:
+    case OriginKind.Alias:
+      return requirePresence(presenceMap, ['objects', 'enums', 'aliases']);
+    case OriginKind.Input:
+      return requirePresence(presenceMap, ['inputs', 'enums']);
+  }
+}
 
-  const parsedDocument = parsedFile.parsedDocument;
-  parsedDocument.objects.forEach(descriptor => {
-    if (!requiresMaybe)
-      requiresMaybe = !!descriptor.fields.find(field => !field.required);
+export function fileHasReference(
+  fileGraph: ParsedFileGraph,
+  filePath: string,
+  schemaPath: string,
+  kind: OriginKind,
+  field: string,
+): PresenceResult {
+  const referencedFile = fileGraph.get(schemaPath);
+  if (!referencedFile) throw new FileNotFoundInGraph(filePath);
 
-    if (!requiresThunkImports)
-      requiresThunkImports = !!descriptor.fields.find(
-        field => field.thunkType !== ThunkType.None,
+  const { parsedDocument: referencedDocument } = referencedFile;
+  return documentHasReference(referencedDocument, kind, field);
+}
+
+export function linkTypes(state: {
+  descriptor: ObjectTypeDescription;
+  result: TypesFileContents;
+  filePath: string;
+  fileGraph: ParsedFileGraph;
+  parsedFile: ParsedFileDescriptor;
+  kind: OriginKind;
+}) {
+  const {
+    descriptor,
+    fileGraph,
+    kind,
+    filePath,
+    parsedFile,
+    parsedFile: { parsedDocument },
+    result,
+  } = state;
+
+  // Calculate whether Maybe should be required or not.
+  if (
+    !result.requiredDeps.has(MAYBE_DEP_NAME) &&
+    descriptor.fields.find(field => !field.required)
+  )
+    result.requiredDeps.add(MAYBE_DEP_NAME);
+
+  // Calculate whether ThunkImports should be required or not.
+  if (
+    !result.requiredDeps.has(THUNK_IMPORTS_DEP_NAME) &&
+    descriptor.fields.find(field => field.thunkType !== ThunkType.None)
+  )
+    result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
+
+  // Ensure that dependencies can be satisfied for each field.
+  descriptor.referencedTypes.forEach(field => {
+    // 1. Search in the object.
+    if (
+      documentHasReference(parsedDocument, kind, field) ===
+      PresenceResult.Present
+    ) {
+      // Linking passed. Nothing to do here because it's already on the file.
+      // TODO: Log
+      return;
+    } else {
+      // 2. Search in references explicitly.
+      const existingRef = [...parsedFile.references.named.entries()].find(
+        ([_, map]) => map.has(field),
       );
 
-    // Ensure that dependencies can be satisfied for each field.
-    descriptor.referencedTypes.forEach(field => {
-      // 1. Search in the object.
-      if (parsedDocument.objects.has(field)) {
-        // Linking passed. Nothing to do here because it's already on the file.
-        // TODO: Log
-        return;
-      } else {
-        // 2. Search in references explicitly.
-        const existingRef = [...parsedFile.references.named.entries()].find(
-          ([_, map]) => map.has(field),
+      // Reference found. Ensure that the file is readily available and that
+      // the reference can actually be imported.
+      if (existingRef) {
+        const [schemaPath] = existingRef;
+
+        switch (
+          fileHasReference(fileGraph, filePath, schemaPath, kind, field)
+        ) {
+          case PresenceResult.Present:
+            addImport(
+              result.fileImports,
+              'FileImport',
+              typesFilePath(schemaPath),
+              field,
+            );
+            return;
+          case PresenceResult.Invalid:
+            throw new InvalidReferenceError(field, filePath, kind);
+          case PresenceResult.NotPresent:
+            throw new ReferenceNotFoundError(field, filePath);
+        }
+      }
+
+      // 3. Search in references with wildcards.
+      let schemaPath: string | undefined;
+      let presenceResult: PresenceResult = PresenceResult.NotPresent;
+
+      for (const referencedSchemaPath of parsedFile.references.full) {
+        const result = fileHasReference(
+          fileGraph,
+          filePath,
+          referencedSchemaPath,
+          kind,
+          field,
         );
 
-        if (existingRef) {
-          const [schemaPath] = existingRef;
+        if (result !== PresenceResult.NotPresent) {
+          presenceResult = result;
+          schemaPath = referencedSchemaPath;
+          break;
+        }
+      }
+
+      // TODO: Log
+      switch (presenceResult) {
+        case PresenceResult.Present:
+          if (!schemaPath) throw new Error('Schema path not found.');
+
           addImport(
             result.fileImports,
             'FileImport',
@@ -114,42 +244,57 @@ export function linkTypesFile(
             field,
           );
           return;
-        }
-
-        // 3. Search in references with wildcards.
-        const schemaPath = [...parsedFile.references.full].find(schemaPath => {
-          const parsedReference = fileGraph.get(schemaPath);
-
-          if (!parsedReference)
-            throw new Error( // TODO: Specific error.
-              `Parsed file for ${schemaPath} not found fileGraph.`,
-            );
-
-          // TODO: What about enums and aliases? This needs to be refactored.
-          return parsedReference.parsedDocument.objects.has(field);
-        });
-
-        // TODO: Log
-        if (schemaPath) {
-          addImport(
-            result.fileImports,
-            'FileImport',
-            typesFilePath(schemaPath),
-            field,
-          );
-        } else {
-          throw new Error( // TODO: Wrap in another error.
-            `Reference ${field} required by file ${file} was nowhere to be found. Did you forget an # import statement?`,
-          );
-        }
+        case PresenceResult.Invalid:
+          throw new InvalidReferenceError(field, filePath, kind);
+        case PresenceResult.NotPresent:
+          throw new ReferenceNotFoundError(field, filePath);
       }
-    });
-
-    // Append to the list of type declarations.
-    result.typeDeclarations.push(descriptor);
+    }
   });
 
+  // Append to the list of type declarations.
+  result.typeDeclarations.push(descriptor);
+}
+
+export function linkTypesFile(
+  filePath: string,
+  fileGraph: ParsedFileGraph,
+): TypesFileContents {
+  const parsedFile = fileGraph.get(filePath);
+  if (!parsedFile) {
+    throw new FileNotFoundInGraph(filePath);
+  }
+
+  const result: TypesFileContents = {
+    vendorImports: new Map(),
+    fileImports: new Map(),
+    typeDeclarations: [],
+    requiredDeps: new Set(),
+  };
+
+  // Link every object
+  const objectErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.objects.values()],
+    descriptor =>
+      linkTypes({
+        descriptor,
+        result,
+        filePath,
+        fileGraph,
+        parsedFile,
+        kind: OriginKind.Object,
+      }),
+  );
+
+  if (objectErrors.length > 0) {
+    console.error('Errors found while parsing:');
+    objectErrors.forEach(error => console.error(error));
+  }
+
   // If we have any thunked schema file, add the corresponding imports.
+  const requiresThunkImports = result.requiredDeps.has(THUNK_IMPORTS_DEP_NAME);
+  const requiresMaybe = result.requiredDeps.has(MAYBE_DEP_NAME);
+
   if (requiresThunkImports) {
     addImport(
       result.vendorImports,

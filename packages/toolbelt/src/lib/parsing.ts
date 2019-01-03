@@ -245,10 +245,11 @@ type ParsedSchemaReferences = {
  */
 type PathSchemaMap = Map<string, ParsedSchemaReferences>;
 
-export type ParsedFileGraph = Map<
-  string,
-  ParsedSchemaReferences & { parsedDocument: DocumentParsingOuput }
->;
+export type ParsedFileDescriptor = ParsedSchemaReferences & {
+  parsedDocument: DocumentParsingOuput;
+};
+
+export type ParsedFileGraph = Map<string, ParsedFileDescriptor>;
 
 export type ReferencedTypeList = Set<string>;
 
