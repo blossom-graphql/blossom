@@ -320,9 +320,11 @@ export function createImportDeclaration(importDescription: ImportDescription) {
   );
 }
 
+type CodeGroup = ReadonlyArray<ts.Node>;
+
 export function generateTypesFileNodes(
   contents: TypesFileContents,
-): ReadonlyArray<ts.Node> {
+): ReadonlyArray<CodeGroup> {
   const vendorImports = [...contents.vendorImports.values()].map(
     createImportDeclaration,
   );
@@ -335,5 +337,5 @@ export function generateTypesFileNodes(
     generateTypeAlias,
   );
 
-  return [...vendorImports, ...fileImports, ...typeDeclarations];
+  return [vendorImports, fileImports, typeDeclarations];
 }
