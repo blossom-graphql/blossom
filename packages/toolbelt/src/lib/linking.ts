@@ -18,6 +18,7 @@ import {
   FileNotFoundInGraph,
   InvalidReferenceError,
   ReferenceNotFoundError,
+  LinkingError,
 } from './errors';
 import { forEachWithErrors } from './utils';
 
@@ -287,8 +288,7 @@ export function linkTypesFile(
   );
 
   if (objectErrors.length > 0) {
-    console.error('Errors found while parsing:');
-    objectErrors.forEach(error => console.error(error));
+    throw new LinkingError(objectErrors);
   }
 
   // If we have any thunked schema file, add the corresponding imports.

@@ -18,8 +18,9 @@ import { parseFileGraph } from '../../lib/parsing';
 import { generateTypesFileNodes } from '../../lib/codegen';
 import { appPath, typesFilePath } from '../../lib/paths';
 import { linkTypesFile } from '../../lib/linking';
+import { cliRunWrapper } from '../../lib/runtime';
 
-export default async function generateTypes(options: {
+export async function generateTypes(options: {
   file?: string;
   stdin?: boolean;
   stdout?: boolean;
@@ -94,3 +95,5 @@ export default async function generateTypes(options: {
     writeFileSync(typesFilePath(fullInputFilePath), formattedFile);
   }
 }
+
+export default cliRunWrapper(generateTypes);

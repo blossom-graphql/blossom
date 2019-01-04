@@ -71,14 +71,13 @@ export function fullInspect(object: any) {
   return inspect(object, true, null, true);
 }
 
-export function run(fun: (...args: any[]) => Promise<any>, ...args: any[]) {
-  try {
-    fun(...args).catch(error => {
-      console.error(error);
-      process.exit(1);
-    });
-  } catch (error) {
-    console.error(error);
-    process.exit(1);
-  }
+export function tabMessage(message: string, tabSize: number = 2) {
+  const tab = Array.from({ length: tabSize })
+    .map(() => ' ')
+    .join('');
+
+  return message
+    .split('\n')
+    .map(l => `${tab}${l}`)
+    .join('\n');
 }
