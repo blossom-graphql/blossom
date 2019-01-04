@@ -9,13 +9,14 @@
 import path from 'path';
 
 import ts from 'typescript';
-import { camelCase } from 'lodash';
+import { camelCase, upperFirst } from 'lodash';
 
 import {
   FieldDescriptor,
   ObjectTypeDescription,
   ThunkType,
   KnownScalarTypes,
+  EnumTypeDescription,
 } from './parsing';
 import { TypesFileContents, ImportDescription } from './linking';
 import { projectImportPath } from './paths';
@@ -233,6 +234,33 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   return declaration;
 }
 
+export function generateEnum(enumDescriptor: EnumTypeDescription) {
+  const members: ts.EnumMember[] = enumDescriptor.fields.map(field => {
+    const enumFieldName = upperFirst(camelCase(field.originalName));
+
+    const member = ts.createEnumMember(
+      ts.createIdentifier(enumFieldName),
+      ts.createStringLiteral(field.originalName),
+    );
+
+    if (field.comments) appendJSDocComments(member, field.comments);
+
+    return member;
+  });
+
+  const declaration = ts.createEnumDeclaration(
+    undefined,
+    undefined,
+    ts.createIdentifier(enumDescriptor.name),
+    members,
+  );
+
+  if (enumDescriptor.comments)
+    appendJSDocComments(declaration, enumDescriptor.comments);
+
+  return declaration;
+}
+
 /**
  * Given a type descriptor, generates a type alias declaration which can be
  * used by the TypeScript API to autogenerate files.
@@ -333,9 +361,13 @@ export function generateTypesFileNodes(
     createImportDeclaration,
   );
 
+  const enumDeclarations = [...contents.enumDeclarations.values()].map(
+    generateEnum,
+  );
+
   const typeDeclarations = [...contents.typeDeclarations.values()].map(
     generateTypeAlias,
   );
 
-  return [vendorImports, fileImports, typeDeclarations];
+  return [vendorImports, fileImports, enumDeclarations, typeDeclarations];
 }

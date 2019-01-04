@@ -72,7 +72,7 @@ export async function generateTypesFile(
   }
 
   const formattedFile = prettier.format(generatedFile, {
-    parser: 'babylon',
+    parser: 'typescript',
     ...prettierConfig,
   });
 

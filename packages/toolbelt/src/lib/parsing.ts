@@ -87,6 +87,7 @@ export type IntermediateDictionary = {
 export type DocumentParsingOuput = {
   objects: Map<string, ObjectTypeDescription>;
   inputs: Map<string, ObjectTypeDescription>;
+  enums: Map<string, EnumTypeDescription>;
   operationNames: OperationNames;
 };
 
@@ -188,6 +189,17 @@ type KnownScalarTypeDescriptor = {
 type ReferencedTypeDescriptor = {
   kind: 'ReferencedType';
   name: string;
+};
+
+export type EnumValueDescription = {
+  originalName: string;
+  comments?: string;
+};
+
+export type EnumTypeDescription = {
+  name: string;
+  comments?: string;
+  fields: EnumValueDescription[];
 };
 
 /**
@@ -483,7 +495,7 @@ export function parseDocumentNode(
    *
    * @param object Descriptor of the Object / Input.
    */
-  function nodeReducer(
+  function objectNodeReducer(
     accumulator: Map<string, ObjectTypeDescription>,
     object:
       | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
@@ -498,16 +510,30 @@ export function parseDocumentNode(
     return accumulator;
   }
 
+  function enumTypeReducer(
+    accumulator: Map<string, EnumTypeDescription>,
+    object: DocumentNodeDescriptor<EnumTypeDefinitionNode>,
+  ) {
+    const parsedResult = parseDocumentEnumType(object.node);
+
+    accumulator.set(parsedResult.name, parsedResult);
+
+    return accumulator;
+  }
+
   // Return the parsed AST for the objects.
-  // TODO: Do something with enums.
   // TODO: Do something with aliases.
   return {
     objects: Object.values(intermediateDict.objects).reduce(
-      nodeReducer,
+      objectNodeReducer,
       new Map(),
     ),
     inputs: Object.values(intermediateDict.inputs).reduce(
-      nodeReducer,
+      objectNodeReducer,
+      new Map(),
+    ),
+    enums: Object.values(intermediateDict.enums).reduce(
+      enumTypeReducer,
       new Map(),
     ),
     operationNames: intermediateDict.operationNames,
@@ -787,5 +813,23 @@ export function parseDocumentObjectType(
     comments: type.description && type.description.value,
     fields,
     referencedTypes,
+  };
+}
+
+export function parseDocumentEnumType(
+  enumDesc: EnumTypeDefinitionNode,
+): EnumTypeDescription {
+  if (!enumDesc.values || enumDesc.values.length === 0) {
+    // TODO: Create error.
+    throw new Error('Any enum expected to be parsed must have values');
+  }
+
+  return {
+    name: enumDesc.name.value,
+    comments: enumDesc.description && enumDesc.description.value,
+    fields: enumDesc.values.map(value => ({
+      originalName: value.name.value,
+      comments: value.description && value.description.value,
+    })),
   };
 }

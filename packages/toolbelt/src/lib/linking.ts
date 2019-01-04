@@ -12,6 +12,7 @@ import {
   ThunkType,
   DocumentParsingOuput,
   ParsedFileDescriptor,
+  EnumTypeDescription,
 } from './parsing';
 import { typesFilePath, blossomInstancePath } from './paths';
 import {
@@ -48,6 +49,7 @@ export type TypesFileContents = {
   vendorImports: ImportGroupMap;
   fileImports: ImportGroupMap;
   requiredDeps: Set<string>;
+  enumDeclarations: EnumTypeDescription[];
   typeDeclarations: ObjectTypeDescription[];
 };
 
@@ -115,7 +117,7 @@ export function documentHasReference(
   const presenceMap = {
     objects: document.objects.has(field),
     inputs: document.inputs.has(field),
-    enums: false, // document.enums.has(field)
+    enums: document.enums.has(field),
     aliases: false, // document.aliases.has(field)
   };
 
@@ -277,6 +279,7 @@ export function linkTypesFile(
     vendorImports: new Map(),
     fileImports: new Map(),
     typeDeclarations: [],
+    enumDeclarations: [],
     requiredDeps: new Set(),
   };
 
@@ -306,6 +309,11 @@ export function linkTypesFile(
         kind: OriginKind.Input,
       }),
   );
+
+  // Push enums. If this gets more complicated, a new function can be created.
+  [...parsedFile.parsedDocument.enums.values()].forEach(descriptor => {
+    result.enumDeclarations.push(descriptor);
+  });
 
   const accumulatedErrors = [...objectErrors, ...inputErrors];
 
