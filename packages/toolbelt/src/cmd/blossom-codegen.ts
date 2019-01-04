@@ -12,11 +12,12 @@ import generateTypes from './codegen/types';
 
 program
   .command('types')
+  .alias('t')
   .description('Generates types from a GraphQL SDL.')
   .option('-f, --file <file>', 'Input GraphQL SDL from file.')
   .option('--stdin', 'Input GraphQL SDL from stdin.')
   .option('--stdout', 'Output result to stdout.')
-  .option('--recursive', 'Build files for all involved dependencies.')
+  .option('-r, --recursive', 'Build files for all involved dependencies.')
   .option(
     '-o, --output-file [file]',
     'Path to the output file. If none specified, defaults to <filename>.types.ts.',
@@ -25,5 +26,11 @@ program
 
 program.parse(process.argv);
 
-// Do nothing when there are no arguments
+// Shpw help when there are no arguments
 if (!program.args.length) program.help();
+
+// Show help when command is invalid
+program.on('command:*', () => {
+  program.help();
+  process.exit(1);
+});

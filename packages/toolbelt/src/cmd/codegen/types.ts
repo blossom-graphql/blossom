@@ -6,7 +6,7 @@
  *
  */
 
-import { writeFileSync } from 'fs';
+import fs from 'fs';
 import path from 'path';
 
 import ts from 'typescript';
@@ -96,17 +96,36 @@ export async function generateTypes(options: {
     throw new Error('An input for the SDL must be specified.');
   }
 
+  const filesOutput: { [key: string]: string } = {};
   const parsedFileGraph = await parseFileGraph(fullInputFilePath);
 
-  const formattedFile = await generateTypesFile(
+  filesOutput[fullInputFilePath] = await generateTypesFile(
     fullInputFilePath,
     parsedFileGraph,
   );
 
-  if (options.stdout) {
-    console.log(formattedFile);
+  // On recursive mode, output must be generated for all files.
+  if (options.recursive) {
+    await Promise.all(
+      [...parsedFileGraph.keys()].map(async fullPath => {
+        filesOutput[fullPath] = await generateTypesFile(
+          fullPath,
+          parsedFileGraph,
+        );
+      }),
+    );
+  }
+
+  if (options.stdout && !options.recursive) {
+    console.log(filesOutput[fullInputFilePath]);
   } else {
-    writeFileSync(typesFilePath(fullInputFilePath), formattedFile);
+    await Promise.all(
+      Object.entries(filesOutput).map(async ([fullPath, contents]) => {
+        const typesFilePathname = typesFilePath(fullPath);
+
+        await fs.promises.writeFile(typesFilePathname, contents);
+      }),
+    );
   }
 }
 

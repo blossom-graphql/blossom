@@ -23,5 +23,11 @@ program
 // Parse and start running.
 program.parse(process.argv);
 
-// Do nothing when there are no arguments
+// Shpw help when there are no arguments
 if (!program.args.length) program.help();
+
+// Show help when command is invalid
+program.on('command:*', () => {
+  program.help();
+  process.exit(1);
+});
