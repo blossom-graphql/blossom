@@ -176,14 +176,21 @@ export function linkTypes(state: {
 
   // Ensure that dependencies can be satisfied for each field.
   descriptor.referencedTypes.forEach(field => {
+    const presenceInSameDocument = documentHasReference(
+      parsedDocument,
+      kind,
+      field,
+    );
+
     // 1. Search in the object.
-    if (
-      documentHasReference(parsedDocument, kind, field) ===
-      PresenceResult.Present
-    ) {
-      // Linking passed. Nothing to do here because it's already on the file.
-      // TODO: Log
-      return;
+    if (presenceInSameDocument !== PresenceResult.NotPresent) {
+      if (presenceInSameDocument === PresenceResult.Invalid) {
+        throw new InvalidReferenceError(field, filePath, kind);
+      } else {
+        // Linking passed. Nothing to do here because it's already on the file.
+        // TODO: Log
+        return;
+      }
     } else {
       // 2. Search in references explicitly.
       const existingRef = [...parsedFile.references.named.entries()].find(
@@ -287,8 +294,23 @@ export function linkTypesFile(
       }),
   );
 
-  if (objectErrors.length > 0) {
-    throw new LinkingError(objectErrors);
+  const inputErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.inputs.values()],
+    descriptor =>
+      linkTypes({
+        descriptor,
+        result,
+        filePath,
+        fileGraph,
+        parsedFile,
+        kind: OriginKind.Input,
+      }),
+  );
+
+  const accumulatedErrors = [...objectErrors, ...inputErrors];
+
+  if (accumulatedErrors.length > 0) {
+    throw new LinkingError(accumulatedErrors);
   }
 
   // If we have any thunked schema file, add the corresponding imports.

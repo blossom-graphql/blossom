@@ -14,30 +14,17 @@ import cosmiconfig from 'cosmiconfig';
 import prettier from 'prettier';
 
 import VERSION from '../../version';
-import { parseFileGraph } from '../../lib/parsing';
+import { parseFileGraph, ParsedFileGraph } from '../../lib/parsing';
 import { generateTypesFileNodes } from '../../lib/codegen';
 import { appPath, typesFilePath } from '../../lib/paths';
 import { linkTypesFile } from '../../lib/linking';
 import { cliRunWrapper } from '../../lib/runtime';
 
-export async function generateTypes(options: {
-  file?: string;
-  stdin?: boolean;
-  stdout?: boolean;
-  outputFile?: string | boolean;
-}) {
-  let fullInputFilePath: string = path.join(process.cwd(), 'schema.gql');
-
-  if (options.stdin) {
-    throw new Error('Implement me.');
-  } else if (options.file) {
-    fullInputFilePath = appPath(options.file);
-  } else {
-    throw new Error('An input for the SDL must be specified.');
-  }
-
-  const parsedFileGraph = await parseFileGraph(fullInputFilePath);
-  const linkedTypesFile = linkTypesFile(fullInputFilePath, parsedFileGraph);
+export async function generateTypesFile(
+  filePath: string,
+  fileGraph: ParsedFileGraph,
+) {
+  const linkedTypesFile = linkTypesFile(filePath, fileGraph);
 
   // Generate file
   const generatedNodeGroups = generateTypesFileNodes(linkedTypesFile);
@@ -88,6 +75,33 @@ export async function generateTypes(options: {
     parser: 'babylon',
     ...prettierConfig,
   });
+
+  return formattedFile;
+}
+
+export async function generateTypes(options: {
+  file?: string;
+  outputFile?: string | boolean;
+  recursive?: boolean;
+  stdin?: boolean;
+  stdout?: boolean;
+}) {
+  let fullInputFilePath: string = path.join(process.cwd(), 'schema.gql');
+
+  if (options.stdin) {
+    throw new Error('Implement me.');
+  } else if (options.file) {
+    fullInputFilePath = appPath(options.file);
+  } else {
+    throw new Error('An input for the SDL must be specified.');
+  }
+
+  const parsedFileGraph = await parseFileGraph(fullInputFilePath);
+
+  const formattedFile = await generateTypesFile(
+    fullInputFilePath,
+    parsedFileGraph,
+  );
 
   if (options.stdout) {
     console.log(formattedFile);
