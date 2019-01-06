@@ -19,6 +19,7 @@ import {
   InputValueDefinitionNode,
   NamedTypeNode,
   parse,
+  UnionTypeDefinitionNode,
 } from 'graphql';
 
 import { ImportParsingError, UnsupportedOperationError } from './errors';
@@ -70,6 +71,10 @@ export type IntermediateDictionary = {
    */
   enums: DocumentNameMap<EnumTypeDefinitionNode>;
   /**
+   * Map of parsed unions.
+   */
+  unions: DocumentNameMap<UnionTypeDefinitionNode>;
+  /**
    * The node that is defining the schema on this file.
    */
   schema?: SchemaDefinitionNode;
@@ -88,6 +93,7 @@ export type DocumentParsingOuput = {
   objects: Map<string, ObjectTypeDescription>;
   inputs: Map<string, ObjectTypeDescription>;
   enums: Map<string, EnumTypeDescription>;
+  unions: Map<string, UnionTypeDescription>;
   operationNames: OperationNames;
 };
 
@@ -200,6 +206,12 @@ export type EnumTypeDescription = {
   name: string;
   comments?: string;
   fields: EnumValueDescription[];
+};
+
+export type UnionTypeDescription = {
+  name: string;
+  comments?: string;
+  members: string[];
 };
 
 /**
@@ -428,6 +440,7 @@ export function parseDocumentNode(
     objects: {},
     inputs: {},
     enums: {},
+    unions: {},
     schema: undefined,
     operationNames: {},
   };
@@ -454,6 +467,9 @@ export function parseDocumentNode(
         intermediateDict.enums[definition.name.value] = {
           node: definition,
         };
+        break;
+      case 'UnionTypeDefinition':
+        intermediateDict.unions[definition.name.value] = { node: definition };
         break;
       // TODO: Extra types go here.
       default:
@@ -515,7 +531,16 @@ export function parseDocumentNode(
     object: DocumentNodeDescriptor<EnumTypeDefinitionNode>,
   ) {
     const parsedResult = parseDocumentEnumType(object.node);
+    accumulator.set(parsedResult.name, parsedResult);
 
+    return accumulator;
+  }
+
+  function unionTypeReducer(
+    accumulator: Map<string, UnionTypeDescription>,
+    object: DocumentNodeDescriptor<UnionTypeDefinitionNode>,
+  ) {
+    const parsedResult = parseDocumentUnionType(object.node);
     accumulator.set(parsedResult.name, parsedResult);
 
     return accumulator;
@@ -534,6 +559,10 @@ export function parseDocumentNode(
     ),
     enums: Object.values(intermediateDict.enums).reduce(
       enumTypeReducer,
+      new Map(),
+    ),
+    unions: Object.values(intermediateDict.unions).reduce(
+      unionTypeReducer,
       new Map(),
     ),
     operationNames: intermediateDict.operationNames,
@@ -831,5 +860,19 @@ export function parseDocumentEnumType(
       originalName: value.name.value,
       comments: value.description && value.description.value,
     })),
+  };
+}
+
+export function parseDocumentUnionType(
+  unionDesc: UnionTypeDefinitionNode,
+): UnionTypeDescription {
+  if (!unionDesc.types || unionDesc.types.length === 0) {
+    throw new Error('Any union expected to be parsed must have members');
+  }
+
+  return {
+    name: unionDesc.name.value,
+    comments: unionDesc.description && unionDesc.description.value,
+    members: unionDesc.types.map(type => type.name.value),
   };
 }

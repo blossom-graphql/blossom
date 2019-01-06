@@ -144,23 +144,100 @@ export function fileHasReference(
   return documentHasReference(referencedDocument, kind, field);
 }
 
-export function linkTypes(state: {
+export type LinkingContext = {
   descriptor: ObjectTypeDescription;
   result: TypesFileContents;
   filePath: string;
   fileGraph: ParsedFileGraph;
   parsedFile: ParsedFileDescriptor;
   kind: OriginKind;
-}) {
+};
+
+export function enforceFieldPresence(
+  field: string,
+  linkingContext: LinkingContext,
+): string | undefined {
   const {
-    descriptor,
     fileGraph,
-    kind,
     filePath,
+    kind,
     parsedFile,
     parsedFile: { parsedDocument },
-    result,
-  } = state;
+  } = linkingContext;
+
+  const presenceInSameDocument = documentHasReference(
+    parsedDocument,
+    kind,
+    field,
+  );
+
+  // 1. Search in the object.
+  if (presenceInSameDocument !== PresenceResult.NotPresent) {
+    if (presenceInSameDocument === PresenceResult.Invalid) {
+      throw new InvalidReferenceError(field, filePath, kind);
+    } else {
+      // Linking passed. Nothing to do here because it's already on the file.
+      // TODO: Log
+      return undefined;
+    }
+  } else {
+    // 2. Search in references explicitly.
+    const existingRef = [...parsedFile.references.named.entries()].find(
+      ([_, map]) => map.has(field),
+    );
+
+    // Reference found. Ensure that the file is readily available and that
+    // the reference can actually be imported.
+    if (existingRef) {
+      const [schemaPath] = existingRef;
+
+      switch (fileHasReference(fileGraph, filePath, schemaPath, kind, field)) {
+        case PresenceResult.Present:
+          return schemaPath;
+        case PresenceResult.Invalid:
+          throw new InvalidReferenceError(field, filePath, kind);
+        case PresenceResult.NotPresent:
+          throw new ReferenceNotFoundError(field, filePath);
+      }
+    }
+
+    // 3. Search in references with wildcards.
+    let schemaPath: string | undefined;
+    let presenceResult: PresenceResult = PresenceResult.NotPresent;
+
+    for (const referencedSchemaPath of parsedFile.references.full) {
+      const result = fileHasReference(
+        fileGraph,
+        filePath,
+        referencedSchemaPath,
+        kind,
+        field,
+      );
+
+      if (result !== PresenceResult.NotPresent) {
+        presenceResult = result;
+        schemaPath = referencedSchemaPath;
+        break;
+      }
+    }
+
+    // TODO: Log
+    switch (presenceResult) {
+      case PresenceResult.Invalid:
+        throw new InvalidReferenceError(field, filePath, kind);
+      case PresenceResult.NotPresent:
+        throw new ReferenceNotFoundError(field, filePath);
+      case PresenceResult.Present:
+      default:
+        if (!schemaPath) throw new Error('Schema path not found.');
+
+        return schemaPath;
+    }
+  }
+}
+
+export function linkTypes(linkingContext: LinkingContext) {
+  const { descriptor, result } = linkingContext;
 
   // Calculate whether Maybe should be required or not.
   if (
@@ -177,90 +254,21 @@ export function linkTypes(state: {
     result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
 
   // Ensure that dependencies can be satisfied for each field.
-  descriptor.referencedTypes.forEach(field => {
-    const presenceInSameDocument = documentHasReference(
-      parsedDocument,
-      kind,
-      field,
-    );
+  const errors = forEachWithErrors([...descriptor.referencedTypes], field => {
+    const schemaPath = enforceFieldPresence(field, linkingContext);
 
-    // 1. Search in the object.
-    if (presenceInSameDocument !== PresenceResult.NotPresent) {
-      if (presenceInSameDocument === PresenceResult.Invalid) {
-        throw new InvalidReferenceError(field, filePath, kind);
-      } else {
-        // Linking passed. Nothing to do here because it's already on the file.
-        // TODO: Log
-        return;
-      }
-    } else {
-      // 2. Search in references explicitly.
-      const existingRef = [...parsedFile.references.named.entries()].find(
-        ([_, map]) => map.has(field),
+    // Nothing thrown on enforceFieldPresence. Add to imports list only when
+    // the path is specified. Otherwise the import is on the same file.
+    if (schemaPath)
+      addImport(
+        result.fileImports,
+        'FileImport',
+        typesFilePath(schemaPath),
+        field,
       );
-
-      // Reference found. Ensure that the file is readily available and that
-      // the reference can actually be imported.
-      if (existingRef) {
-        const [schemaPath] = existingRef;
-
-        switch (
-          fileHasReference(fileGraph, filePath, schemaPath, kind, field)
-        ) {
-          case PresenceResult.Present:
-            addImport(
-              result.fileImports,
-              'FileImport',
-              typesFilePath(schemaPath),
-              field,
-            );
-            return;
-          case PresenceResult.Invalid:
-            throw new InvalidReferenceError(field, filePath, kind);
-          case PresenceResult.NotPresent:
-            throw new ReferenceNotFoundError(field, filePath);
-        }
-      }
-
-      // 3. Search in references with wildcards.
-      let schemaPath: string | undefined;
-      let presenceResult: PresenceResult = PresenceResult.NotPresent;
-
-      for (const referencedSchemaPath of parsedFile.references.full) {
-        const result = fileHasReference(
-          fileGraph,
-          filePath,
-          referencedSchemaPath,
-          kind,
-          field,
-        );
-
-        if (result !== PresenceResult.NotPresent) {
-          presenceResult = result;
-          schemaPath = referencedSchemaPath;
-          break;
-        }
-      }
-
-      // TODO: Log
-      switch (presenceResult) {
-        case PresenceResult.Present:
-          if (!schemaPath) throw new Error('Schema path not found.');
-
-          addImport(
-            result.fileImports,
-            'FileImport',
-            typesFilePath(schemaPath),
-            field,
-          );
-          return;
-        case PresenceResult.Invalid:
-          throw new InvalidReferenceError(field, filePath, kind);
-        case PresenceResult.NotPresent:
-          throw new ReferenceNotFoundError(field, filePath);
-      }
-    }
   });
+
+  if (errors.length > 0) throw new LinkingError(errors);
 
   // Append to the list of type declarations.
   result.typeDeclarations.push(descriptor);

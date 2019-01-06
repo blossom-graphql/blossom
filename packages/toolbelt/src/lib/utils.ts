@@ -11,6 +11,7 @@ import { inspect } from 'util';
 export type ErrorsOutput = [number, Error][];
 export type ReducedWithErrorsOutput<V> = [V, ErrorsOutput];
 
+// TODO: Overloading for sets.
 export function forEachWithErrors<U>(
   iterable: ReadonlyArray<U>,
   callbackfn: (value: U, index: number, array: ReadonlyArray<U>) => void,
