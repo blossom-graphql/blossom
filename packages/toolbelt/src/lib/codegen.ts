@@ -10,6 +10,7 @@ import path from 'path';
 
 import ts from 'typescript';
 import { camelCase, upperFirst } from 'lodash';
+import wrap from 'word-wrap';
 
 import {
   FieldDescriptor,
@@ -21,6 +22,12 @@ import {
 } from './parsing';
 import { TypesFileContents, ImportDescription } from './linking';
 import { projectImportPath } from './paths';
+
+const GRAPHQL_TYPENAME_FIELD = '__typename';
+const GRAPHQL_TYPENAME_FIELD_COMMENTS = wrap(
+  'Required by GraphQL.js. Must match the name of the object in the GraphQL SDL this type is representing in the codebase.',
+  { width: 80, indent: '' },
+);
 
 /**
  * Receives a list of arguments and generates a type literal with the arguments
@@ -275,12 +282,24 @@ export function generateObjectTypeAlias(
     generateTypeElement,
   );
 
+  const typenameElement = ts.createPropertySignature(
+    undefined,
+    ts.createIdentifier(GRAPHQL_TYPENAME_FIELD),
+    undefined,
+    // ! ALWAYS the literal name, whatever the typename is converted in the lib.
+    // ! This goes to GraphQL.js for presenting results.
+    ts.createLiteralTypeNode(ts.createStringLiteral(descriptor.name)),
+    undefined,
+  );
+
+  appendJSDocComments(typenameElement, GRAPHQL_TYPENAME_FIELD_COMMENTS);
+
   const declaration = ts.createTypeAliasDeclaration(
     undefined,
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
     ts.createIdentifier(descriptor.name),
     undefined,
-    ts.createTypeLiteralNode(members),
+    ts.createTypeLiteralNode([typenameElement, ...members]),
   );
 
   if (descriptor.comments) {
