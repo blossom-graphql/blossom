@@ -14,6 +14,7 @@ import {
   ParsedFileDescriptor,
   EnumTypeDescription,
   UnionTypeDescription,
+  FieldDescriptor,
 } from './parsing';
 import { typesFilePath, blossomInstancePath } from './paths';
 import {
@@ -53,6 +54,7 @@ export type TypesFileContents = {
   enumDeclarations: EnumTypeDescription[];
   typeDeclarations: ObjectTypeDescription[];
   unionDeclarations: UnionTypeDescription[];
+  operationDeclarations: FieldDescriptor[];
 };
 
 export function addImport(
@@ -239,6 +241,41 @@ export function enforceTypePresence(
   }
 }
 
+export function linkOperationTypes(
+  _operationName: string, // ! Not used at this time.
+  operationTypeName: string,
+  linkingContext: LinkingContext,
+) {
+  const { fileGraph, filePath, result } = linkingContext;
+  const schemaPath = enforceTypePresence(operationTypeName, linkingContext);
+
+  if (schemaPath) {
+    addImport(
+      result.fileImports,
+      'FileImport',
+      typesFilePath(schemaPath),
+      operationTypeName,
+    );
+  }
+
+  const referencePath = schemaPath || filePath;
+  const fileDescriptor = fileGraph.get(referencePath);
+  if (!fileDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
+
+  const { parsedDocument } = fileDescriptor;
+  const objectDescriptor = parsedDocument.objects.get(operationTypeName);
+  if (!objectDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
+
+  // Add fields to the list of operation declarations.
+  objectDescriptor.fields.forEach(field => {
+    // We are always forcing these fields to become promises.
+    result.operationDeclarations.push({
+      ...field,
+      thunkType: ThunkType.AsyncFunction,
+    });
+  });
+}
+
 export function linkUnionTypes(
   unionDescriptor: UnionTypeDescription,
   linkingContext: LinkingContext,
@@ -313,6 +350,7 @@ export function linkObjectTypes(
 export function linkTypesFile(
   filePath: string,
   fileGraph: ParsedFileGraph,
+  options: { parseRootOperations: boolean } = { parseRootOperations: true },
 ): TypesFileContents {
   const parsedFile = fileGraph.get(filePath);
   if (!parsedFile) {
@@ -326,6 +364,7 @@ export function linkTypesFile(
     typeDeclarations: [],
     enumDeclarations: [],
     unionDeclarations: [],
+    operationDeclarations: [],
   };
 
   const linkingContext: LinkingContext = {
@@ -367,8 +406,25 @@ export function linkTypesFile(
       linkUnionTypes(descriptor, { ...linkingContext, kind: OriginKind.Union }),
   );
 
+  // Check for operation names. When that's the case, the underlying types must
+  // be found (not necessarily in the same document), check whether they are
+  // object types and store their location
+  const operationErrors = options.parseRootOperations
+    ? forEachWithErrors(
+        Object.entries(parsedFile.parsedDocument.operationNames),
+        ([operationName, operationType]: [string, string | undefined]) =>
+          operationType &&
+          linkOperationTypes(operationName, operationType, linkingContext),
+      )
+    : [];
+
   // Show errors
-  const accumulatedErrors = [...objectErrors, ...inputErrors, ...unionErrors];
+  const accumulatedErrors = [
+    ...objectErrors,
+    ...inputErrors,
+    ...unionErrors,
+    ...operationErrors,
+  ];
 
   if (accumulatedErrors.length > 0) {
     throw new LinkingError(accumulatedErrors);

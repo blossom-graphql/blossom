@@ -22,6 +22,7 @@ import {
 } from './parsing';
 import { TypesFileContents, ImportDescription } from './linking';
 import { projectImportPath } from './paths';
+import { resolverSignatureName } from './naming';
 
 const GRAPHQL_TYPENAME_FIELD = '__typename';
 const GRAPHQL_TYPENAME_FIELD_COMMENTS = wrap(
@@ -331,6 +332,32 @@ export function generateUnionTypeAlias(
   return declaration;
 }
 
+export function generateResolverSignatureDeclaration(
+  descriptor: FieldDescriptor,
+): ts.TypeAliasDeclaration {
+  const terminalTypeNode = generateTerminalTypeNode(descriptor);
+
+  const functionTypeNode = generateFunctionTypeNode(
+    terminalTypeNode,
+    descriptor.arguments,
+    descriptor.thunkType === ThunkType.AsyncFunction,
+  );
+
+  const declaration = ts.createTypeAliasDeclaration(
+    undefined,
+    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+    ts.createIdentifier(resolverSignatureName(descriptor.name)),
+    undefined,
+    functionTypeNode,
+  );
+
+  if (descriptor.comments) {
+    appendJSDocComments(declaration, descriptor.comments);
+  }
+
+  return declaration;
+}
+
 export function defaultImportName(description: ImportDescription): string {
   if (description.kind === 'VendorImport') {
     const arr = description.moduleName.split('/');
@@ -403,16 +430,20 @@ export function generateTypesFileNodes(
     createImportDeclaration,
   );
 
-  const enumDeclarations = [...contents.enumDeclarations.values()].map(
+  const enumDeclarations = contents.enumDeclarations.map(
     generateEnumDeclaration,
   );
 
-  const objectTypeDeclarations = [...contents.typeDeclarations.values()].map(
+  const objectTypeDeclarations = contents.typeDeclarations.map(
     generateObjectTypeAlias,
   );
 
-  const unionTypeDeclarations = [...contents.unionDeclarations.values()].map(
+  const unionTypeDeclarations = contents.unionDeclarations.map(
     generateUnionTypeAlias,
+  );
+
+  const resolverSignatureDeclarations = contents.operationDeclarations.map(
+    generateResolverSignatureDeclaration,
   );
 
   return [
@@ -421,5 +452,6 @@ export function generateTypesFileNodes(
     enumDeclarations,
     objectTypeDeclarations,
     unionTypeDeclarations,
+    resolverSignatureDeclarations,
   ];
 }

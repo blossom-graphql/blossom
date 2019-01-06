@@ -486,16 +486,16 @@ export function parseDocumentNode(
   // the types are properly defined in the objects map.
   //
   // We always parse it because it's required in nodeReducer.
-  const operationTypes: OperationNames = {};
+  const operationNames: OperationNames = {};
 
   if (schemaDefinition) {
     schemaDefinition.operationTypes.forEach(operation => {
       switch (operation.operation) {
         case 'query':
-          operationTypes.query = operation.type.name.value;
+          operationNames.query = operation.type.name.value;
           break;
         case 'mutation':
-          operationTypes.mutation = operation.type.name.value;
+          operationNames.mutation = operation.type.name.value;
           break;
         default:
           throw new UnsupportedOperationError(operation.operation);
@@ -566,7 +566,7 @@ export function parseDocumentNode(
       unionTypeReducer,
       new Map(),
     ),
-    operationNames: intermediateDict.operationNames,
+    operationNames,
   };
 }
 
