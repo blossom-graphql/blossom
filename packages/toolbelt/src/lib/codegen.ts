@@ -17,6 +17,7 @@ import {
   ThunkType,
   KnownScalarTypes,
   EnumTypeDescription,
+  UnionTypeDescription,
 } from './parsing';
 import { TypesFileContents, ImportDescription } from './linking';
 import { projectImportPath } from './paths';
@@ -234,7 +235,7 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   return declaration;
 }
 
-export function generateEnum(enumDescriptor: EnumTypeDescription) {
+export function generateEnumDeclaration(enumDescriptor: EnumTypeDescription) {
   const members: ts.EnumMember[] = enumDescriptor.fields.map(field => {
     const enumFieldName = upperFirst(camelCase(field.originalName));
 
@@ -250,7 +251,7 @@ export function generateEnum(enumDescriptor: EnumTypeDescription) {
 
   const declaration = ts.createEnumDeclaration(
     undefined,
-    undefined,
+    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
     ts.createIdentifier(enumDescriptor.name),
     members,
   );
@@ -267,7 +268,7 @@ export function generateEnum(enumDescriptor: EnumTypeDescription) {
  *
  * @param descriptor Object containing the type descriptor.
  */
-export function generateTypeAlias(
+export function generateObjectTypeAlias(
   descriptor: ObjectTypeDescription,
 ): ts.TypeAliasDeclaration {
   const members: ReadonlyArray<ts.TypeElement> = descriptor.fields.map(
@@ -280,6 +281,28 @@ export function generateTypeAlias(
     ts.createIdentifier(descriptor.name),
     undefined,
     ts.createTypeLiteralNode(members),
+  );
+
+  if (descriptor.comments) {
+    appendJSDocComments(declaration, descriptor.comments);
+  }
+
+  return declaration;
+}
+
+export function generateUnionTypeAlias(
+  descriptor: UnionTypeDescription,
+): ts.TypeAliasDeclaration {
+  const declaration = ts.createTypeAliasDeclaration(
+    undefined,
+    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+    ts.createIdentifier(descriptor.name),
+    undefined,
+    ts.createUnionTypeNode(
+      descriptor.members.map(typeName =>
+        ts.createTypeReferenceNode(ts.createIdentifier(typeName), undefined),
+      ),
+    ),
   );
 
   if (descriptor.comments) {
@@ -362,12 +385,22 @@ export function generateTypesFileNodes(
   );
 
   const enumDeclarations = [...contents.enumDeclarations.values()].map(
-    generateEnum,
+    generateEnumDeclaration,
   );
 
-  const typeDeclarations = [...contents.typeDeclarations.values()].map(
-    generateTypeAlias,
+  const objectTypeDeclarations = [...contents.typeDeclarations.values()].map(
+    generateObjectTypeAlias,
   );
 
-  return [vendorImports, fileImports, enumDeclarations, typeDeclarations];
+  const unionTypeDeclarations = [...contents.unionDeclarations.values()].map(
+    generateUnionTypeAlias,
+  );
+
+  return [
+    vendorImports,
+    fileImports,
+    enumDeclarations,
+    objectTypeDeclarations,
+    unionTypeDeclarations,
+  ];
 }

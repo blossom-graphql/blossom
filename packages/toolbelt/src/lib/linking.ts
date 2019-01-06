@@ -13,6 +13,7 @@ import {
   DocumentParsingOuput,
   ParsedFileDescriptor,
   EnumTypeDescription,
+  UnionTypeDescription,
 } from './parsing';
 import { typesFilePath, blossomInstancePath } from './paths';
 import {
@@ -51,6 +52,7 @@ export type TypesFileContents = {
   requiredDeps: Set<string>;
   enumDeclarations: EnumTypeDescription[];
   typeDeclarations: ObjectTypeDescription[];
+  unionDeclarations: UnionTypeDescription[];
 };
 
 export function addImport(
@@ -85,7 +87,7 @@ export function addImport(
 export enum OriginKind {
   Object = 'Object',
   Input = 'Input',
-  Alias = 'Alias',
+  Union = 'Union',
 }
 
 export enum PresenceResult {
@@ -123,7 +125,7 @@ export function documentHasReference(
 
   switch (originKind) {
     case OriginKind.Object:
-    case OriginKind.Alias:
+    case OriginKind.Union:
       return requirePresence(presenceMap, ['objects', 'enums', 'aliases']);
     case OriginKind.Input:
       return requirePresence(presenceMap, ['inputs', 'enums']);
@@ -145,7 +147,6 @@ export function fileHasReference(
 }
 
 export type LinkingContext = {
-  descriptor: ObjectTypeDescription;
   result: TypesFileContents;
   filePath: string;
   fileGraph: ParsedFileGraph;
@@ -153,8 +154,8 @@ export type LinkingContext = {
   kind: OriginKind;
 };
 
-export function enforceFieldPresence(
-  field: string,
+export function enforceTypePresence(
+  typeName: string,
   linkingContext: LinkingContext,
 ): string | undefined {
   const {
@@ -168,13 +169,13 @@ export function enforceFieldPresence(
   const presenceInSameDocument = documentHasReference(
     parsedDocument,
     kind,
-    field,
+    typeName,
   );
 
   // 1. Search in the object.
   if (presenceInSameDocument !== PresenceResult.NotPresent) {
     if (presenceInSameDocument === PresenceResult.Invalid) {
-      throw new InvalidReferenceError(field, filePath, kind);
+      throw new InvalidReferenceError(typeName, filePath, kind);
     } else {
       // Linking passed. Nothing to do here because it's already on the file.
       // TODO: Log
@@ -183,7 +184,7 @@ export function enforceFieldPresence(
   } else {
     // 2. Search in references explicitly.
     const existingRef = [...parsedFile.references.named.entries()].find(
-      ([_, map]) => map.has(field),
+      ([_, map]) => map.has(typeName),
     );
 
     // Reference found. Ensure that the file is readily available and that
@@ -191,13 +192,15 @@ export function enforceFieldPresence(
     if (existingRef) {
       const [schemaPath] = existingRef;
 
-      switch (fileHasReference(fileGraph, filePath, schemaPath, kind, field)) {
+      switch (
+        fileHasReference(fileGraph, filePath, schemaPath, kind, typeName)
+      ) {
         case PresenceResult.Present:
           return schemaPath;
         case PresenceResult.Invalid:
-          throw new InvalidReferenceError(field, filePath, kind);
+          throw new InvalidReferenceError(typeName, filePath, kind);
         case PresenceResult.NotPresent:
-          throw new ReferenceNotFoundError(field, filePath);
+          throw new ReferenceNotFoundError(typeName, filePath);
       }
     }
 
@@ -211,7 +214,7 @@ export function enforceFieldPresence(
         filePath,
         referencedSchemaPath,
         kind,
-        field,
+        typeName,
       );
 
       if (result !== PresenceResult.NotPresent) {
@@ -224,9 +227,9 @@ export function enforceFieldPresence(
     // TODO: Log
     switch (presenceResult) {
       case PresenceResult.Invalid:
-        throw new InvalidReferenceError(field, filePath, kind);
+        throw new InvalidReferenceError(typeName, filePath, kind);
       case PresenceResult.NotPresent:
-        throw new ReferenceNotFoundError(field, filePath);
+        throw new ReferenceNotFoundError(typeName, filePath);
       case PresenceResult.Present:
       default:
         if (!schemaPath) throw new Error('Schema path not found.');
@@ -236,42 +239,75 @@ export function enforceFieldPresence(
   }
 }
 
-export function linkTypes(linkingContext: LinkingContext) {
-  const { descriptor, result } = linkingContext;
+export function linkUnionTypes(
+  unionDescriptor: UnionTypeDescription,
+  linkingContext: LinkingContext,
+) {
+  const { result } = linkingContext;
+
+  const errors = forEachWithErrors(
+    [...unionDescriptor.referencedTypes],
+    typeName => {
+      const schemaPath = enforceTypePresence(typeName, linkingContext);
+
+      if (schemaPath)
+        addImport(
+          result.fileImports,
+          'FileImport',
+          typesFilePath(schemaPath),
+          typeName,
+        );
+    },
+  );
+
+  if (errors.length > 0) throw new LinkingError(errors);
+
+  result.unionDeclarations.push(unionDescriptor);
+}
+
+export function linkObjectTypes(
+  typeDescriptor: ObjectTypeDescription,
+  linkingContext: LinkingContext,
+) {
+  const { kind, result } = linkingContext;
 
   // Calculate whether Maybe should be required or not.
   if (
     !result.requiredDeps.has(MAYBE_DEP_NAME) &&
-    descriptor.fields.find(field => !field.required)
+    typeDescriptor.fields.find(field => !field.required)
   )
     result.requiredDeps.add(MAYBE_DEP_NAME);
 
   // Calculate whether ThunkImports should be required or not.
   if (
+    kind === OriginKind.Object &&
     !result.requiredDeps.has(THUNK_IMPORTS_DEP_NAME) &&
-    descriptor.fields.find(field => field.thunkType !== ThunkType.None)
+    typeDescriptor.fields.find(field => field.thunkType !== ThunkType.None)
   )
     result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
 
   // Ensure that dependencies can be satisfied for each field.
-  const errors = forEachWithErrors([...descriptor.referencedTypes], field => {
-    const schemaPath = enforceFieldPresence(field, linkingContext);
+  const errors = forEachWithErrors(
+    [...typeDescriptor.referencedTypes],
+    field => {
+      const schemaPath = enforceTypePresence(field, linkingContext);
 
-    // Nothing thrown on enforceFieldPresence. Add to imports list only when
-    // the path is specified. Otherwise the import is on the same file.
-    if (schemaPath)
-      addImport(
-        result.fileImports,
-        'FileImport',
-        typesFilePath(schemaPath),
-        field,
-      );
-  });
+      // Nothing thrown on enforceFieldPresence. Add to imports list only when
+      // the path is specified. Otherwise the import is on the same file.
+      if (schemaPath)
+        addImport(
+          result.fileImports,
+          'FileImport',
+          typesFilePath(schemaPath),
+          field,
+        );
+    },
+  );
 
   if (errors.length > 0) throw new LinkingError(errors);
 
   // Append to the list of type declarations.
-  result.typeDeclarations.push(descriptor);
+  result.typeDeclarations.push(typeDescriptor);
 }
 
 export function linkTypesFile(
@@ -286,21 +322,26 @@ export function linkTypesFile(
   const result: TypesFileContents = {
     vendorImports: new Map(),
     fileImports: new Map(),
+    requiredDeps: new Set(),
     typeDeclarations: [],
     enumDeclarations: [],
-    requiredDeps: new Set(),
+    unionDeclarations: [],
+  };
+
+  const linkingContext: LinkingContext = {
+    result,
+    filePath,
+    fileGraph,
+    parsedFile,
+    kind: OriginKind.Object,
   };
 
   // Link every object
   const objectErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.objects.values()],
     descriptor =>
-      linkTypes({
-        descriptor,
-        result,
-        filePath,
-        fileGraph,
-        parsedFile,
+      linkObjectTypes(descriptor, {
+        ...linkingContext,
         kind: OriginKind.Object,
       }),
   );
@@ -308,12 +349,8 @@ export function linkTypesFile(
   const inputErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.inputs.values()],
     descriptor =>
-      linkTypes({
-        descriptor,
-        result,
-        filePath,
-        fileGraph,
-        parsedFile,
+      linkObjectTypes(descriptor, {
+        ...linkingContext,
         kind: OriginKind.Input,
       }),
   );
@@ -323,7 +360,15 @@ export function linkTypesFile(
     result.enumDeclarations.push(descriptor);
   });
 
-  const accumulatedErrors = [...objectErrors, ...inputErrors];
+  // Push unions.
+  const unionErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.unions.values()],
+    descriptor =>
+      linkUnionTypes(descriptor, { ...linkingContext, kind: OriginKind.Union }),
+  );
+
+  // Show errors
+  const accumulatedErrors = [...objectErrors, ...inputErrors, ...unionErrors];
 
   if (accumulatedErrors.length > 0) {
     throw new LinkingError(accumulatedErrors);

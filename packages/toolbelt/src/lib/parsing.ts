@@ -212,6 +212,7 @@ export type UnionTypeDescription = {
   name: string;
   comments?: string;
   members: string[];
+  referencedTypes: ReferencedTypeList;
 };
 
 /**
@@ -870,9 +871,12 @@ export function parseDocumentUnionType(
     throw new Error('Any union expected to be parsed must have members');
   }
 
+  const members = unionDesc.types.map(type => type.name.value);
+
   return {
     name: unionDesc.name.value,
     comments: unionDesc.description && unionDesc.description.value,
-    members: unionDesc.types.map(type => type.name.value),
+    members,
+    referencedTypes: new Set(members),
   };
 }
