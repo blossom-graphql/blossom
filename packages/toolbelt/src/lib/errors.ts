@@ -169,7 +169,23 @@ export class LinkingError extends ExtendableError implements FormattableError {
   constructor(errors: ErrorsOutput) {
     super(`Linking errors`);
 
-    this.errors = errors;
+    this.errors = [];
+
+    errors.forEach(error => {
+      const [index, errorInstance] = error;
+
+      // If the error comes from a child LinkingError, put all the child errors
+      // in this instance.
+      if (errorInstance instanceof LinkingError) {
+        this.errors.push(
+          ...errorInstance.errors.map(
+            ([_, linkingError]): [number, Error] => [index, linkingError],
+          ),
+        );
+      } else {
+        this.errors.push(error);
+      }
+    });
   }
 
   cliFormat() {
