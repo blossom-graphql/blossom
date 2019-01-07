@@ -20,9 +20,13 @@ import {
   EnumTypeDescription,
   UnionTypeDescription,
 } from './parsing';
-import { TypesFileContents, ImportDescription } from './linking';
+import {
+  TypesFileContents,
+  ImportDescription,
+  RootFileContents,
+} from './linking';
 import { projectImportPath } from './paths';
-import { resolverSignatureName } from './naming';
+import { resolverSignatureName, rootResolverName } from './naming';
 
 const GRAPHQL_TYPENAME_FIELD = '__typename';
 const GRAPHQL_TYPENAME_FIELD_COMMENTS = wrap(
@@ -454,4 +458,48 @@ export function generateTypesFileNodes(
     unionTypeDeclarations,
     resolverSignatureDeclarations,
   ];
+}
+
+export function generateRootFileNodes(
+  contents: RootFileContents,
+): ReadonlyArray<CodeGroup> {
+  const fileImports = [...contents.fileImports.values()].map(
+    createImportDeclaration,
+  );
+
+  const functionDeclarations = contents.operationDeclarations.map(
+    fieldDescriptor => {
+      const terminalTypeNode = generateTerminalTypeNode(fieldDescriptor);
+
+      const name = rootResolverName(fieldDescriptor.name);
+
+      const functionContents = ts.createFunctionExpression(
+        [ts.createModifier(ts.SyntaxKind.AsyncKeyword)],
+        undefined,
+        ts.createIdentifier(name),
+        undefined,
+        [],
+        terminalTypeNode,
+        ts.createBlock([], true),
+      );
+
+      const declaration = ts.createVariableStatement(
+        [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+        [
+          ts.createVariableDeclaration(
+            ts.createIdentifier(name),
+            ts.createTypeReferenceNode(
+              ts.createIdentifier(resolverSignatureName(fieldDescriptor.name)),
+              undefined,
+            ),
+            functionContents,
+          ),
+        ],
+      );
+
+      return declaration;
+    },
+  );
+
+  return [fileImports, functionDeclarations];
 }

@@ -24,6 +24,7 @@ import {
   LinkingError,
 } from './errors';
 import { forEachWithErrors } from './utils';
+import { resolverSignatureName } from './naming';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
 const MAYBE_DEP_NAME = 'Maybe';
@@ -48,12 +49,19 @@ type FileImportDescription = {
 type ImportGroupMap = Map<string, ImportDescription>;
 
 export type TypesFileContents = {
+  kind: 'TypesFile';
   vendorImports: ImportGroupMap;
   fileImports: ImportGroupMap;
   requiredDeps: Set<string>;
   enumDeclarations: EnumTypeDescription[];
   typeDeclarations: ObjectTypeDescription[];
   unionDeclarations: UnionTypeDescription[];
+  operationDeclarations: FieldDescriptor[];
+};
+
+export type RootFileContents = {
+  kind: 'RootFile';
+  fileImports: ImportGroupMap;
   operationDeclarations: FieldDescriptor[];
 };
 
@@ -97,6 +105,14 @@ export enum PresenceResult {
   Invalid = 'Invalid',
   NotPresent = 'NotPresent',
 }
+
+export type LinkingContext = Readonly<{
+  addImports: boolean;
+  filePath: string;
+  fileGraph: ParsedFileGraph;
+  parsedFile: ParsedFileDescriptor;
+  kind: OriginKind;
+}>;
 
 export function requirePresence(presenceMap: any, keys: string[]) {
   const hasValidKey = !!keys.find(key => presenceMap[key]);
@@ -147,14 +163,6 @@ export function fileHasReference(
   const { parsedDocument: referencedDocument } = referencedFile;
   return documentHasReference(referencedDocument, kind, field);
 }
-
-export type LinkingContext = {
-  result: TypesFileContents;
-  filePath: string;
-  fileGraph: ParsedFileGraph;
-  parsedFile: ParsedFileDescriptor;
-  kind: OriginKind;
-};
 
 export function enforceTypePresence(
   typeName: string,
@@ -244,12 +252,13 @@ export function enforceTypePresence(
 export function linkOperationTypes(
   _operationName: string, // ! Not used at this time.
   operationTypeName: string,
+  result: TypesFileContents | RootFileContents,
   linkingContext: LinkingContext,
 ) {
-  const { fileGraph, filePath, result } = linkingContext;
+  const { addImports, fileGraph, filePath } = linkingContext;
   const schemaPath = enforceTypePresence(operationTypeName, linkingContext);
 
-  if (schemaPath) {
+  if (schemaPath && addImports) {
     addImport(
       result.fileImports,
       'FileImport',
@@ -278,10 +287,9 @@ export function linkOperationTypes(
 
 export function linkUnionTypes(
   unionDescriptor: UnionTypeDescription,
+  result: TypesFileContents,
   linkingContext: LinkingContext,
 ) {
-  const { result } = linkingContext;
-
   const errors = forEachWithErrors(
     [...unionDescriptor.referencedTypes],
     typeName => {
@@ -304,9 +312,10 @@ export function linkUnionTypes(
 
 export function linkObjectTypes(
   typeDescriptor: ObjectTypeDescription,
+  result: TypesFileContents,
   linkingContext: LinkingContext,
 ) {
-  const { kind, result } = linkingContext;
+  const { kind } = linkingContext;
 
   // Calculate whether Maybe should be required or not.
   if (
@@ -358,6 +367,7 @@ export function linkTypesFile(
   }
 
   const result: TypesFileContents = {
+    kind: 'TypesFile',
     vendorImports: new Map(),
     fileImports: new Map(),
     requiredDeps: new Set(),
@@ -368,7 +378,7 @@ export function linkTypesFile(
   };
 
   const linkingContext: LinkingContext = {
-    result,
+    addImports: true,
     filePath,
     fileGraph,
     parsedFile,
@@ -379,7 +389,7 @@ export function linkTypesFile(
   const objectErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.objects.values()],
     descriptor =>
-      linkObjectTypes(descriptor, {
+      linkObjectTypes(descriptor, result, {
         ...linkingContext,
         kind: OriginKind.Object,
       }),
@@ -388,7 +398,7 @@ export function linkTypesFile(
   const inputErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.inputs.values()],
     descriptor =>
-      linkObjectTypes(descriptor, {
+      linkObjectTypes(descriptor, result, {
         ...linkingContext,
         kind: OriginKind.Input,
       }),
@@ -403,7 +413,10 @@ export function linkTypesFile(
   const unionErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.unions.values()],
     descriptor =>
-      linkUnionTypes(descriptor, { ...linkingContext, kind: OriginKind.Union }),
+      linkUnionTypes(descriptor, result, {
+        ...linkingContext,
+        kind: OriginKind.Union,
+      }),
   );
 
   // Check for operation names. When that's the case, the underlying types must
@@ -414,7 +427,12 @@ export function linkTypesFile(
         Object.entries(parsedFile.parsedDocument.operationNames),
         ([operationName, operationType]: [string, string | undefined]) =>
           operationType &&
-          linkOperationTypes(operationName, operationType, linkingContext),
+          linkOperationTypes(
+            operationName,
+            operationType,
+            result,
+            linkingContext,
+          ),
       )
     : [];
 
@@ -454,6 +472,59 @@ export function linkTypesFile(
   if (requiresMaybe) {
     addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
   }
+
+  return result;
+}
+
+export function linkRootFile(
+  filePath: string,
+  fileGraph: ParsedFileGraph,
+): RootFileContents {
+  const parsedFile = fileGraph.get(filePath);
+  if (!parsedFile) {
+    throw new FileNotFoundInGraph(filePath);
+  }
+
+  const result: RootFileContents = {
+    kind: 'RootFile',
+    fileImports: new Map(),
+    operationDeclarations: [],
+  };
+
+  const linkingContext: LinkingContext = {
+    addImports: false,
+    filePath,
+    fileGraph,
+    parsedFile,
+    kind: OriginKind.Object,
+  };
+
+  Object.entries(parsedFile.parsedDocument.operationNames).forEach(
+    ([operationName, operationTypeName]) => {
+      if (!operationTypeName) return;
+
+      addImport(
+        result.fileImports,
+        'FileImport',
+        typesFilePath(filePath),
+        'Test', // TODO: CHANGE ME
+      );
+
+      addImport(
+        result.fileImports,
+        'FileImport',
+        typesFilePath(filePath),
+        resolverSignatureName(operationTypeName),
+      );
+
+      linkOperationTypes(
+        operationName,
+        operationTypeName,
+        result,
+        linkingContext,
+      );
+    },
+  );
 
   return result;
 }

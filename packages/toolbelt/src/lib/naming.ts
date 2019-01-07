@@ -11,3 +11,7 @@ import { camelCase, upperFirst } from 'lodash';
 export function resolverSignatureName(methodName: string): string {
   return upperFirst(camelCase(methodName)) + 'Resolver';
 }
+
+export function rootResolverName(methodName: string): string {
+  return camelCase(methodName) + 'Resolver';
+}

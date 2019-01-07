@@ -22,11 +22,19 @@ export function appPath(relativePath: string, basePath = APP_DIR): string {
   return path.resolve(basePath, relativePath);
 }
 
-export function typesFilePath(schemaFilePath: string): string {
+export function createDotName(schemaFilePath: string, resourceName: string) {
   const parsedPath = path.parse(schemaFilePath);
   const baseFileName = parsedPath.name.split('.')[0];
 
-  return path.join(parsedPath.dir, `${baseFileName}.types.ts`);
+  return path.join(parsedPath.dir, `${baseFileName}.${resourceName}.ts`);
+}
+
+export function typesFilePath(schemaFilePath: string): string {
+  return createDotName(schemaFilePath, 'types');
+}
+
+export function rootFilePath(schemaFilePath: string): string {
+  return createDotName(schemaFilePath, 'root');
 }
 
 export function blossomInstancePath(): string {
