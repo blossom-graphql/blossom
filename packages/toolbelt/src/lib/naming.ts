@@ -15,3 +15,7 @@ export function resolverSignatureName(methodName: string): string {
 export function rootResolverName(methodName: string): string {
   return camelCase(methodName) + 'Resolver';
 }
+
+export function resolverName(gqlTypeName: string): string {
+  return camelCase(gqlTypeName) + 'Resolver';
+}

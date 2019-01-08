@@ -184,7 +184,7 @@ export enum ThunkImplementationType {
 /**
  * Descriptor for a known scalar type.
  */
-type KnownScalarTypeDescriptor = {
+export type KnownScalarTypeDescriptor = {
   kind: 'KnownScalarType';
   type: KnownScalarTypes;
 };

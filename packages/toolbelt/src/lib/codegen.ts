@@ -19,6 +19,7 @@ import {
   KnownScalarTypes,
   EnumTypeDescription,
   UnionTypeDescription,
+  KnownScalarTypeDescriptor,
 } from './parsing';
 import {
   TypesFileContents,
@@ -26,13 +27,30 @@ import {
   RootFileContents,
 } from './linking';
 import { projectImportPath } from './paths';
-import { resolverSignatureName, rootResolverName } from './naming';
+import {
+  resolverSignatureName,
+  rootResolverName,
+  resolverName,
+} from './naming';
 
 const GRAPHQL_TYPENAME_FIELD = '__typename';
 const GRAPHQL_TYPENAME_FIELD_COMMENTS = wrap(
   'Required by GraphQL.js. Must match the name of the object in the GraphQL SDL this type is representing in the codebase.',
   { width: 80, indent: '' },
 );
+
+export function createMockLiteral(
+  descriptor: KnownScalarTypeDescriptor,
+): ts.StringLiteral | ts.NumericLiteral | ts.BooleanLiteral {
+  switch (descriptor.type) {
+    case KnownScalarTypes.String:
+      return ts.createStringLiteral('Your returned string');
+    case KnownScalarTypes.Number:
+      return ts.createNumericLiteral('0');
+    case KnownScalarTypes.Boolean:
+      return ts.createLiteral(false);
+  }
+}
 
 /**
  * Receives a list of arguments and generates a type literal with the arguments
@@ -42,7 +60,7 @@ const GRAPHQL_TYPENAME_FIELD_COMMENTS = wrap(
  * @param args List of arguments, if any, as FieldDescriptor structures.
  */
 export function generateArgumentsTypeLiteral(
-  args: FieldDescriptor[] | undefined,
+  args: ReadonlyArray<FieldDescriptor> | undefined,
 ): ts.ParameterDeclaration {
   const name = ts.createIdentifier('args');
 
@@ -67,23 +85,11 @@ export function generateArgumentsTypeLiteral(
   );
 }
 
-/**
- * Generates a function type node, to be part of the type alias declaration.
- *
- * @param terminalType TypeNode of the return value.
- * @param args List of arguments, if any.
- * @param isAsync Should this be an async function?
- */
-export function generateFunctionTypeNode(
-  terminalType: ts.TypeNode,
-  args: FieldDescriptor[] | undefined,
-  isAsync: boolean = false,
-): ts.FunctionTypeNode {
-  const outputType = isAsync
-    ? ts.createTypeReferenceNode(ts.createIdentifier('Promise'), [terminalType])
-    : terminalType;
-
-  const signatureArgs = [
+export function generateResolverFunctionArguments(
+  args: ReadonlyArray<FieldDescriptor> | undefined,
+  addResolverInfo: boolean = true,
+): ReadonlyArray<ts.ParameterDeclaration> {
+  const result = [
     generateArgumentsTypeLiteral(args),
     // Context parameter.
     ts.createParameter(
@@ -97,21 +103,63 @@ export function generateFunctionTypeNode(
         undefined,
       ),
     ),
-    // AST parameter.
-    ts.createParameter(
-      undefined,
-      undefined,
-      undefined,
-      ts.createIdentifier('resolveInfo'),
-      undefined,
-      ts.createTypeReferenceNode(
-        ts.createIdentifier('GraphQLResolveInfo'),
-        undefined,
-      ),
-    ),
   ];
 
-  return ts.createFunctionTypeNode(undefined, signatureArgs, outputType);
+  if (addResolverInfo)
+    result.push(
+      // AST parameter.
+      ts.createParameter(
+        undefined,
+        undefined,
+        undefined,
+        ts.createIdentifier('resolveInfo'),
+        undefined,
+        ts.createTypeReferenceNode(
+          ts.createIdentifier('GraphQLResolveInfo'),
+          undefined,
+        ),
+      ),
+    );
+
+  return result;
+}
+
+export function getOutputType(terminalType: ts.TypeNode, isAsync: boolean) {
+  return isAsync
+    ? ts.createTypeReferenceNode(ts.createIdentifier('Promise'), [terminalType])
+    : terminalType;
+}
+
+/**
+ * Generates a function type node, to be part of the type alias declaration.
+ *
+ * @param terminalType TypeNode of the return value.
+ * @param args List of arguments, if any.
+ * @param isAsync Should this be an async function?
+ */
+export function generateFunctionTypeNode(
+  terminalType: ts.TypeNode,
+  args: FieldDescriptor[] | undefined,
+  isAsync: boolean = false,
+): ts.FunctionTypeNode {
+  return ts.createFunctionTypeNode(
+    undefined,
+    generateResolverFunctionArguments(args),
+    getOutputType(terminalType, isAsync),
+  );
+}
+
+export function preprendComments(declaration: ts.Node, text: string) {
+  const lines = text.split('\n');
+
+  lines.forEach(line => {
+    ts.addSyntheticLeadingComment(
+      declaration,
+      ts.SyntaxKind.SingleLineCommentTrivia,
+      ` ${line}`,
+      true,
+    );
+  });
 }
 
 /**
@@ -122,7 +170,7 @@ export function generateFunctionTypeNode(
  *
  * @param text Text to be added.
  */
-export function appendJSDocComments(declaration: ts.Node, text: string) {
+export function prependJSDocComments(declaration: ts.Node, text: string) {
   const appendedLines = text
     .split('\n')
     .map(line => `* ${line}`)
@@ -199,6 +247,18 @@ export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
   return wrapInOptionalType(terminalType, field.required);
 }
 
+export function getTerminalTypeName(fieldDescriptor: FieldDescriptor): string {
+  if (fieldDescriptor.array) {
+    return getTerminalTypeName(fieldDescriptor.elementDescriptor);
+  }
+
+  if (fieldDescriptor.type.kind === 'KnownScalarType') {
+    return fieldDescriptor.type.type;
+  } else {
+    return fieldDescriptor.type.name;
+  }
+}
+
 /**
  * Given a field descriptor, generates the type element which is going to be
  * a member of the type alias declaration.
@@ -241,7 +301,7 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   );
 
   if (field.comments) {
-    appendJSDocComments(declaration, field.comments);
+    prependJSDocComments(declaration, field.comments);
   }
 
   return declaration;
@@ -256,7 +316,7 @@ export function generateEnumDeclaration(enumDescriptor: EnumTypeDescription) {
       ts.createStringLiteral(field.originalName),
     );
 
-    if (field.comments) appendJSDocComments(member, field.comments);
+    if (field.comments) prependJSDocComments(member, field.comments);
 
     return member;
   });
@@ -269,7 +329,7 @@ export function generateEnumDeclaration(enumDescriptor: EnumTypeDescription) {
   );
 
   if (enumDescriptor.comments)
-    appendJSDocComments(declaration, enumDescriptor.comments);
+    prependJSDocComments(declaration, enumDescriptor.comments);
 
   return declaration;
 }
@@ -297,7 +357,7 @@ export function generateObjectTypeAlias(
     undefined,
   );
 
-  appendJSDocComments(typenameElement, GRAPHQL_TYPENAME_FIELD_COMMENTS);
+  prependJSDocComments(typenameElement, GRAPHQL_TYPENAME_FIELD_COMMENTS);
 
   const declaration = ts.createTypeAliasDeclaration(
     undefined,
@@ -308,7 +368,7 @@ export function generateObjectTypeAlias(
   );
 
   if (descriptor.comments) {
-    appendJSDocComments(declaration, descriptor.comments);
+    prependJSDocComments(declaration, descriptor.comments);
   }
 
   return declaration;
@@ -330,7 +390,7 @@ export function generateUnionTypeAlias(
   );
 
   if (descriptor.comments) {
-    appendJSDocComments(declaration, descriptor.comments);
+    prependJSDocComments(declaration, descriptor.comments);
   }
 
   return declaration;
@@ -356,7 +416,7 @@ export function generateResolverSignatureDeclaration(
   );
 
   if (descriptor.comments) {
-    appendJSDocComments(declaration, descriptor.comments);
+    prependJSDocComments(declaration, descriptor.comments);
   }
 
   return declaration;
@@ -469,32 +529,89 @@ export function generateRootFileNodes(
 
   const functionDeclarations = contents.operationDeclarations.map(
     fieldDescriptor => {
-      const terminalTypeNode = generateTerminalTypeNode(fieldDescriptor);
+      const terminalType = getOutputType(
+        generateTerminalTypeNode(fieldDescriptor),
+        fieldDescriptor.thunkType === ThunkType.AsyncFunction,
+      );
 
       const name = rootResolverName(fieldDescriptor.name);
 
-      const functionContents = ts.createFunctionExpression(
+      const terminalTypeName = getTerminalTypeName(fieldDescriptor);
+
+      const commentStatement = ts.createEmptyStatement();
+      preprendComments(
+        commentStatement,
+        'Inside this function you must find a way to retrieve attributes in order' +
+          '\nto pass it to the resolver. Example: call a loader or a connection. Use' +
+          '\nargs for this purpose.',
+      );
+
+      let returnStatement: ts.ReturnStatement;
+
+      if (
+        !fieldDescriptor.array &&
+        fieldDescriptor.type.kind === 'KnownScalarType'
+      ) {
+        returnStatement = ts.createReturn(
+          createMockLiteral(fieldDescriptor.type),
+        );
+      } else {
+        returnStatement = ts.createReturn(
+          ts.createCall(
+            ts.createIdentifier(resolverName(terminalTypeName)),
+            undefined,
+            [
+              ts.createObjectLiteral(
+                [
+                  ts.createShorthandPropertyAssignment('attributes'),
+                  ts.createShorthandPropertyAssignment('context'),
+                ],
+                true,
+              ),
+            ],
+          ),
+        );
+      }
+
+      const functionContents = ts.createBlock(
+        [commentStatement, returnStatement],
+        true,
+      );
+
+      const functionExpression = ts.createFunctionExpression(
         [ts.createModifier(ts.SyntaxKind.AsyncKeyword)],
         undefined,
         ts.createIdentifier(name),
         undefined,
-        [],
-        terminalTypeNode,
-        ts.createBlock([], true),
+        // At the moment we are hardwiring this to false. However, when we try
+        // to further optimize the loading of specific fields, the actual field
+        // list should be retrieved from resolveInfo.
+        //
+        // Thus, this should be wired to a setting, a directive or something
+        // similar. E.g. if we use a different kind of loader for this resource,
+        // then resolveInfo should be included in the list of arguments.
+        generateResolverFunctionArguments(fieldDescriptor.arguments, false),
+        terminalType,
+        functionContents,
       );
 
       const declaration = ts.createVariableStatement(
         [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-        [
-          ts.createVariableDeclaration(
-            ts.createIdentifier(name),
-            ts.createTypeReferenceNode(
-              ts.createIdentifier(resolverSignatureName(fieldDescriptor.name)),
-              undefined,
+        ts.createVariableDeclarationList(
+          [
+            ts.createVariableDeclaration(
+              ts.createIdentifier(name),
+              ts.createTypeReferenceNode(
+                ts.createIdentifier(
+                  resolverSignatureName(fieldDescriptor.name),
+                ),
+                undefined,
+              ),
+              functionExpression,
             ),
-            functionContents,
-          ),
-        ],
+          ],
+          ts.NodeFlags.Const,
+        ),
       );
 
       return declaration;
