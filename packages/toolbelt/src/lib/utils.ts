@@ -72,13 +72,8 @@ export function fullInspect(object: any) {
   return inspect(object, true, null, true);
 }
 
-export function tabMessage(message: string, tabSize: number = 2) {
-  const tab = Array.from({ length: tabSize })
-    .map(() => ' ')
+export function repeatChar(token: string, length: number): string {
+  return Array.from({ length })
+    .map(() => token)
     .join('');
-
-  return message
-    .split('\n')
-    .map(l => `${tab}${l}`)
-    .join('\n');
 }

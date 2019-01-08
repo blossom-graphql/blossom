@@ -18,6 +18,7 @@ import { generateRootFileNodes } from '../../lib/codegen';
 import { appPath, rootFilePath } from '../../lib/paths';
 import { linkRootFile } from '../../lib/linking';
 import { cliRunWrapper } from '../../lib/runtime';
+import { repeatChar } from '../../lib/utils';
 
 export async function generateRootFile(
   filePath: string,
@@ -40,10 +41,10 @@ export async function generateRootFile(
     newLine: ts.NewLineKind.LineFeed,
   });
 
-  const chunks = generatedNodeGroups.map(nodes =>
-    nodes
+  const chunks = generatedNodeGroups.map(nodeGroup =>
+    nodeGroup.nodes
       .map(node => printer.printNode(ts.EmitHint.Unspecified, node, resultFile))
-      .join('\n'),
+      .join(repeatChar('\n', nodeGroup.spacing + 1)),
   );
 
   const generatedFile = chunks.join('\n\n');

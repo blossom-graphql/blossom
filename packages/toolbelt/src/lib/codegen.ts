@@ -481,7 +481,7 @@ export function createImportDeclaration(importDescription: ImportDescription) {
   );
 }
 
-type CodeGroup = ReadonlyArray<ts.Node>;
+type CodeGroup = { spacing: number; nodes: ReadonlyArray<ts.Node> };
 
 export function generateTypesFileNodes(
   contents: TypesFileContents,
@@ -511,12 +511,12 @@ export function generateTypesFileNodes(
   );
 
   return [
-    vendorImports,
-    fileImports,
-    enumDeclarations,
-    objectTypeDeclarations,
-    unionTypeDeclarations,
-    resolverSignatureDeclarations,
+    { spacing: 0, nodes: fileImports },
+    { spacing: 0, nodes: vendorImports },
+    { spacing: 1, nodes: enumDeclarations },
+    { spacing: 1, nodes: objectTypeDeclarations },
+    { spacing: 1, nodes: unionTypeDeclarations },
+    { spacing: 1, nodes: resolverSignatureDeclarations },
   ];
 }
 
@@ -618,5 +618,8 @@ export function generateRootFileNodes(
     },
   );
 
-  return [fileImports, functionDeclarations];
+  return [
+    { spacing: 1, nodes: fileImports },
+    { spacing: 1, nodes: functionDeclarations },
+  ];
 }
