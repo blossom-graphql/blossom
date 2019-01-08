@@ -267,6 +267,11 @@ export function linkOperationTypes(
     );
   }
 
+  // Ensure that the thunk imports are going to be present.
+  if (addImports && result.kind === 'TypesFile') {
+    result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
+  }
+
   const referencePath = schemaPath || filePath;
   const fileDescriptor = fileGraph.get(referencePath);
   if (!fileDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.

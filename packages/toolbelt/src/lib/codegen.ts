@@ -511,8 +511,8 @@ export function generateTypesFileNodes(
   );
 
   return [
-    { spacing: 0, nodes: fileImports },
     { spacing: 0, nodes: vendorImports },
+    { spacing: 0, nodes: fileImports },
     { spacing: 1, nodes: enumDeclarations },
     { spacing: 1, nodes: objectTypeDeclarations },
     { spacing: 1, nodes: unionTypeDeclarations },
