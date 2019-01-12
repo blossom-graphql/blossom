@@ -8,12 +8,41 @@
 
 import { camelCase, upperFirst } from 'lodash';
 
-export function resolverSignatureName(methodName: string): string {
-  return upperFirst(camelCase(methodName)) + 'Resolver';
+import { OperationDescriptor } from './parsing';
+import { SupportedOperation, ReferencedTypeDescriptor } from './parsing';
+
+export function referencedTypeName(
+  descriptor: ReferencedTypeDescriptor,
+): string {
+  return descriptor.name;
 }
 
-export function rootResolverName(methodName: string): string {
-  return camelCase(methodName) + 'Resolver';
+export function operationName(operation: SupportedOperation) {
+  switch (operation) {
+    case SupportedOperation.Mutation:
+      return 'Mutation';
+    case SupportedOperation.Query:
+    default:
+      return 'Query';
+  }
+}
+
+export function resolverSignatureName({
+  fieldDescriptor: descriptor,
+  operation,
+}: OperationDescriptor): string {
+  return (
+    upperFirst(camelCase(descriptor.name)) +
+    operationName(operation) +
+    'Resolver'
+  );
+}
+
+export function rootResolverName({
+  fieldDescriptor: descriptor,
+  operation,
+}: OperationDescriptor): string {
+  return camelCase(descriptor.name) + operationName(operation) + 'Resolver';
 }
 
 export function resolverName(gqlTypeName: string): string {

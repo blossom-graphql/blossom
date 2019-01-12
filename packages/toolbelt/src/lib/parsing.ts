@@ -31,6 +31,11 @@ export const BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME = 'type';
 const PATH_REGEX = `[^'"]+`;
 const IMPORT_MATCH_REGEX = `^#\\s?import\\s+(?<imported>.+\\s+from\\s+)?(?<quote>['"])(?<path>${PATH_REGEX})(\\k<quote>);?$`;
 
+export enum SupportedOperation {
+  Query = 'query',
+  Mutation = 'mutation',
+}
+
 /**
  * Descriptor of a document node.
  */
@@ -50,7 +55,7 @@ type DocumentNameMap<T> = { [key: string]: DocumentNodeDescriptor<T> };
 /**
  * Map to represent the operation names and their associated types.
  */
-type OperationNames = { [key in 'query' | 'mutation']?: string };
+type OperationNames = { [key in SupportedOperation]?: string };
 
 /**
  * An intermediate dictionary where all the types described in the file are
@@ -117,33 +122,7 @@ export enum ThunkType {
   None = 'None',
 }
 
-/**
- * Full descriptor of a single type entry.
- */
-type SingleFieldDescriptor = {
-  /**
-   * Is this an array? Always false. Used for type guards.
-   */
-  array: false;
-  name: string;
-  comments?: string;
-  type: KnownScalarTypeDescriptor | ReferencedTypeDescriptor;
-  /**
-   * Is it required to return the field?
-   */
-  required: boolean;
-  thunkType: ThunkType;
-  arguments?: FieldDescriptor[];
-};
-
-/**
- * Full descriptor of an array field.
- */
-type ArrayFieldDescriptor = {
-  /**
-   * Is this an array? Always true. Used for type guards.
-   */
-  array: true;
+export type FieldDescriptorBase = {
   name: string;
   comments?: string;
   /**
@@ -151,11 +130,26 @@ type ArrayFieldDescriptor = {
    */
   required: boolean;
   thunkType: ThunkType;
+  arguments?: FieldDescriptor[];
+};
+
+/**
+ * Full descriptor of a single type entry.
+ */
+type SingleFieldDescriptor = FieldDescriptorBase & {
+  kind: 'SingleFieldDescriptor';
+  type: TypeDescriptor;
+};
+
+/**
+ * Full descriptor of an array field.
+ */
+type ArrayFieldDescriptor = FieldDescriptorBase & {
+  kind: 'ArrayFieldDescriptor';
   /**
    * Descriptor of a single element of the array.
    */
   elementDescriptor: FieldDescriptor;
-  arguments?: FieldDescriptor[];
 };
 
 /**
@@ -164,6 +158,12 @@ type ArrayFieldDescriptor = {
  * determined by the `array` property.
  */
 export type FieldDescriptor = SingleFieldDescriptor | ArrayFieldDescriptor;
+
+export type OperationDescriptor = {
+  kind: 'OperationDescriptor';
+  fieldDescriptor: FieldDescriptor;
+  operation: SupportedOperation;
+};
 
 /**
  * Enum containing all the known scalar types. Used internally in `switch`
@@ -192,10 +192,14 @@ export type KnownScalarTypeDescriptor = {
 /**
  * Descriptor for a referenced type descriptor.
  */
-type ReferencedTypeDescriptor = {
+export type ReferencedTypeDescriptor = {
   kind: 'ReferencedType';
   name: string;
 };
+
+export type TypeDescriptor =
+  | KnownScalarTypeDescriptor
+  | ReferencedTypeDescriptor;
 
 export type EnumValueDescription = {
   originalName: string;
@@ -693,9 +697,9 @@ export function parseFieldDefinitionNode(
     ) as FieldDescriptor;
 
     return {
+      kind: 'ArrayFieldDescriptor',
       name: '',
       required: false,
-      array: true,
       elementDescriptor: result,
       thunkType: ThunkType.None,
     };
@@ -718,10 +722,10 @@ export function parseFieldDefinitionNode(
     // the type in order to match it with any of the references.
 
     return {
+      kind: 'SingleFieldDescriptor',
       name: definition.name.value,
       type: parseFieldType(definition, referencedTypes),
       thunkType: ThunkType.None,
-      array: false,
       required: false,
     };
   } else {

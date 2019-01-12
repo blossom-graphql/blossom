@@ -15,11 +15,13 @@ import wrap from 'word-wrap';
 import {
   FieldDescriptor,
   ObjectTypeDescription,
+  OperationDescriptor,
   ThunkType,
   KnownScalarTypes,
   EnumTypeDescription,
   UnionTypeDescription,
   KnownScalarTypeDescriptor,
+  SupportedOperation,
 } from './parsing';
 import {
   TypesFileContents,
@@ -49,6 +51,14 @@ export function createMockLiteral(
       return ts.createNumericLiteral('0');
     case KnownScalarTypes.Boolean:
       return ts.createLiteral(false);
+  }
+}
+
+export function signatureName(
+  descriptor: OperationDescriptor | FieldDescriptor,
+) {
+  if (descriptor.hasOwnProperty('operation')) {
+    descriptor;
   }
 }
 
@@ -138,15 +148,49 @@ export function getOutputType(terminalType: ts.TypeNode, isAsync: boolean) {
  * @param isAsync Should this be an async function?
  */
 export function generateFunctionTypeNode(
-  terminalType: ts.TypeNode,
-  args: FieldDescriptor[] | undefined,
-  isAsync: boolean = false,
-): ts.FunctionTypeNode {
-  return ts.createFunctionTypeNode(
-    undefined,
-    generateResolverFunctionArguments(args),
+  descriptor: OperationDescriptor | FieldDescriptor,
+  operation?: SupportedOperation,
+  // terminalType: ts.TypeNode,
+  // args: FieldDescriptor[] | undefined,
+  // isAsync: boolean = false,
+): ts.TypeReferenceNode {
+  if (descriptor.kind === 'OperationDescriptor')
+    return generateFunctionTypeNode(
+      descriptor.fieldDescriptor,
+      descriptor.operation,
+    );
+
+  let signatureName: string;
+
+  switch (operation) {
+    case SupportedOperation.Mutation:
+      signatureName = 'MutationResolverSignature';
+      break;
+    case SupportedOperation.Query:
+      signatureName = 'QueryResolverSignature';
+      break;
+    default:
+      signatureName = 'ObjectResolverSignature';
+      break;
+  }
+
+  const terminalType = generateTerminalTypeNode(descriptor);
+  const isAsync = descriptor.thunkType === ThunkType.AsyncFunction;
+
+  const members = descriptor.arguments
+    ? descriptor.arguments.map(generateTypeElement)
+    : [];
+
+  return ts.createTypeReferenceNode(ts.createIdentifier(signatureName), [
+    ts.createTypeLiteralNode(members),
     getOutputType(terminalType, isAsync),
-  );
+  ]);
+
+  // return ts.createFunctionTypeNode(
+  //   undefined,
+  //   generateResolverFunctionArguments(args),
+  //   getOutputType(terminalType, isAsync),
+  // );
 }
 
 export function preprendComments(declaration: ts.Node, text: string) {
@@ -209,9 +253,14 @@ export function wrapInOptionalType(
  * @param field Descriptor of the field where the terminal type needs to be
  * computed.
  */
-export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
+export function generateTerminalTypeNode(
+  field: OperationDescriptor | FieldDescriptor,
+): ts.TypeNode {
+  if (field.kind === 'OperationDescriptor')
+    return generateTerminalTypeNode(field.fieldDescriptor);
+
   // If it's an array, then we must recurse based on the element descriptor
-  if (field.array) {
+  if (field.kind === 'ArrayFieldDescriptor') {
     return wrapInOptionalType(
       ts.createTypeReferenceNode(ts.createIdentifier('ReadonlyArray'), [
         generateTerminalTypeNode(field.elementDescriptor),
@@ -248,7 +297,7 @@ export function generateTerminalTypeNode(field: FieldDescriptor): ts.TypeNode {
 }
 
 export function getTerminalTypeName(fieldDescriptor: FieldDescriptor): string {
-  if (fieldDescriptor.array) {
+  if (fieldDescriptor.kind === 'ArrayFieldDescriptor') {
     return getTerminalTypeName(fieldDescriptor.elementDescriptor);
   }
 
@@ -269,21 +318,17 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   let typeNode: ts.TypeNode;
   let requiredSignature: ts.Token<ts.SyntaxKind.QuestionToken> | undefined;
 
-  const terminalTypeNode = generateTerminalTypeNode(field);
-
   // Wrap in a function based in the thunk type
   switch (field.thunkType) {
     case ThunkType.AsyncFunction:
     case ThunkType.Function:
       requiredSignature = undefined;
-      typeNode = generateFunctionTypeNode(
-        terminalTypeNode,
-        field.arguments,
-        field.thunkType === ThunkType.AsyncFunction,
-      );
+      typeNode = generateFunctionTypeNode(field);
       break;
 
     default:
+      const terminalTypeNode = generateTerminalTypeNode(field);
+
       // ThunkType.None
       requiredSignature = field.required
         ? undefined
@@ -397,26 +442,21 @@ export function generateUnionTypeAlias(
 }
 
 export function generateResolverSignatureDeclaration(
-  descriptor: FieldDescriptor,
+  descriptor: OperationDescriptor,
 ): ts.TypeAliasDeclaration {
-  const terminalTypeNode = generateTerminalTypeNode(descriptor);
-
-  const functionTypeNode = generateFunctionTypeNode(
-    terminalTypeNode,
-    descriptor.arguments,
-    descriptor.thunkType === ThunkType.AsyncFunction,
-  );
+  const functionTypeNode = generateFunctionTypeNode(descriptor);
+  const { fieldDescriptor } = descriptor;
 
   const declaration = ts.createTypeAliasDeclaration(
     undefined,
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-    ts.createIdentifier(resolverSignatureName(descriptor.name)),
+    ts.createIdentifier(resolverSignatureName(descriptor)),
     undefined,
     functionTypeNode,
   );
 
-  if (descriptor.comments) {
-    prependJSDocComments(declaration, descriptor.comments);
+  if (fieldDescriptor.comments) {
+    prependJSDocComments(declaration, fieldDescriptor.comments);
   }
 
   return declaration;
@@ -520,23 +560,66 @@ export function generateTypesFileNodes(
   ];
 }
 
+export function generateRootValueReturnExpression(
+  descriptor: OperationDescriptor | FieldDescriptor,
+): ts.Expression {
+  if (descriptor.kind === 'OperationDescriptor') {
+    return generateRootValueReturnExpression(descriptor.fieldDescriptor);
+  } else if (descriptor.kind === 'ArrayFieldDescriptor') {
+    if (
+      descriptor.elementDescriptor.kind === 'SingleFieldDescriptor' &&
+      descriptor.elementDescriptor.type.kind === 'KnownScalarType'
+    ) {
+      return ts.createArrayLiteral([
+        createMockLiteral(descriptor.elementDescriptor.type),
+      ]);
+    } else {
+      return generateRootValueReturnExpression(descriptor.elementDescriptor);
+    }
+  } else {
+    const terminalTypeName = getTerminalTypeName(descriptor);
+
+    if (descriptor.type.kind === 'KnownScalarType') {
+      return createMockLiteral(descriptor.type);
+    } else {
+      return ts.createCall(
+        ts.createIdentifier(resolverName(terminalTypeName)),
+        undefined,
+        [
+          ts.createObjectLiteral(
+            [
+              ts.createShorthandPropertyAssignment('attributes'),
+              ts.createShorthandPropertyAssignment('context'),
+            ],
+            true,
+          ),
+        ],
+      );
+    }
+  }
+}
+
 export function generateRootFileNodes(
   contents: RootFileContents,
 ): ReadonlyArray<CodeGroup> {
+  const vendorImports = [...contents.vendorImports.values()].map(
+    createImportDeclaration,
+  );
+
   const fileImports = [...contents.fileImports.values()].map(
     createImportDeclaration,
   );
 
   const functionDeclarations = contents.operationDeclarations.map(
-    fieldDescriptor => {
+    operationDescriptor => {
+      const { fieldDescriptor } = operationDescriptor;
       const terminalType = getOutputType(
-        generateTerminalTypeNode(fieldDescriptor),
-        fieldDescriptor.thunkType === ThunkType.AsyncFunction,
+        generateTerminalTypeNode(operationDescriptor),
+        operationDescriptor.fieldDescriptor.thunkType ===
+          ThunkType.AsyncFunction,
       );
 
-      const name = rootResolverName(fieldDescriptor.name);
-
-      const terminalTypeName = getTerminalTypeName(fieldDescriptor);
+      const name = rootResolverName(operationDescriptor);
 
       const commentStatement = ts.createEmptyStatement();
       preprendComments(
@@ -546,32 +629,9 @@ export function generateRootFileNodes(
           '\nargs for this purpose.',
       );
 
-      let returnStatement: ts.ReturnStatement;
-
-      if (
-        !fieldDescriptor.array &&
-        fieldDescriptor.type.kind === 'KnownScalarType'
-      ) {
-        returnStatement = ts.createReturn(
-          createMockLiteral(fieldDescriptor.type),
-        );
-      } else {
-        returnStatement = ts.createReturn(
-          ts.createCall(
-            ts.createIdentifier(resolverName(terminalTypeName)),
-            undefined,
-            [
-              ts.createObjectLiteral(
-                [
-                  ts.createShorthandPropertyAssignment('attributes'),
-                  ts.createShorthandPropertyAssignment('context'),
-                ],
-                true,
-              ),
-            ],
-          ),
-        );
-      }
+      const returnStatement: ts.ReturnStatement = ts.createReturn(
+        generateRootValueReturnExpression(operationDescriptor),
+      );
 
       const functionContents = ts.createBlock(
         [commentStatement, returnStatement],
@@ -602,9 +662,7 @@ export function generateRootFileNodes(
             ts.createVariableDeclaration(
               ts.createIdentifier(name),
               ts.createTypeReferenceNode(
-                ts.createIdentifier(
-                  resolverSignatureName(fieldDescriptor.name),
-                ),
+                ts.createIdentifier(resolverSignatureName(operationDescriptor)),
                 undefined,
               ),
               functionExpression,
@@ -619,7 +677,8 @@ export function generateRootFileNodes(
   );
 
   return [
-    { spacing: 1, nodes: fileImports },
+    { spacing: 0, nodes: vendorImports },
+    { spacing: 0, nodes: fileImports },
     { spacing: 1, nodes: functionDeclarations },
   ];
 }
