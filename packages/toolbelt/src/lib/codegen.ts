@@ -18,8 +18,8 @@ import {
   OperationDescriptor,
   ThunkType,
   KnownScalarTypes,
-  EnumTypeDescription,
-  UnionTypeDescription,
+  EnumTypeDescriptor,
+  UnionTypeDescriptor,
   KnownScalarTypeDescriptor,
   SupportedOperation,
 } from './parsing';
@@ -352,7 +352,7 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
   return declaration;
 }
 
-export function generateEnumDeclaration(enumDescriptor: EnumTypeDescription) {
+export function generateEnumDeclaration(enumDescriptor: EnumTypeDescriptor) {
   const members: ts.EnumMember[] = enumDescriptor.fields.map(field => {
     const enumFieldName = upperFirst(camelCase(field.originalName));
 
@@ -420,7 +420,7 @@ export function generateObjectTypeAlias(
 }
 
 export function generateUnionTypeAlias(
-  descriptor: UnionTypeDescription,
+  descriptor: UnionTypeDescriptor,
 ): ts.TypeAliasDeclaration {
   const declaration = ts.createTypeAliasDeclaration(
     undefined,

@@ -97,8 +97,8 @@ export type IntermediateDictionary = {
 export type DocumentParsingOuput = {
   objects: Map<string, ObjectTypeDescription>;
   inputs: Map<string, ObjectTypeDescription>;
-  enums: Map<string, EnumTypeDescription>;
-  unions: Map<string, UnionTypeDescription>;
+  enums: Map<string, EnumTypeDescriptor>;
+  unions: Map<string, UnionTypeDescriptor>;
   operationNames: OperationNames;
 };
 
@@ -165,6 +165,26 @@ export type OperationDescriptor = {
   operation: SupportedOperation;
 };
 
+export type EnumValueDescriptor = {
+  originalName: string;
+  comments?: string;
+};
+
+export type EnumTypeDescriptor = {
+  kind: 'EnumTypeDescriptor';
+  name: string;
+  comments?: string;
+  fields: EnumValueDescriptor[];
+};
+
+export type UnionTypeDescriptor = {
+  kind: 'UnionTypeDescriptor';
+  name: string;
+  comments?: string;
+  members: string[];
+  referencedTypes: ReferencedTypeList;
+};
+
 /**
  * Enum containing all the known scalar types. Used internally in `switch`
  * statements used in codegen.
@@ -201,30 +221,14 @@ export type TypeDescriptor =
   | KnownScalarTypeDescriptor
   | ReferencedTypeDescriptor;
 
-export type EnumValueDescription = {
-  originalName: string;
-  comments?: string;
-};
-
-export type EnumTypeDescription = {
-  name: string;
-  comments?: string;
-  fields: EnumValueDescription[];
-};
-
-export type UnionTypeDescription = {
-  name: string;
-  comments?: string;
-  members: string[];
-  referencedTypes: ReferencedTypeList;
-};
-
 /**
  * Full description of an object type. Any `type` and `input` declaration in
  * GraphQL objects is collapsed into this data structure which in turned is
  * then consumed for codegen purposes.
  */
 export type ObjectTypeDescription = {
+  kind: 'ObjectTypeDescription';
+  objectType: ObjectTypeKind;
   name: string;
   comments?: string;
   fields: FieldDescriptor[];
@@ -532,7 +536,7 @@ export function parseDocumentNode(
   }
 
   function enumTypeReducer(
-    accumulator: Map<string, EnumTypeDescription>,
+    accumulator: Map<string, EnumTypeDescriptor>,
     object: DocumentNodeDescriptor<EnumTypeDefinitionNode>,
   ) {
     const parsedResult = parseDocumentEnumType(object.node);
@@ -542,7 +546,7 @@ export function parseDocumentNode(
   }
 
   function unionTypeReducer(
-    accumulator: Map<string, UnionTypeDescription>,
+    accumulator: Map<string, UnionTypeDescriptor>,
     object: DocumentNodeDescriptor<UnionTypeDefinitionNode>,
   ) {
     const parsedResult = parseDocumentUnionType(object.node);
@@ -843,6 +847,11 @@ export function parseDocumentObjectType(
 
   // Mount the parsed object.
   return {
+    kind: 'ObjectTypeDescription',
+    objectType:
+      type.kind === 'ObjectTypeDefinition'
+        ? ObjectTypeKind.Object
+        : ObjectTypeKind.Input,
     name: type.name.value,
     comments: type.description && type.description.value,
     fields,
@@ -852,13 +861,14 @@ export function parseDocumentObjectType(
 
 export function parseDocumentEnumType(
   enumDesc: EnumTypeDefinitionNode,
-): EnumTypeDescription {
+): EnumTypeDescriptor {
   if (!enumDesc.values || enumDesc.values.length === 0) {
     // TODO: Create error.
     throw new Error('Any enum expected to be parsed must have values');
   }
 
   return {
+    kind: 'EnumTypeDescriptor',
     name: enumDesc.name.value,
     comments: enumDesc.description && enumDesc.description.value,
     fields: enumDesc.values.map(value => ({
@@ -870,7 +880,7 @@ export function parseDocumentEnumType(
 
 export function parseDocumentUnionType(
   unionDesc: UnionTypeDefinitionNode,
-): UnionTypeDescription {
+): UnionTypeDescriptor {
   if (!unionDesc.types || unionDesc.types.length === 0) {
     throw new Error('Any union expected to be parsed must have members');
   }
@@ -878,6 +888,7 @@ export function parseDocumentUnionType(
   const members = unionDesc.types.map(type => type.name.value);
 
   return {
+    kind: 'UnionTypeDescriptor',
     name: unionDesc.name.value,
     comments: unionDesc.description && unionDesc.description.value,
     members,

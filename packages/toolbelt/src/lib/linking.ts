@@ -12,12 +12,13 @@ import {
   ThunkType,
   DocumentParsingOuput,
   ParsedFileDescriptor,
-  EnumTypeDescription,
-  UnionTypeDescription,
+  EnumTypeDescriptor,
+  UnionTypeDescriptor,
   FieldDescriptor,
   SupportedOperation,
   TypeDescriptor,
   OperationDescriptor,
+  ObjectTypeKind,
 } from './parsing';
 import { typesFilePath, blossomInstancePath } from './paths';
 import {
@@ -26,7 +27,7 @@ import {
   ReferenceNotFoundError,
   LinkingError,
 } from './errors';
-import { forEachWithErrors } from './utils';
+import { forEachWithErrors, fullInspect } from './utils';
 import { resolverSignatureName, referencedTypeName } from './naming';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
@@ -57,9 +58,9 @@ export type TypesFileContents = {
   vendorImports: ImportGroupMap;
   fileImports: ImportGroupMap;
   requiredDeps: Set<string>;
-  enumDeclarations: EnumTypeDescription[];
+  enumDeclarations: EnumTypeDescriptor[];
   typeDeclarations: ObjectTypeDescription[];
-  unionDeclarations: UnionTypeDescription[];
+  unionDeclarations: UnionTypeDescriptor[];
   operationDeclarations: OperationDescriptor[];
 };
 
@@ -103,6 +104,16 @@ export enum OriginKind {
   Object = 'Object',
   Input = 'Input',
   Union = 'Union',
+  ObjectArgument = 'ObjectArgument',
+  InputArgument = 'InputArgument',
+}
+
+export enum ElementKind {
+  Type = 'Type',
+  Input = 'Input',
+  Enum = 'Enum',
+  Union = 'Union',
+  // Scalar = 'Scalar',
 }
 
 export enum PresenceResult {
@@ -116,12 +127,50 @@ export enum LinkingType {
   RootFile = 'RootFile',
 }
 
+export type OriginDescription =
+  | FieldOriginDescription
+  | UnionOriginDescription
+  | ArgumentOriginDescription;
+
+export type FieldOriginDescription = {
+  fieldName: string;
+  objectName: string;
+  originKind: OriginKind.Object | OriginKind.Input;
+};
+
+export type ArgumentOriginDescription = {
+  argumentName: string;
+  originKind: OriginKind.ObjectArgument | OriginKind.InputArgument;
+  fieldOriginDescription: FieldOriginDescription;
+};
+
+export type UnionOriginDescription = {
+  name: string;
+  originKind: OriginKind.Union;
+};
+
+export type ResolutionDescription = {
+  filePath: string;
+  elementKind: ElementKind;
+};
+
+export type ReferenceMap = Map<
+  string,
+  {
+    references: OriginDescription[];
+    resolution: ResolutionDescription | undefined;
+  }
+>;
+
+export type ReferenceGraph = Map<string, ReferenceMap>;
+
 export type LinkingContext = Readonly<{
   filePath: string;
   fileGraph: ParsedFileGraph;
   kind: OriginKind;
   linkingType: LinkingType;
   parsedFile: ParsedFileDescriptor;
+  referenceGraph: ReferenceGraph;
 }>;
 
 export function outputBaseType(
@@ -166,8 +215,10 @@ export function documentHasReference(
   switch (originKind) {
     case OriginKind.Object:
     case OriginKind.Union:
+    case OriginKind.ObjectArgument:
       return requirePresence(presenceMap, ['objects', 'enums', 'aliases']);
     case OriginKind.Input:
+    case OriginKind.InputArgument:
       return requirePresence(presenceMap, ['inputs', 'enums']);
   }
 }
@@ -271,6 +322,129 @@ export function enforceTypePresence(
   }
 }
 
+export function addReferenceInGraph(
+  referenceGraph: ReferenceGraph,
+  filePath: string,
+  field: string,
+  originDescription: OriginDescription,
+) {
+  const referenceMap = referenceGraph.get(filePath);
+  if (!referenceMap) {
+    referenceGraph.set(
+      filePath,
+      new Map([
+        [field, { references: [originDescription], resolution: undefined }],
+      ]),
+    );
+    return;
+  }
+
+  const referenceDescription = referenceMap.get(field);
+  if (!referenceDescription) {
+    referenceMap.set(field, {
+      references: [originDescription],
+      resolution: undefined,
+    });
+    return;
+  }
+
+  referenceDescription.references.push(originDescription);
+}
+
+export function updateReferenceGraphArgument(
+  linkingContext: LinkingContext,
+  argumentDescriptor: FieldDescriptor,
+  fieldOriginDescription: FieldOriginDescription,
+) {
+  if (argumentDescriptor.kind === 'ArrayFieldDescriptor') {
+    updateReferenceGraphArgument(
+      linkingContext,
+      argumentDescriptor.elementDescriptor,
+      fieldOriginDescription,
+    );
+  } else {
+    if (argumentDescriptor.type.kind === 'ReferencedType') {
+      const originKind =
+        fieldOriginDescription.originKind === OriginKind.Object
+          ? OriginKind.ObjectArgument
+          : OriginKind.InputArgument;
+
+      addReferenceInGraph(
+        linkingContext.referenceGraph,
+        linkingContext.filePath,
+        argumentDescriptor.type.name,
+        {
+          originKind,
+          argumentName: argumentDescriptor.name,
+          fieldOriginDescription,
+        },
+      );
+    }
+  }
+}
+
+export function updateReferenceGraphField(
+  linkingContext: LinkingContext,
+  descriptor: FieldDescriptor,
+  parent: ObjectTypeDescription,
+) {
+  const originKind: OriginKind.Object | OriginKind.Input =
+    parent.objectType === ObjectTypeKind.Object
+      ? OriginKind.Object
+      : OriginKind.Input;
+
+  const fieldOriginDescription: FieldOriginDescription = {
+    originKind,
+    fieldName: descriptor.name,
+    objectName: parent.name,
+  };
+
+  if (descriptor.kind === 'ArrayFieldDescriptor') {
+    updateReferenceGraphField(
+      linkingContext,
+      descriptor.elementDescriptor,
+      parent,
+    );
+  } else {
+    if (descriptor.type.kind === 'ReferencedType') {
+      addReferenceInGraph(
+        linkingContext.referenceGraph,
+        linkingContext.filePath,
+        descriptor.type.name,
+        fieldOriginDescription,
+      );
+    }
+  }
+
+  descriptor.arguments &&
+    descriptor.arguments.forEach(argumentDescriptor => {
+      updateReferenceGraphArgument(
+        linkingContext,
+        argumentDescriptor,
+        fieldOriginDescription,
+      );
+    });
+}
+
+export function updateReferenceGraph(
+  linkingContext: LinkingContext,
+  filePath: string,
+  descriptor: ObjectTypeDescription | UnionTypeDescriptor,
+): void {
+  if (descriptor.kind === 'UnionTypeDescriptor') {
+    descriptor.members.forEach(field =>
+      addReferenceInGraph(linkingContext.referenceGraph, filePath, field, {
+        originKind: OriginKind.Union,
+        name: descriptor.name,
+      }),
+    );
+  } else if (descriptor.kind === 'ObjectTypeDescription') {
+    descriptor.fields.forEach(field => {
+      updateReferenceGraphField(linkingContext, field, descriptor);
+    });
+  }
+}
+
 export function linkOperationTypes(
   operation: SupportedOperation, // ! Not used at this time.
   operationTypeName: string,
@@ -332,7 +506,7 @@ export function linkOperationTypes(
 }
 
 export function linkUnionTypes(
-  unionDescriptor: UnionTypeDescription,
+  unionDescriptor: UnionTypeDescriptor,
   result: TypesFileContents,
   linkingContext: LinkingContext,
 ) {
@@ -443,17 +617,23 @@ export function linkTypesFile(
     kind: OriginKind.Object,
     linkingType: LinkingType.TypesFile,
     parsedFile,
+    referenceGraph: new Map(),
   };
 
   // Link every object
   const objectErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.objects.values()],
-    descriptor =>
+    descriptor => {
+      updateReferenceGraph(linkingContext, filePath, descriptor);
+
       linkObjectTypes(descriptor, result, {
         ...linkingContext,
         kind: OriginKind.Object,
-      }),
+      });
+    },
   );
+
+  console.log(fullInspect(linkingContext.referenceGraph));
 
   const inputErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.inputs.values()],
@@ -562,6 +742,7 @@ export function linkRootFile(
     kind: OriginKind.Object,
     linkingType: LinkingType.RootFile,
     parsedFile,
+    referenceGraph: new Map(),
   };
 
   const operationTuples = Object.entries(
