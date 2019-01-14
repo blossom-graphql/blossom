@@ -26,6 +26,7 @@ import {
   InvalidReferenceError,
   ReferenceNotFoundError,
   LinkingError,
+  DuplicateFieldError,
 } from './errors';
 import { forEachWithErrors, fullInspect } from './utils';
 import { resolverSignatureName, referencedTypeName } from './naming';
@@ -162,15 +163,13 @@ export type ReferenceMap = Map<
   }
 >;
 
-export type ReferenceGraph = Map<string, ReferenceMap>;
-
 export type LinkingContext = Readonly<{
   filePath: string;
   fileGraph: ParsedFileGraph;
   kind: OriginKind;
   linkingType: LinkingType;
   parsedFile: ParsedFileDescriptor;
-  referenceGraph: ReferenceGraph;
+  referenceMap: ReferenceMap;
 }>;
 
 export function outputBaseType(
@@ -323,22 +322,10 @@ export function enforceTypePresence(
 }
 
 export function addReferenceInGraph(
-  referenceGraph: ReferenceGraph,
-  filePath: string,
+  referenceMap: ReferenceMap,
   field: string,
   originDescription: OriginDescription,
 ) {
-  const referenceMap = referenceGraph.get(filePath);
-  if (!referenceMap) {
-    referenceGraph.set(
-      filePath,
-      new Map([
-        [field, { references: [originDescription], resolution: undefined }],
-      ]),
-    );
-    return;
-  }
-
   const referenceDescription = referenceMap.get(field);
   if (!referenceDescription) {
     referenceMap.set(field, {
@@ -370,8 +357,7 @@ export function updateReferenceGraphArgument(
           : OriginKind.InputArgument;
 
       addReferenceInGraph(
-        linkingContext.referenceGraph,
-        linkingContext.filePath,
+        linkingContext.referenceMap,
         argumentDescriptor.type.name,
         {
           originKind,
@@ -408,8 +394,7 @@ export function updateReferenceGraphField(
   } else {
     if (descriptor.type.kind === 'ReferencedType') {
       addReferenceInGraph(
-        linkingContext.referenceGraph,
-        linkingContext.filePath,
+        linkingContext.referenceMap,
         descriptor.type.name,
         fieldOriginDescription,
       );
@@ -426,14 +411,13 @@ export function updateReferenceGraphField(
     });
 }
 
-export function updateReferenceGraph(
+export function updateReferenceMap(
   linkingContext: LinkingContext,
-  filePath: string,
   descriptor: ObjectTypeDescription | UnionTypeDescriptor,
 ): void {
   if (descriptor.kind === 'UnionTypeDescriptor') {
     descriptor.members.forEach(field =>
-      addReferenceInGraph(linkingContext.referenceGraph, filePath, field, {
+      addReferenceInGraph(linkingContext.referenceMap, field, {
         originKind: OriginKind.Union,
         name: descriptor.name,
       }),
@@ -443,6 +427,74 @@ export function updateReferenceGraph(
       updateReferenceGraphField(linkingContext, field, descriptor);
     });
   }
+}
+
+export function ensureResolution(
+  referenceMap: ReferenceMap,
+  descriptor: { name: string },
+  filePath: string,
+  elementKind: ElementKind,
+) {
+  const referenceDescription = referenceMap.get(descriptor.name);
+  if (!referenceDescription) return;
+
+  if (referenceDescription.resolution)
+    throw new DuplicateFieldError(
+      referenceDescription.resolution,
+      descriptor.name,
+      filePath,
+      elementKind,
+    );
+
+  referenceDescription.resolution = {
+    elementKind,
+    filePath,
+  };
+}
+
+export function resolveReferences(linkingContext: LinkingContext) {
+  const { referenceMap } = linkingContext;
+
+  forEachWithErrors(
+    [...linkingContext.fileGraph.entries()],
+    ([filePath, { parsedDocument }]) => {
+      [...parsedDocument.enums.values()].forEach(enumDescriptor => {
+        ensureResolution(
+          referenceMap,
+          enumDescriptor,
+          filePath,
+          ElementKind.Enum,
+        );
+      });
+
+      [...parsedDocument.objects.values()].forEach(objectDescriptor => {
+        ensureResolution(
+          referenceMap,
+          objectDescriptor,
+          filePath,
+          ElementKind.Type,
+        );
+      });
+
+      [...parsedDocument.inputs.values()].forEach(inputDescriptor => {
+        ensureResolution(
+          referenceMap,
+          inputDescriptor,
+          filePath,
+          ElementKind.Input,
+        );
+      });
+
+      [...parsedDocument.unions.values()].forEach(unionDescriptor => {
+        ensureResolution(
+          referenceMap,
+          unionDescriptor,
+          filePath,
+          ElementKind.Union,
+        );
+      });
+    },
+  );
 }
 
 export function linkOperationTypes(
@@ -617,14 +669,14 @@ export function linkTypesFile(
     kind: OriginKind.Object,
     linkingType: LinkingType.TypesFile,
     parsedFile,
-    referenceGraph: new Map(),
+    referenceMap: new Map(),
   };
 
   // Link every object
   const objectErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.objects.values()],
     descriptor => {
-      updateReferenceGraph(linkingContext, filePath, descriptor);
+      updateReferenceMap(linkingContext, descriptor);
 
       linkObjectTypes(descriptor, result, {
         ...linkingContext,
@@ -633,15 +685,16 @@ export function linkTypesFile(
     },
   );
 
-  console.log(fullInspect(linkingContext.referenceGraph));
-
   const inputErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.inputs.values()],
-    descriptor =>
+    descriptor => {
+      updateReferenceMap(linkingContext, descriptor);
+
       linkObjectTypes(descriptor, result, {
         ...linkingContext,
         kind: OriginKind.Input,
-      }),
+      });
+    },
   );
 
   // Push enums. If this gets more complicated, a new function can be created.
@@ -652,12 +705,18 @@ export function linkTypesFile(
   // Push unions.
   const unionErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.unions.values()],
-    descriptor =>
+    descriptor => {
+      updateReferenceMap(linkingContext, descriptor);
+
       linkUnionTypes(descriptor, result, {
         ...linkingContext,
         kind: OriginKind.Union,
-      }),
+      });
+    },
   );
+
+  resolveReferences(linkingContext);
+  console.log(fullInspect(linkingContext.referenceMap));
 
   // Check for operation names. When that's the case, the underlying types must
   // be found (not necessarily in the same document), check whether they are
@@ -742,7 +801,7 @@ export function linkRootFile(
     kind: OriginKind.Object,
     linkingType: LinkingType.RootFile,
     parsedFile,
-    referenceGraph: new Map(),
+    referenceMap: new Map(),
   };
 
   const operationTuples = Object.entries(

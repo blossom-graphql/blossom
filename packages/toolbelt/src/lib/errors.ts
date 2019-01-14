@@ -8,7 +8,7 @@
 
 import chalk from 'chalk';
 
-import { OriginKind } from './linking';
+import { OriginKind, ResolutionDescription, ElementKind } from './linking';
 import { ErrorsOutput } from './utils';
 import wrap from 'word-wrap';
 
@@ -203,5 +203,31 @@ export class LinkingError extends ExtendableError implements FormattableError {
       wrap(details, { width: 90, indent: '    ' }) +
       '\n'
     );
+  }
+}
+
+export class DuplicateFieldError extends ExtendableError
+  implements FormattableError {
+  existingResolution: ResolutionDescription;
+  name: string;
+  filePath: string;
+  elementKind: ElementKind;
+
+  constructor(
+    existingResolution: ResolutionDescription,
+    name: string,
+    filePath: string,
+    elementKind: ElementKind,
+  ) {
+    super('Duplicate error found');
+
+    this.existingResolution = existingResolution;
+    this.name = name;
+    this.filePath = filePath;
+    this.elementKind = elementKind;
+  }
+
+  cliFormat() {
+    return '';
   }
 }
