@@ -7,6 +7,7 @@
  */
 
 import { inspect } from 'util';
+import { OriginDescription, OriginKind } from './linking';
 
 export type ErrorsOutput = [number, Error][];
 export type ReducedWithErrorsOutput<V> = [V, ErrorsOutput];
@@ -76,4 +77,26 @@ export function repeatChar(token: string, length: number): string {
   return Array.from({ length })
     .map(() => token)
     .join('');
+}
+
+export function makeTitleOriginDescriptor(
+  originDescriptor: OriginDescription,
+): string {
+  switch (originDescriptor.originKind) {
+    case OriginKind.Object:
+      return `T:${originDescriptor.objectName} > ${originDescriptor.fieldName}`;
+    case OriginKind.ObjectArgument:
+      return `T:${originDescriptor.fieldOriginDescription.objectName} > ${
+        originDescriptor.fieldOriginDescription.fieldName
+      } > ${originDescriptor.argumentName}`;
+      break;
+    case OriginKind.Input:
+      return `I:${originDescriptor.objectName} > ${originDescriptor.fieldName}`;
+    case OriginKind.InputArgument:
+      return `I:${originDescriptor.fieldOriginDescription.objectName} > ${
+        originDescriptor.fieldOriginDescription.fieldName
+      } > ${originDescriptor.argumentName}`;
+    case OriginKind.Union:
+      return `U:${originDescriptor.name}`;
+  }
 }

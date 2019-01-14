@@ -28,7 +28,7 @@ import {
   LinkingError,
   DuplicateFieldError,
 } from './errors';
-import { forEachWithErrors, fullInspect, ErrorsOutput } from './utils';
+import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
 import { resolverSignatureName, referencedTypeName } from './naming';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
@@ -624,7 +624,7 @@ export function isValidResolution(
         resolution.elementKind,
       );
     case OriginKind.Union:
-      return [ElementKind.Union].includes(resolution.elementKind);
+      return [ElementKind.Type].includes(resolution.elementKind);
   }
 
   return false;
@@ -892,9 +892,8 @@ export function linkTypesFile(
   );
 
   resolveReferences(linkingContext);
-  const errors = enforceReferencesPresence(linkingContext);
-  console.log(fullInspect(linkingContext.referenceMap));
-  console.log(new LinkingError(errors));
+  const linkingErrors = enforceReferencesPresence(linkingContext);
+  // console.log(fullInspect(linkingContext.referenceMap));
 
   // Check for operation names. When that's the case, the underlying types must
   // be found (not necessarily in the same document), check whether they are
@@ -922,6 +921,7 @@ export function linkTypesFile(
     ...objectErrors,
     ...inputErrors,
     ...unionErrors,
+    ...linkingErrors,
     ...operationErrors,
   ];
 

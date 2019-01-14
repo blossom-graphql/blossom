@@ -7,14 +7,14 @@
  */
 
 import chalk from 'chalk';
+import wrap from 'word-wrap';
 
 import {
   ResolutionDescription,
   ElementKind,
   OriginDescription,
 } from './linking';
-import { ErrorsOutput } from './utils';
-import wrap from 'word-wrap';
+import { ErrorsOutput, makeTitleOriginDescriptor } from './utils';
 
 export class ExtendableError extends Error {
   constructor(error?: string | undefined) {
@@ -128,7 +128,9 @@ export class InvalidReferenceError extends ExtendableError
   }
 
   cliFormat() {
-    const title = chalk.red(`File ${this.filePath}`);
+    const title = chalk.red(
+      `File ${this.filePath} - ${makeTitleOriginDescriptor(this.reference)}`,
+    );
     const message = `\nReference to ${chalk.bold(
       this.field,
     )} is invalid. This usually means you're trying to reference a type that cannot be used in the current declaration. Some examples:`;
@@ -162,7 +164,12 @@ export class ReferenceNotFoundError extends ExtendableError
   }
 
   cliFormat() {
-    const title = chalk.red(`File ${this.filePath}`);
+    const titles: string[] = this.references.map(reference =>
+      chalk.red(
+        `File ${this.filePath} - ${makeTitleOriginDescriptor(reference)}`,
+      ),
+    );
+
     const message = `\nReference to ${chalk.bold(
       this.field,
     )} was nowhere to be found.`;
@@ -171,7 +178,7 @@ export class ReferenceNotFoundError extends ExtendableError
       chalk.gray('# import') +
       ' statement in this file?';
 
-    return title + message + help;
+    return titles.join('\n') + message + help;
   }
 }
 
