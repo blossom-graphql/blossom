@@ -8,7 +8,11 @@
 
 import chalk from 'chalk';
 
-import { OriginKind, ResolutionDescription, ElementKind } from './linking';
+import {
+  ResolutionDescription,
+  ElementKind,
+  OriginDescription,
+} from './linking';
 import { ErrorsOutput } from './utils';
 import wrap from 'word-wrap';
 
@@ -109,16 +113,18 @@ export class InvalidReferenceError extends ExtendableError
   implements FormattableError {
   field: string;
   filePath: string;
-  kind: OriginKind;
+  reference: OriginDescription;
 
-  constructor(field: string, filePath: string, kind: OriginKind) {
+  constructor(field: string, filePath: string, reference: OriginDescription) {
     super(
-      `Reference to ${field} in file ${filePath} is invalid. ${field} cannot be referenced from kind ${kind}`,
+      `Reference to ${field} in file ${filePath} is invalid. ${field} cannot be referenced from kind ${
+        reference.originKind
+      }`,
     );
 
     this.field = field;
     this.filePath = filePath;
-    this.kind = kind;
+    this.reference = reference;
   }
 
   cliFormat() {
@@ -139,14 +145,20 @@ export class ReferenceNotFoundError extends ExtendableError
   implements FormattableError {
   field: string;
   filePath: string;
+  references: ReadonlyArray<OriginDescription>;
 
-  constructor(field: string, filePath: string) {
+  constructor(
+    field: string,
+    filePath: string,
+    references: ReadonlyArray<OriginDescription>,
+  ) {
     super(
       `Reference to ${field} required by file ${filePath} not found. Did you forget an \`# import\` statement?`,
     );
 
     this.field = field;
     this.filePath = filePath;
+    this.references = references;
   }
 
   cliFormat() {

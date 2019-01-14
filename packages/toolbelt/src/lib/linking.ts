@@ -257,7 +257,7 @@ export function enforceTypePresence(
   // 1. Search in the object.
   if (presenceInSameDocument !== PresenceResult.NotPresent) {
     if (presenceInSameDocument === PresenceResult.Invalid) {
-      throw new InvalidReferenceError(typeName, filePath, kind);
+      // throw new InvalidReferenceError(typeName, filePath, kind);
     } else {
       // Linking passed. Nothing to do here because it's already on the file.
       // TODO: Log
@@ -280,9 +280,9 @@ export function enforceTypePresence(
         case PresenceResult.Present:
           return schemaPath;
         case PresenceResult.Invalid:
-          throw new InvalidReferenceError(typeName, filePath, kind);
+        // throw new InvalidReferenceError(typeName, filePath, kind);
         case PresenceResult.NotPresent:
-          throw new ReferenceNotFoundError(typeName, filePath);
+        // throw new ReferenceNotFoundError(typeName, filePath);
       }
     }
 
@@ -309,9 +309,9 @@ export function enforceTypePresence(
     // TODO: Log
     switch (presenceResult) {
       case PresenceResult.Invalid:
-        throw new InvalidReferenceError(typeName, filePath, kind);
+      // throw new InvalidReferenceError(typeName, filePath, kind);
       case PresenceResult.NotPresent:
-        throw new ReferenceNotFoundError(typeName, filePath);
+      // throw new ReferenceNotFoundError(typeName, filePath);
       case PresenceResult.Present:
       default:
         if (!schemaPath) throw new Error('Schema path not found.');
@@ -319,6 +319,8 @@ export function enforceTypePresence(
         return schemaPath;
     }
   }
+
+  return undefined;
 }
 
 export function addReferenceInGraph(
@@ -551,8 +553,8 @@ export function resolveDocumentNamedReferences(
     );
   }
 
-  // Wasn't found in any of the definitions. That's an error.
-  throw new ReferenceNotFoundError(field, filePath);
+  // ! Wasn't found in any of the definitions. That's an error. Should be caught
+  // ! by enforceReferencesPresence().
 }
 
 export function resolveReferences(
@@ -604,6 +606,71 @@ export function resolveReferences(
   );
 
   return [...sameFileErrors, ...fullReferencesErrors, ...namedReferencesErrors];
+}
+
+export function isValidResolution(
+  resolution: ResolutionDescription,
+  reference: OriginDescription,
+): boolean {
+  switch (reference.originKind) {
+    case OriginKind.Object:
+    case OriginKind.ObjectArgument:
+      return [ElementKind.Type, ElementKind.Enum, ElementKind.Union].includes(
+        resolution.elementKind,
+      );
+    case OriginKind.Input:
+    case OriginKind.InputArgument:
+      return [ElementKind.Input, ElementKind.Enum].includes(
+        resolution.elementKind,
+      );
+    case OriginKind.Union:
+      return [ElementKind.Union].includes(resolution.elementKind);
+  }
+
+  return false;
+}
+
+export function enforceReferencesPresence(
+  linkingContext: LinkingContext,
+): ErrorsOutput {
+  // 1. All references must be defined.
+  // 2. All references must have matching type.
+  return forEachWithErrors(
+    [...linkingContext.referenceMap.entries()],
+    ([fieldName, referenceDescription]) => {
+      if (referenceDescription.references.length === 0) return;
+
+      // Resolution must be present
+      if (!referenceDescription.resolution) {
+        throw new ReferenceNotFoundError(
+          fieldName,
+          linkingContext.filePath,
+          referenceDescription.references,
+        );
+      }
+
+      // For each of the references, what's resolved must match
+      const errors = forEachWithErrors(
+        referenceDescription.references,
+        reference => {
+          if (
+            !isValidResolution(
+              referenceDescription.resolution as ResolutionDescription,
+              reference,
+            )
+          ) {
+            throw new InvalidReferenceError(
+              fieldName,
+              linkingContext.filePath,
+              reference,
+            );
+          }
+        },
+      );
+
+      if (errors.length > 0) throw new LinkingError(errors);
+    },
+  );
 }
 
 export function linkOperationTypes(
@@ -825,7 +892,9 @@ export function linkTypesFile(
   );
 
   resolveReferences(linkingContext);
+  const errors = enforceReferencesPresence(linkingContext);
   console.log(fullInspect(linkingContext.referenceMap));
+  console.log(new LinkingError(errors));
 
   // Check for operation names. When that's the case, the underlying types must
   // be found (not necessarily in the same document), check whether they are
