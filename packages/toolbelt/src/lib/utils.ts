@@ -84,19 +84,27 @@ export function makeTitleOriginDescriptor(
 ): string {
   switch (originDescriptor.originKind) {
     case OriginKind.Object:
-      return `T:${originDescriptor.objectName} > ${originDescriptor.fieldName}`;
+      return `Type: ${originDescriptor.objectName} > Field: ${
+        originDescriptor.fieldName
+      }`;
     case OriginKind.ObjectArgument:
-      return `T:${originDescriptor.fieldOriginDescription.objectName} > ${
+      return `Type: ${
+        originDescriptor.fieldOriginDescription.objectName
+      } > Field: ${
         originDescriptor.fieldOriginDescription.fieldName
-      } > ${originDescriptor.argumentName}`;
+      } > Argument: ${originDescriptor.argumentName}`;
       break;
     case OriginKind.Input:
-      return `I:${originDescriptor.objectName} > ${originDescriptor.fieldName}`;
+      return `Input: ${originDescriptor.objectName} > Field: ${
+        originDescriptor.fieldName
+      }`;
     case OriginKind.InputArgument:
-      return `I:${originDescriptor.fieldOriginDescription.objectName} > ${
+      return `Input: ${
+        originDescriptor.fieldOriginDescription.objectName
+      } > Field: ${
         originDescriptor.fieldOriginDescription.fieldName
-      } > ${originDescriptor.argumentName}`;
+      } > Argument: ${originDescriptor.argumentName}`;
     case OriginKind.Union:
-      return `U:${originDescriptor.name}`;
+      return `Union: ${originDescriptor.name}`;
   }
 }

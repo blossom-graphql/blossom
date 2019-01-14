@@ -129,7 +129,7 @@ export class InvalidReferenceError extends ExtendableError
 
   cliFormat() {
     const title = chalk.red(
-      `File ${this.filePath} - ${makeTitleOriginDescriptor(this.reference)}`,
+      `File ${this.filePath}\n${makeTitleOriginDescriptor(this.reference)}`,
     );
     const message = `\nReference to ${chalk.bold(
       this.field,
@@ -166,7 +166,7 @@ export class ReferenceNotFoundError extends ExtendableError
   cliFormat() {
     const titles: string[] = this.references.map(reference =>
       chalk.red(
-        `File ${this.filePath} - ${makeTitleOriginDescriptor(reference)}`,
+        `File ${this.filePath}\n${makeTitleOriginDescriptor(reference)}`,
       ),
     );
 
