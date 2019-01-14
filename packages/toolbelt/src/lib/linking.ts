@@ -28,7 +28,7 @@ import {
   LinkingError,
   DuplicateFieldError,
 } from './errors';
-import { forEachWithErrors, fullInspect } from './utils';
+import { forEachWithErrors, fullInspect, ErrorsOutput } from './utils';
 import { resolverSignatureName, referencedTypeName } from './naming';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
@@ -452,49 +452,158 @@ export function ensureResolution(
   };
 }
 
-export function resolveReferences(linkingContext: LinkingContext) {
-  const { referenceMap } = linkingContext;
-
-  forEachWithErrors(
-    [...linkingContext.fileGraph.entries()],
-    ([filePath, { parsedDocument }]) => {
-      [...parsedDocument.enums.values()].forEach(enumDescriptor => {
-        ensureResolution(
-          referenceMap,
-          enumDescriptor,
-          filePath,
-          ElementKind.Enum,
-        );
-      });
-
-      [...parsedDocument.objects.values()].forEach(objectDescriptor => {
-        ensureResolution(
-          referenceMap,
-          objectDescriptor,
-          filePath,
-          ElementKind.Type,
-        );
-      });
-
-      [...parsedDocument.inputs.values()].forEach(inputDescriptor => {
-        ensureResolution(
-          referenceMap,
-          inputDescriptor,
-          filePath,
-          ElementKind.Input,
-        );
-      });
-
-      [...parsedDocument.unions.values()].forEach(unionDescriptor => {
-        ensureResolution(
-          referenceMap,
-          unionDescriptor,
-          filePath,
-          ElementKind.Union,
-        );
-      });
+export function resolveDocumentFullReferences(
+  referenceMap: ReferenceMap,
+  parsedDocument: DocumentParsingOuput,
+  filePath: string,
+): ErrorsOutput {
+  const enumErrors = forEachWithErrors(
+    [...parsedDocument.enums.values()],
+    enumDescriptor => {
+      ensureResolution(
+        referenceMap,
+        enumDescriptor,
+        filePath,
+        ElementKind.Enum,
+      );
     },
   );
+
+  const objectErrors = forEachWithErrors(
+    [...parsedDocument.objects.values()],
+    objectDescriptor => {
+      ensureResolution(
+        referenceMap,
+        objectDescriptor,
+        filePath,
+        ElementKind.Type,
+      );
+    },
+  );
+
+  const inputErrors = forEachWithErrors(
+    [...parsedDocument.inputs.values()],
+    inputDescriptor => {
+      ensureResolution(
+        referenceMap,
+        inputDescriptor,
+        filePath,
+        ElementKind.Input,
+      );
+    },
+  );
+
+  const unionErrors = forEachWithErrors(
+    [...parsedDocument.unions.values()],
+    unionDescriptor => {
+      ensureResolution(
+        referenceMap,
+        unionDescriptor,
+        filePath,
+        ElementKind.Union,
+      );
+    },
+  );
+
+  return [...enumErrors, ...objectErrors, ...inputErrors, ...unionErrors];
+}
+
+export function resolveDocumentNamedReferences(
+  referenceMap: ReferenceMap,
+  document: DocumentParsingOuput,
+  filePath: string,
+  field: string,
+) {
+  const enumDescriptor = document.enums.get(field);
+  if (enumDescriptor) {
+    ensureResolution(referenceMap, enumDescriptor, filePath, ElementKind.Enum);
+    return;
+  }
+
+  const objectDescriptor = document.objects.get(field);
+  if (objectDescriptor) {
+    ensureResolution(
+      referenceMap,
+      objectDescriptor,
+      filePath,
+      ElementKind.Type,
+    );
+    return;
+  }
+
+  const inputDescriptor = document.inputs.get(field);
+  if (inputDescriptor) {
+    ensureResolution(
+      referenceMap,
+      inputDescriptor,
+      filePath,
+      ElementKind.Input,
+    );
+  }
+
+  const unionDescriptor = document.unions.get(field);
+  if (unionDescriptor) {
+    ensureResolution(
+      referenceMap,
+      unionDescriptor,
+      filePath,
+      ElementKind.Union,
+    );
+  }
+
+  // Wasn't found in any of the definitions. That's an error.
+  throw new ReferenceNotFoundError(field, filePath);
+}
+
+export function resolveReferences(
+  linkingContext: LinkingContext,
+): ErrorsOutput {
+  const { referenceMap } = linkingContext;
+
+  // 1. Resolve references in current file
+  const sameFileErrors = resolveDocumentFullReferences(
+    referenceMap,
+    linkingContext.parsedFile.parsedDocument,
+    linkingContext.filePath,
+  );
+
+  // 2. Resolve references in all full imports
+  const fullReferencesErrors = forEachWithErrors(
+    [...linkingContext.parsedFile.references.full.keys()],
+    filePath => {
+      const fileDescriptor = linkingContext.fileGraph.get(
+        filePath,
+      ) as ParsedFileDescriptor;
+
+      resolveDocumentFullReferences(
+        referenceMap,
+        fileDescriptor.parsedDocument,
+        filePath,
+      );
+    },
+  );
+
+  // 3. Resolve named imports
+  const namedReferencesErrors = forEachWithErrors(
+    [...linkingContext.parsedFile.references.named.entries()],
+    ([filePath, references]) => {
+      const { parsedDocument } = linkingContext.fileGraph.get(
+        filePath,
+      ) as ParsedFileDescriptor;
+      const errors = forEachWithErrors([...references.keys()], field =>
+        resolveDocumentNamedReferences(
+          referenceMap,
+          parsedDocument,
+          filePath,
+          field,
+        ),
+      );
+
+      if (errors.length > 0) throw new LinkingError(errors);
+    },
+  );
+
+  return [...sameFileErrors, ...fullReferencesErrors, ...namedReferencesErrors];
 }
 
 export function linkOperationTypes(
