@@ -14,7 +14,7 @@ import wrap from 'word-wrap';
 
 import {
   FieldDescriptor,
-  ObjectTypeDescription,
+  ObjectTypeDescriptor,
   OperationDescriptor,
   ThunkType,
   KnownScalarTypes,
@@ -386,7 +386,7 @@ export function generateEnumDeclaration(enumDescriptor: EnumTypeDescriptor) {
  * @param descriptor Object containing the type descriptor.
  */
 export function generateObjectTypeAlias(
-  descriptor: ObjectTypeDescription,
+  descriptor: ObjectTypeDescriptor,
 ): ts.TypeAliasDeclaration {
   const members: ReadonlyArray<ts.TypeElement> = descriptor.fields.map(
     generateTypeElement,

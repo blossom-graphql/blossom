@@ -8,7 +8,7 @@
 
 import {
   ParsedFileGraph,
-  ObjectTypeDescription,
+  ObjectTypeDescriptor,
   ThunkType,
   DocumentParsingOuput,
   ParsedFileDescriptor,
@@ -20,7 +20,7 @@ import {
   OperationDescriptor,
   ObjectTypeKind,
 } from './parsing';
-import { typesFilePath, blossomInstancePath } from './paths';
+import { blossomInstancePath, typesFilePath } from './paths';
 import {
   FileNotFoundInGraph,
   InvalidReferenceError,
@@ -29,12 +29,9 @@ import {
   DuplicateFieldError,
 } from './errors';
 import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
-import { resolverSignatureName, referencedTypeName } from './naming';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
 const CONTEXT_NAME = 'RequestContext';
-const MAYBE_DEP_NAME = 'Maybe';
-const THUNK_IMPORTS_DEP_NAME = 'ThunkImports';
 
 type ImportMembersMap = Map<'default' | string, string | undefined>;
 
@@ -58,9 +55,9 @@ export type TypesFileContents = {
   kind: 'TypesFile';
   vendorImports: ImportGroupMap;
   fileImports: ImportGroupMap;
-  requiredDeps: Set<string>;
+  dependencyFlags: Map<string, any>;
   enumDeclarations: EnumTypeDescriptor[];
-  typeDeclarations: ObjectTypeDescription[];
+  typeDeclarations: ObjectTypeDescriptor[];
   unionDeclarations: UnionTypeDescriptor[];
   operationDeclarations: OperationDescriptor[];
 };
@@ -107,6 +104,7 @@ export enum OriginKind {
   Union = 'Union',
   ObjectArgument = 'ObjectArgument',
   InputArgument = 'InputArgument',
+  Operation = 'Operation',
 }
 
 export enum ElementKind {
@@ -131,7 +129,8 @@ export enum LinkingType {
 export type OriginDescription =
   | FieldOriginDescription
   | UnionOriginDescription
-  | ArgumentOriginDescription;
+  | ArgumentOriginDescription
+  | OperationOriginDescription;
 
 export type FieldOriginDescription = {
   fieldName: string;
@@ -148,6 +147,11 @@ export type ArgumentOriginDescription = {
 export type UnionOriginDescription = {
   name: string;
   originKind: OriginKind.Union;
+};
+
+export type OperationOriginDescription = {
+  originKind: OriginKind.Operation;
+  operationType: SupportedOperation;
 };
 
 export type ResolutionDescription = {
@@ -182,145 +186,6 @@ export function outputBaseType(
   } else {
     return descriptor.type;
   }
-}
-
-export function requirePresence(presenceMap: any, keys: string[]) {
-  const hasValidKey = !!keys.find(key => presenceMap[key]);
-  if (hasValidKey) return PresenceResult.Present;
-
-  if (keys.length > Object.keys(presenceMap).length) {
-    return PresenceResult.NotPresent;
-  } else if (Object.values(presenceMap).find(value => !!value)) {
-    return PresenceResult.Invalid;
-  } else {
-    return PresenceResult.NotPresent;
-  }
-}
-
-export function documentHasReference(
-  document: DocumentParsingOuput,
-  originKind: OriginKind,
-  field: string,
-): PresenceResult {
-  // Only one of these should be true. If there's more than one, that's a parsing
-  // bug for sure.
-  const presenceMap = {
-    objects: document.objects.has(field),
-    inputs: document.inputs.has(field),
-    enums: document.enums.has(field),
-    aliases: false, // document.aliases.has(field)
-  };
-
-  switch (originKind) {
-    case OriginKind.Object:
-    case OriginKind.Union:
-    case OriginKind.ObjectArgument:
-      return requirePresence(presenceMap, ['objects', 'enums', 'aliases']);
-    case OriginKind.Input:
-    case OriginKind.InputArgument:
-      return requirePresence(presenceMap, ['inputs', 'enums']);
-  }
-}
-
-export function fileHasReference(
-  fileGraph: ParsedFileGraph,
-  filePath: string,
-  schemaPath: string,
-  kind: OriginKind,
-  field: string,
-): PresenceResult {
-  const referencedFile = fileGraph.get(schemaPath);
-  if (!referencedFile) throw new FileNotFoundInGraph(filePath);
-
-  const { parsedDocument: referencedDocument } = referencedFile;
-  return documentHasReference(referencedDocument, kind, field);
-}
-
-export function enforceTypePresence(
-  typeName: string,
-  linkingContext: LinkingContext,
-): string | undefined {
-  const {
-    fileGraph,
-    filePath,
-    kind,
-    parsedFile,
-    parsedFile: { parsedDocument },
-  } = linkingContext;
-
-  const presenceInSameDocument = documentHasReference(
-    parsedDocument,
-    kind,
-    typeName,
-  );
-
-  // 1. Search in the object.
-  if (presenceInSameDocument !== PresenceResult.NotPresent) {
-    if (presenceInSameDocument === PresenceResult.Invalid) {
-      // throw new InvalidReferenceError(typeName, filePath, kind);
-    } else {
-      // Linking passed. Nothing to do here because it's already on the file.
-      // TODO: Log
-      return undefined;
-    }
-  } else {
-    // 2. Search in references explicitly.
-    const existingRef = [...parsedFile.references.named.entries()].find(
-      ([_, map]) => map.has(typeName),
-    );
-
-    // Reference found. Ensure that the file is readily available and that
-    // the reference can actually be imported.
-    if (existingRef) {
-      const [schemaPath] = existingRef;
-
-      switch (
-        fileHasReference(fileGraph, filePath, schemaPath, kind, typeName)
-      ) {
-        case PresenceResult.Present:
-          return schemaPath;
-        case PresenceResult.Invalid:
-        // throw new InvalidReferenceError(typeName, filePath, kind);
-        case PresenceResult.NotPresent:
-        // throw new ReferenceNotFoundError(typeName, filePath);
-      }
-    }
-
-    // 3. Search in references with wildcards.
-    let schemaPath: string | undefined;
-    let presenceResult: PresenceResult = PresenceResult.NotPresent;
-
-    for (const referencedSchemaPath of parsedFile.references.full) {
-      const result = fileHasReference(
-        fileGraph,
-        filePath,
-        referencedSchemaPath,
-        kind,
-        typeName,
-      );
-
-      if (result !== PresenceResult.NotPresent) {
-        presenceResult = result;
-        schemaPath = referencedSchemaPath;
-        break;
-      }
-    }
-
-    // TODO: Log
-    switch (presenceResult) {
-      case PresenceResult.Invalid:
-      // throw new InvalidReferenceError(typeName, filePath, kind);
-      case PresenceResult.NotPresent:
-      // throw new ReferenceNotFoundError(typeName, filePath);
-      case PresenceResult.Present:
-      default:
-        if (!schemaPath) throw new Error('Schema path not found.');
-
-        return schemaPath;
-    }
-  }
-
-  return undefined;
 }
 
 export function addReferenceInGraph(
@@ -374,7 +239,7 @@ export function updateReferenceGraphArgument(
 export function updateReferenceGraphField(
   linkingContext: LinkingContext,
   descriptor: FieldDescriptor,
-  parent: ObjectTypeDescription,
+  parent: ObjectTypeDescriptor,
 ) {
   const originKind: OriginKind.Object | OriginKind.Input =
     parent.objectType === ObjectTypeKind.Object
@@ -415,7 +280,7 @@ export function updateReferenceGraphField(
 
 export function updateReferenceMap(
   linkingContext: LinkingContext,
-  descriptor: ObjectTypeDescription | UnionTypeDescriptor,
+  descriptor: ObjectTypeDescriptor | UnionTypeDescriptor | OperationDescriptor,
 ): void {
   if (descriptor.kind === 'UnionTypeDescriptor') {
     descriptor.members.forEach(field =>
@@ -424,10 +289,19 @@ export function updateReferenceMap(
         name: descriptor.name,
       }),
     );
-  } else if (descriptor.kind === 'ObjectTypeDescription') {
+  } else if (descriptor.kind === 'ObjectTypeDescriptor') {
     descriptor.fields.forEach(field => {
       updateReferenceGraphField(linkingContext, field, descriptor);
     });
+  } else if (descriptor.kind === 'OperationDescriptor') {
+    addReferenceInGraph(
+      linkingContext.referenceMap,
+      descriptor.objectType.name,
+      {
+        originKind: OriginKind.Operation,
+        operationType: descriptor.operation,
+      },
+    );
   }
 }
 
@@ -625,9 +499,9 @@ export function isValidResolution(
       );
     case OriginKind.Union:
       return [ElementKind.Type].includes(resolution.elementKind);
+    case OriginKind.Operation:
+      return [ElementKind.Type].includes(resolution.elementKind);
   }
-
-  return false;
 }
 
 export function enforceReferencesPresence(
@@ -674,148 +548,160 @@ export function enforceReferencesPresence(
 }
 
 export function linkOperationTypes(
-  operation: SupportedOperation, // ! Not used at this time.
-  operationTypeName: string,
-  result: TypesFileContents | RootFileContents,
-  linkingContext: LinkingContext,
+  _operation: SupportedOperation, // ! Not used at this time.
+  _operationTypeName: string,
+  _result: TypesFileContents | RootFileContents,
+  _linkingContext: LinkingContext,
 ) {
-  const { linkingType, fileGraph, filePath } = linkingContext;
-  const schemaPath = enforceTypePresence(operationTypeName, linkingContext);
-
-  // Ensure that the thunk imports are going to be present.
-  if (linkingType === LinkingType.TypesFile && result.kind === 'TypesFile') {
-    result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
-  }
-
-  const referencePath = schemaPath || filePath;
-  const fileDescriptor = fileGraph.get(referencePath);
-  if (!fileDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
-
-  const { parsedDocument } = fileDescriptor;
-  const objectDescriptor = parsedDocument.objects.get(operationTypeName);
-  if (!objectDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
-
-  // Add fields to the list of operation declarations.
-  objectDescriptor.fields.forEach(fieldDescriptor => {
-    const operationDescriptor: OperationDescriptor = {
-      kind: 'OperationDescriptor',
-      fieldDescriptor,
-      operation,
-    };
-    const outputType = outputBaseType(operationDescriptor);
-
-    if (linkingType === LinkingType.RootFile) {
-      outputType.kind === 'ReferencedType' &&
-        addImport(
-          result.fileImports,
-          'FileImport',
-          typesFilePath(filePath),
-          referencedTypeName(outputType),
-        );
-
-      addImport(
-        result.fileImports,
-        'FileImport',
-        typesFilePath(filePath),
-        resolverSignatureName(operationDescriptor),
-      );
-    }
-
-    result.operationDeclarations.push({
-      kind: 'OperationDescriptor',
-      fieldDescriptor: {
-        // We are always forcing these fields to become promises.
-        ...fieldDescriptor,
-        thunkType: ThunkType.AsyncFunction,
-      },
-      operation,
-    });
-  });
+  // const { linkingType, fileGraph, filePath } = linkingContext;
+  // const schemaPath = enforceTypePresence(operationTypeName, linkingContext);
+  // // Ensure that the thunk imports are going to be present.
+  // if (linkingType === LinkingType.TypesFile && result.kind === 'TypesFile') {
+  //   result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
+  // }
+  // const referencePath = schemaPath || filePath;
+  // const fileDescriptor = fileGraph.get(referencePath);
+  // if (!fileDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
+  // const { parsedDocument } = fileDescriptor;
+  // const objectDescriptor = parsedDocument.objects.get(operationTypeName);
+  // if (!objectDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
+  // // Add fields to the list of operation declarations.
+  // objectDescriptor.fields.forEach(fieldDescriptor => {
+  //   const operationDescriptor: OperationDescriptor = {
+  //     kind: 'OperationDescriptor',
+  //     fieldDescriptor,
+  //     operation,
+  //   };
+  //   const outputType = outputBaseType(operationDescriptor);
+  //   if (linkingType === LinkingType.RootFile) {
+  //     outputType.kind === 'ReferencedType' &&
+  //       addImport(
+  //         result.fileImports,
+  //         'FileImport',
+  //         typesFilePath(filePath),
+  //         referencedTypeName(outputType),
+  //       );
+  //     addImport(
+  //       result.fileImports,
+  //       'FileImport',
+  //       typesFilePath(filePath),
+  //       resolverSignatureName(operationDescriptor),
+  //     );
+  //   }
+  //   result.operationDeclarations.push({
+  //     kind: 'OperationDescriptor',
+  //     fieldDescriptor: {
+  //       // We are always forcing these fields to become promises.
+  //       ...fieldDescriptor,
+  //       thunkType: ThunkType.AsyncFunction,
+  //     },
+  //     operation,
+  //   });
+  // });
 }
 
 export function linkUnionTypes(
   unionDescriptor: UnionTypeDescriptor,
   result: TypesFileContents,
-  linkingContext: LinkingContext,
+  _linkingContext: LinkingContext,
 ) {
-  const errors = forEachWithErrors(
-    [...unionDescriptor.referencedTypes],
-    typeName => {
-      const schemaPath = enforceTypePresence(typeName, linkingContext);
-
-      if (schemaPath)
-        addImport(
-          result.fileImports,
-          'FileImport',
-          typesFilePath(schemaPath),
-          typeName,
-        );
-    },
-  );
-
-  if (errors.length > 0) throw new LinkingError(errors);
-
   result.unionDeclarations.push(unionDescriptor);
 }
 
+export function isRootType(
+  fieldName: string,
+  linkingContext: LinkingContext,
+): boolean {
+  for (const operationDescriptor of linkingContext.parsedFile.parsedDocument.operations.values()) {
+    if (operationDescriptor.objectType.name === fieldName) return true;
+  }
+
+  return false;
+}
+
 export function linkObjectTypes(
-  typeDescriptor: ObjectTypeDescription,
+  typeDescriptor: ObjectTypeDescriptor,
   result: TypesFileContents,
   linkingContext: LinkingContext,
 ) {
-  const { kind } = linkingContext;
+  // Update some of the stats that will be used to compute imports.
+  typeDescriptor.fields.some(field => {
+    if (field.required) {
+      result.dependencyFlags.set('requiredObjectField', true);
+    }
 
-  // Calculate whether Maybe should be required or not.
-  if (
-    !result.requiredDeps.has(MAYBE_DEP_NAME) &&
-    typeDescriptor.fields.find(field => !field.required)
-  )
-    result.requiredDeps.add(MAYBE_DEP_NAME);
+    if (field.thunkType !== ThunkType.None) {
+      result.dependencyFlags.set('thunkedField', true);
+    }
 
-  // Calculate whether ThunkImports should be required or not.
-  if (
-    kind === OriginKind.Object &&
-    !result.requiredDeps.has(THUNK_IMPORTS_DEP_NAME) &&
-    typeDescriptor.fields.find(field => field.thunkType !== ThunkType.None)
-  )
-    result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
-
-  // Ensure that dependencies can be satisfied for each field.
-  const errors = forEachWithErrors(
-    [...typeDescriptor.referencedTypes],
-    field => {
-      const schemaPath = enforceTypePresence(field, linkingContext);
-
-      // Nothing thrown on enforceFieldPresence. Add to imports list only when
-      // the path is specified. Otherwise the import is on the same file.
-      if (schemaPath)
-        addImport(
-          result.fileImports,
-          'FileImport',
-          typesFilePath(schemaPath),
-          field,
-        );
-    },
-  );
-
-  if (errors.length > 0) throw new LinkingError(errors);
+    return (
+      result.dependencyFlags.has('requiredObjectField') &&
+      result.dependencyFlags.has('thunkedField')
+    );
+  });
 
   // We are not adding types if this type is a root value and includeRootTypes
   // option is marked as false.
-  const isRootType = Object.values(
-    linkingContext.parsedFile.parsedDocument.operationNames,
-  ).includes(typeDescriptor.name);
-
   if (
     linkingContext.kind === OriginKind.Object &&
     linkingContext.linkingType === LinkingType.TypesFile &&
-    isRootType
+    isRootType(typeDescriptor.name, linkingContext)
   ) {
     return;
   }
 
-  // Append to the list of type declarations.
   result.typeDeclarations.push(typeDescriptor);
+}
+
+export function addTypesFileImports(
+  result: TypesFileContents,
+  linkingContext: LinkingContext,
+) {
+  if (linkingContext.linkingType !== LinkingType.TypesFile) {
+    throw new TypeError('Invalid linking type in linking context.');
+  }
+
+  // 1. Add vendor imports
+
+  // - When there's a required field, Maybe must be included.
+  if (result.dependencyFlags.has('requiredObjectField')) {
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
+  }
+
+  // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
+  //   be included.
+  if (result.dependencyFlags.has('thunkedField')) {
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      'graphql',
+      'GraphQLResolveInfo',
+    );
+
+    addImport(
+      result.fileImports,
+      'FileImport',
+      blossomInstancePath(),
+      CONTEXT_NAME,
+    );
+  }
+
+  // 2. Add dependencies coming from other files.
+  //    For each field, when resolution filePath is different from the filePath
+  //    in the current linking context, an import must be created.
+  for (const [field, referenceDescription] of linkingContext.referenceMap) {
+    // It's already enforced because the enforcing function is called before.
+    const resolution = referenceDescription.resolution as ResolutionDescription;
+
+    if (resolution.filePath !== linkingContext.filePath) {
+      addImport(
+        result.fileImports,
+        'FileImport',
+        typesFilePath(linkingContext.filePath),
+        field, // TODO: Maybe change naming?
+      );
+    }
+  }
 }
 
 export function linkTypesFile(
@@ -832,7 +718,7 @@ export function linkTypesFile(
     kind: 'TypesFile',
     vendorImports: new Map(),
     fileImports: new Map(),
-    requiredDeps: new Set(),
+    dependencyFlags: new Map(),
     typeDeclarations: [],
     enumDeclarations: [],
     unionDeclarations: [],
@@ -891,30 +777,17 @@ export function linkTypesFile(
     },
   );
 
+  const operationErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.operations.values()],
+    descriptor => {
+      updateReferenceMap(linkingContext, descriptor);
+    },
+  );
+
+  // Find a resolution for each one of the added references.
   resolveReferences(linkingContext);
+
   const linkingErrors = enforceReferencesPresence(linkingContext);
-  // console.log(fullInspect(linkingContext.referenceMap));
-
-  // Check for operation names. When that's the case, the underlying types must
-  // be found (not necessarily in the same document), check whether they are
-  // object types and store their location
-  const operationsTuples = Object.entries(
-    parsedFile.parsedDocument.operationNames,
-  ) as ReadonlyArray<[SupportedOperation, string]>;
-
-  const operationErrors = options.parseRootOperations
-    ? forEachWithErrors(
-        operationsTuples,
-        ([operationName, operationType]: [SupportedOperation, string]) =>
-          operationType &&
-          linkOperationTypes(
-            operationName,
-            operationType,
-            result,
-            linkingContext,
-          ),
-      )
-    : [];
 
   // Show errors
   const accumulatedErrors = [
@@ -929,30 +802,7 @@ export function linkTypesFile(
     throw new LinkingError(accumulatedErrors);
   }
 
-  // If we have any thunked schema file, add the corresponding imports.
-  const requiresThunkImports = result.requiredDeps.has(THUNK_IMPORTS_DEP_NAME);
-  const requiresMaybe = result.requiredDeps.has(MAYBE_DEP_NAME);
-
-  if (requiresThunkImports) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      'graphql',
-      'GraphQLResolveInfo',
-    );
-
-    addImport(
-      result.fileImports,
-      'FileImport',
-      blossomInstancePath(),
-      CONTEXT_NAME,
-    );
-  }
-
-  // If we have any optional type, import Maybe type definition.
-  if (requiresMaybe) {
-    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
-  }
+  addTypesFileImports(result, linkingContext);
 
   return result;
 }

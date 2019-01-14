@@ -53,11 +53,6 @@ type DocumentNodeDescriptor<T> = {
 type DocumentNameMap<T> = { [key: string]: DocumentNodeDescriptor<T> };
 
 /**
- * Map to represent the operation names and their associated types.
- */
-type OperationNames = { [key in SupportedOperation]?: string };
-
-/**
  * An intermediate dictionary where all the types described in the file are
  * consolidated into maps. This in turn is useful for checking whether
  * internal types are defined inside the schema.
@@ -83,11 +78,6 @@ export type IntermediateDictionary = {
    * The node that is defining the schema on this file.
    */
   schema?: SchemaDefinitionNode;
-  /**
-   * A dictionary that maps the operation in the SchemaDefinitionNode to the
-   * described type.
-   */
-  operationNames: OperationNames;
 };
 
 /**
@@ -95,11 +85,11 @@ export type IntermediateDictionary = {
  * parsing.
  */
 export type DocumentParsingOuput = {
-  objects: Map<string, ObjectTypeDescription>;
-  inputs: Map<string, ObjectTypeDescription>;
+  objects: Map<string, ObjectTypeDescriptor>;
+  inputs: Map<string, ObjectTypeDescriptor>;
   enums: Map<string, EnumTypeDescriptor>;
   unions: Map<string, UnionTypeDescriptor>;
-  operationNames: OperationNames;
+  operations: Map<SupportedOperation, OperationDescriptor>;
 };
 
 /**
@@ -161,8 +151,8 @@ export type FieldDescriptor = SingleFieldDescriptor | ArrayFieldDescriptor;
 
 export type OperationDescriptor = {
   kind: 'OperationDescriptor';
-  fieldDescriptor: FieldDescriptor;
   operation: SupportedOperation;
+  objectType: ReferencedTypeDescriptor;
 };
 
 export type EnumValueDescriptor = {
@@ -226,8 +216,8 @@ export type TypeDescriptor =
  * GraphQL objects is collapsed into this data structure which in turned is
  * then consumed for codegen purposes.
  */
-export type ObjectTypeDescription = {
-  kind: 'ObjectTypeDescription';
+export type ObjectTypeDescriptor = {
+  kind: 'ObjectTypeDescriptor';
   objectType: ObjectTypeKind;
   name: string;
   comments?: string;
@@ -451,7 +441,6 @@ export function parseDocumentNode(
     enums: {},
     unions: {},
     schema: undefined,
-    operationNames: {},
   };
 
   let schemaDefinition: SchemaDefinitionNode | undefined;
@@ -494,16 +483,30 @@ export function parseDocumentNode(
   // the types are properly defined in the objects map.
   //
   // We always parse it because it's required in nodeReducer.
-  const operationNames: OperationNames = {};
+  const operations: Map<SupportedOperation, OperationDescriptor> = new Map();
 
   if (schemaDefinition) {
     schemaDefinition.operationTypes.forEach(operation => {
       switch (operation.operation) {
         case 'query':
-          operationNames.query = operation.type.name.value;
+          operations.set(SupportedOperation.Query, {
+            kind: 'OperationDescriptor',
+            operation: SupportedOperation.Query,
+            objectType: {
+              kind: 'ReferencedType',
+              name: operation.type.name.value,
+            },
+          });
           break;
         case 'mutation':
-          operationNames.mutation = operation.type.name.value;
+          operations.set(SupportedOperation.Mutation, {
+            kind: 'OperationDescriptor',
+            operation: SupportedOperation.Mutation,
+            objectType: {
+              kind: 'ReferencedType',
+              name: operation.type.name.value,
+            },
+          });
           break;
         default:
           throw new UnsupportedOperationError(operation.operation);
@@ -521,7 +524,7 @@ export function parseDocumentNode(
    * @param object Descriptor of the Object / Input.
    */
   function objectNodeReducer(
-    accumulator: Map<string, ObjectTypeDescription>,
+    accumulator: Map<string, ObjectTypeDescriptor>,
     object:
       | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
       | DocumentNodeDescriptor<InputObjectTypeDefinitionNode>,
@@ -574,7 +577,7 @@ export function parseDocumentNode(
       unionTypeReducer,
       new Map(),
     ),
-    operationNames,
+    operations,
   };
 }
 
@@ -800,7 +803,7 @@ export function parseFieldDefinitionNode(
  */
 export function parseDocumentObjectType(
   type: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
-): ObjectTypeDescription | null {
+): ObjectTypeDescriptor | null {
   const referencedTypes: ReferencedTypeList = new Set();
 
   /**
@@ -847,7 +850,7 @@ export function parseDocumentObjectType(
 
   // Mount the parsed object.
   return {
-    kind: 'ObjectTypeDescription',
+    kind: 'ObjectTypeDescriptor',
     objectType:
       type.kind === 'ObjectTypeDefinition'
         ? ObjectTypeKind.Object

@@ -106,5 +106,7 @@ export function makeTitleOriginDescriptor(
       } > Argument: ${originDescriptor.argumentName}`;
     case OriginKind.Union:
       return `Union: ${originDescriptor.name}`;
+    case OriginKind.Operation:
+      return `Operation: ${originDescriptor.operationType}`;
   }
 }
