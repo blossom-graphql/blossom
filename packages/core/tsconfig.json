@@ -3,6 +3,9 @@
   "include": [
     "src/**/*.ts"
   ],
+  "exclude": [
+    "**/__tests__"
+  ],
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
