@@ -24,7 +24,6 @@ import {
   KnownScalarTypeDescriptor,
   SupportedOperation,
   OperationFieldDescriptor,
-  ParsedFileGraph,
 } from './parsing';
 import {
   TypesFileContents,
@@ -515,7 +514,7 @@ export function createImportDeclaration(importDescription: ImportDescription) {
   );
 }
 
-type CodeGroup = { spacing: number; nodes: ReadonlyArray<ts.Node> };
+export type CodeGroup = { spacing: number; nodes: ReadonlyArray<ts.Node> };
 
 export function generateTypesFileNodes(
   contents: TypesFileContents,
@@ -720,30 +719,4 @@ export async function formatOutput(codeOutput: string): Promise<string> {
     parser: 'typescript',
     ...prettierConfig,
   });
-}
-
-export function codegenPipelineMaker(
-  nodeGroupMaker: (
-    filePath: string,
-    fileGraph: ParsedFileGraph,
-  ) => ReadonlyArray<CodeGroup>,
-  headerText?: string,
-) {
-  return async function generator(
-    filePath: string,
-    fileGraph: ParsedFileGraph,
-  ) {
-    const nodeGroups = nodeGroupMaker(filePath, fileGraph);
-
-    let generatedCode: string;
-    if (headerText) {
-      generatedCode = [headerText, ...generateCodeChunks(nodeGroups)].join(
-        CODE_GROUP_SPACING,
-      );
-    } else {
-      generatedCode = generateCodeChunks(nodeGroups).join(CODE_GROUP_SPACING);
-    }
-
-    return await formatOutput(generatedCode);
-  };
 }
