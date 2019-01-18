@@ -11,6 +11,8 @@ import path from 'path';
 import ts from 'typescript';
 import { camelCase, upperFirst } from 'lodash';
 import wrap from 'word-wrap';
+import cosmiconfig from 'cosmiconfig';
+import prettier from 'prettier';
 
 import {
   FieldDescriptor,
@@ -22,6 +24,7 @@ import {
   KnownScalarTypeDescriptor,
   SupportedOperation,
   OperationFieldDescriptor,
+  ParsedFileGraph,
 } from './parsing';
 import {
   TypesFileContents,
@@ -37,7 +40,9 @@ import {
   rootResolverName,
   resolverName,
 } from './naming';
+import { repeatChar } from './utils';
 
+export const CODE_GROUP_SPACING = '\n\n';
 const GRAPHQL_TYPENAME_FIELD = '__typename';
 const GRAPHQL_TYPENAME_FIELD_COMMENTS = wrap(
   'Required by GraphQL.js. Must match the name of the object in the GraphQL SDL this type is representing in the codebase.',
@@ -670,4 +675,75 @@ export function generateRootFileNodes(
     { spacing: 0, nodes: fileImports },
     { spacing: 1, nodes: functionDeclarations },
   ];
+}
+
+export function generateCodeChunks(
+  groups: ReadonlyArray<CodeGroup>,
+): ReadonlyArray<string> {
+  const sourceFile = ts.createSourceFile(
+    'output.ts',
+    '',
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS,
+  );
+
+  const printer = ts.createPrinter({
+    newLine: ts.NewLineKind.LineFeed,
+  });
+
+  return groups.map(nodeGroup =>
+    nodeGroup.nodes
+      .map(node => printer.printNode(ts.EmitHint.Unspecified, node, sourceFile))
+      .join(repeatChar('\n', nodeGroup.spacing + 1)),
+  );
+}
+
+export async function formatOutput(codeOutput: string): Promise<string> {
+  const prettierConfigExplorer = cosmiconfig('prettier');
+
+  let prettierConfig: any = {};
+
+  try {
+    const result = await prettierConfigExplorer.search();
+
+    if (result && !result.isEmpty) {
+      prettierConfig = result.config;
+    }
+  } catch (error) {
+    // Prettier settings not found. Do anything to code.
+    // TODO: Logging.
+    return codeOutput;
+  }
+
+  return prettier.format(codeOutput, {
+    parser: 'typescript',
+    ...prettierConfig,
+  });
+}
+
+export function codegenPipelineMaker(
+  nodeGroupMaker: (
+    filePath: string,
+    fileGraph: ParsedFileGraph,
+  ) => ReadonlyArray<CodeGroup>,
+  headerText?: string,
+) {
+  return async function generator(
+    filePath: string,
+    fileGraph: ParsedFileGraph,
+  ) {
+    const nodeGroups = nodeGroupMaker(filePath, fileGraph);
+
+    let generatedCode: string;
+    if (headerText) {
+      generatedCode = [headerText, ...generateCodeChunks(nodeGroups)].join(
+        CODE_GROUP_SPACING,
+      );
+    } else {
+      generatedCode = generateCodeChunks(nodeGroups).join(CODE_GROUP_SPACING);
+    }
+
+    return await formatOutput(generatedCode);
+  };
 }

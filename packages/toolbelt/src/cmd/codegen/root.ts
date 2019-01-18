@@ -9,69 +9,18 @@
 import fs from 'fs';
 import path from 'path';
 
-import ts from 'typescript';
-import cosmiconfig from 'cosmiconfig';
-import prettier from 'prettier';
-
-import { parseFileGraph, ParsedFileGraph } from '../../lib/parsing';
-import { generateRootFileNodes } from '../../lib/codegen';
+import { parseFileGraph } from '../../lib/parsing';
+import { generateRootFileNodes, codegenPipelineMaker } from '../../lib/codegen';
 import { appPath, rootFilePath } from '../../lib/paths';
 import { linkRootFile } from '../../lib/linking';
 import { cliRunWrapper } from '../../lib/runtime';
-import { repeatChar } from '../../lib/utils';
 
-export async function generateRootFile(
-  filePath: string,
-  fileGraph: ParsedFileGraph,
-) {
+const generateRootFile = codegenPipelineMaker((filePath, fileGraph) => {
   const linkedRootFile = linkRootFile(filePath, fileGraph);
 
   // Generate file
-  const generatedNodeGroups = generateRootFileNodes(linkedRootFile);
-
-  const resultFile = ts.createSourceFile(
-    'types.ts',
-    '',
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TS,
-  );
-
-  const printer = ts.createPrinter({
-    newLine: ts.NewLineKind.LineFeed,
-  });
-
-  const chunks = generatedNodeGroups.map(nodeGroup =>
-    nodeGroup.nodes
-      .map(node => printer.printNode(ts.EmitHint.Unspecified, node, resultFile))
-      .join(repeatChar('\n', nodeGroup.spacing + 1)),
-  );
-
-  const generatedFile = chunks.join('\n\n');
-
-  // Use prettier! Retrieve config first
-  const prettierConfigExplorer = cosmiconfig('prettier');
-
-  let prettierConfig: any = {};
-
-  try {
-    const result = await prettierConfigExplorer.search();
-
-    if (result && !result.isEmpty) {
-      prettierConfig = result.config;
-    }
-  } catch (error) {
-    // Prettier settings not found
-    // TODO: Logging.
-  }
-
-  const formattedFile = prettier.format(generatedFile, {
-    parser: 'typescript',
-    ...prettierConfig,
-  });
-
-  return formattedFile;
-}
+  return generateRootFileNodes(linkedRootFile);
+});
 
 export async function generateRoot(options: {
   file?: string;

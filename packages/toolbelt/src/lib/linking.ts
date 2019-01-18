@@ -845,7 +845,7 @@ export function addTypesFileImports(
   }
 
   // 1. Add vendor imports
-  addCommonVendorImports(result);
+  addCommonVendorImports(result, linkingContext);
 
   // 2. Add dependencies coming from other files.
   addTypeReferencesImports(result, linkingContext);
@@ -856,7 +856,7 @@ export function addRootFileImports(
   linkingContext: LinkingContext,
 ) {
   // 1. Add common vendor imports.
-  addCommonVendorImports(result);
+  addCommonVendorImports(result, linkingContext);
 
   // 2. Add dependencies coming from other files.
   addTypeReferencesImports(result, linkingContext);
