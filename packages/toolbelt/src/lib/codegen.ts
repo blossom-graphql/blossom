@@ -27,6 +27,9 @@ import {
   TypesFileContents,
   ImportDescription,
   RootFileContents,
+  MUTATION_SIGNATURE_NAME,
+  QUERY_SIGNATURE_NAME,
+  OBJECT_SIGNATURE_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -156,13 +159,13 @@ export function generateFunctionTypeNode(
 
   switch (operation) {
     case SupportedOperation.Mutation:
-      signatureName = 'MutationResolverSignature';
+      signatureName = MUTATION_SIGNATURE_NAME;
       break;
     case SupportedOperation.Query:
-      signatureName = 'QueryResolverSignature';
+      signatureName = QUERY_SIGNATURE_NAME;
       break;
     default:
-      signatureName = 'ObjectResolverSignature';
+      signatureName = OBJECT_SIGNATURE_NAME;
       break;
   }
 
@@ -177,12 +180,6 @@ export function generateFunctionTypeNode(
     ts.createTypeLiteralNode(members),
     getOutputType(terminalType, isAsync),
   ]);
-
-  // return ts.createFunctionTypeNode(
-  //   undefined,
-  //   generateResolverFunctionArguments(args),
-  //   getOutputType(terminalType, isAsync),
-  // );
 }
 
 export function preprendComments(declaration: ts.Node, text: string) {

@@ -7,19 +7,19 @@
  */
 
 import {
-  ParsedFileGraph,
-  ObjectTypeDescriptor,
-  ThunkType,
   DocumentParsingOuput,
-  ParsedFileDescriptor,
   EnumTypeDescriptor,
-  UnionTypeDescriptor,
   FieldDescriptor,
-  SupportedOperation,
-  TypeDescriptor,
-  OperationDescriptor,
+  ObjectTypeDescriptor,
   ObjectTypeKind,
+  OperationDescriptor,
   OperationFieldDescriptor,
+  ParsedFileDescriptor,
+  ParsedFileGraph,
+  SupportedOperation,
+  ThunkType,
+  TypeDescriptor,
+  UnionTypeDescriptor,
 } from './parsing';
 import { blossomInstancePath, typesFilePath, resolversFilePath } from './paths';
 import {
@@ -36,8 +36,20 @@ import {
   referencedTypeName,
 } from './naming';
 
+const GRAPHQL_PACKAGE_NAME = 'graphql';
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
 const CONTEXT_NAME = 'RequestContext';
+
+export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
+export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
+export const OBJECT_SIGNATURE_NAME = 'ObjectSignatureName';
+
+export enum DependencyFlag {
+  HasOptionalReference = 'HasOptionalReference',
+  HasThunkedField = 'HasThunkedField',
+  HasQuerySignatures = 'HasQuerySignatures',
+  HasMutationSignatures = 'HasMutationSignatures',
+}
 
 type ImportMembersMap = Map<'default' | string, string | undefined>;
 
@@ -61,7 +73,7 @@ export type TypesFileContents = {
   kind: 'TypesFile';
   vendorImports: ImportGroupMap;
   fileImports: ImportGroupMap;
-  dependencyFlags: Map<string, any>;
+  dependencyFlags: Map<DependencyFlag, any>;
   enumDeclarations: EnumTypeDescriptor[];
   typeDeclarations: ObjectTypeDescriptor[];
   unionDeclarations: UnionTypeDescriptor[];
@@ -72,7 +84,7 @@ export type RootFileContents = {
   kind: 'RootFile';
   fileImports: ImportGroupMap;
   vendorImports: ImportGroupMap;
-  dependencyFlags: Map<string, any>;
+  dependencyFlags: Map<DependencyFlag, any>;
   operationDeclarations: OperationFieldDescriptor[];
 };
 
@@ -559,11 +571,11 @@ export function addFieldCommonDependencyFlags(
   result: TypesFileContents | RootFileContents,
 ) {
   if (!field.required) {
-    result.dependencyFlags.set('optionalObjectField', true);
+    result.dependencyFlags.set(DependencyFlag.HasOptionalReference, true);
   }
 
   if (field.thunkType !== ThunkType.None) {
-    result.dependencyFlags.set('thunkedField', true);
+    result.dependencyFlags.set(DependencyFlag.HasThunkedField, true);
   }
 }
 
@@ -633,9 +645,6 @@ export function linkOperationTypes(
   result: TypesFileContents | RootFileContents,
   linkingContext: LinkingContext,
 ) {
-  // TODO: If extracting types given a resolution is going to happen often,
-  // then this should be abstracted away in a helper.
-
   // 1. Get object type definition from resolved map. Ensure that exists.
   const { name } = descriptor.objectType;
 
@@ -670,6 +679,16 @@ export function linkOperationTypes(
 
     result.operationDeclarations.push(operationFieldDescriptor);
   });
+
+  // 3. Add dependency flags for properly resolving imports when we are
+  //    generating a types file.
+  if (linkingContext.linkingType !== LinkingType.TypesFile) return;
+
+  if (descriptor.operation === SupportedOperation.Query) {
+    result.dependencyFlags.set(DependencyFlag.HasQuerySignatures, true);
+  } else if (descriptor.operation === SupportedOperation.Mutation) {
+    result.dependencyFlags.set(DependencyFlag.HasMutationSignatures, true);
+  }
 }
 
 export function linkUnionTypes(
@@ -701,8 +720,8 @@ export function linkObjectTypes(
     addFieldCommonDependencyFlags(field, result);
 
     return (
-      result.dependencyFlags.has('optionalObjectField') &&
-      result.dependencyFlags.has('thunkedField')
+      result.dependencyFlags.has(DependencyFlag.HasOptionalReference) &&
+      result.dependencyFlags.has(DependencyFlag.HasThunkedField)
     );
   });
 
@@ -728,17 +747,17 @@ export function addCommonVendorImports(
   // linkingContext: LinkingContext,
 ) {
   // - When there's a required field, Maybe must be included.
-  if (result.dependencyFlags.has('optionalObjectField')) {
+  if (result.dependencyFlags.has(DependencyFlag.HasOptionalReference)) {
     addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
   }
 
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
   //   be included.
-  if (result.dependencyFlags.get('thunkedField')) {
+  if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
     addImport(
       result.vendorImports,
       'VendorImport',
-      'graphql',
+      GRAPHQL_PACKAGE_NAME,
       'GraphQLResolveInfo',
     );
 
@@ -747,6 +766,34 @@ export function addCommonVendorImports(
       'FileImport',
       blossomInstancePath(),
       CONTEXT_NAME,
+    );
+  }
+
+  // - Include signatures when they are present in the file
+  if (result.dependencyFlags.get(DependencyFlag.HasQuerySignatures)) {
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      CORE_PACKAGE_NAME,
+      QUERY_SIGNATURE_NAME,
+    );
+  }
+
+  if (result.dependencyFlags.get(DependencyFlag.HasMutationSignatures)) {
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      CORE_PACKAGE_NAME,
+      MUTATION_SIGNATURE_NAME,
+    );
+  }
+
+  if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      CORE_PACKAGE_NAME,
+      OBJECT_SIGNATURE_NAME,
     );
   }
 }
