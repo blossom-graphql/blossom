@@ -744,7 +744,7 @@ export function linkObjectTypes(
 
 export function addCommonVendorImports(
   result: TypesFileContents | RootFileContents,
-  // linkingContext: LinkingContext,
+  linkingContext: LinkingContext,
 ) {
   // - When there's a required field, Maybe must be included.
   if (result.dependencyFlags.has(DependencyFlag.HasOptionalReference)) {
@@ -788,7 +788,10 @@ export function addCommonVendorImports(
     );
   }
 
-  if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
+  if (
+    linkingContext.linkingType === LinkingType.TypesFile &&
+    result.dependencyFlags.get(DependencyFlag.HasThunkedField)
+  ) {
     addImport(
       result.vendorImports,
       'VendorImport',
