@@ -67,6 +67,7 @@ export type RootFileContents = {
   kind: 'RootFile';
   fileImports: ImportGroupMap;
   vendorImports: ImportGroupMap;
+  dependencyFlags: Map<string, any>;
   operationDeclarations: OperationFieldDescriptor[];
 };
 
@@ -550,7 +551,7 @@ export function enforceReferencesPresence(
 
 export function linkOperationTypes(
   descriptor: OperationDescriptor,
-  result: TypesFileContents,
+  result: TypesFileContents | RootFileContents,
   linkingContext: LinkingContext,
 ) {
   // TODO: If extracting types given a resolution is going to happen often,
@@ -591,7 +592,19 @@ export function linkOperationTypes(
   }
 
   // 2. Create descriptor for each one of the fields.
-  objectDescriptor.fields.forEach(fieldDescriptor => {
+  objectDescriptor.fields.forEach(field => {
+    let fieldDescriptor: FieldDescriptor;
+    if (linkingContext.linkingType === LinkingType.RootFile) {
+      result.dependencyFlags.set('thunkedField', true);
+
+      fieldDescriptor = {
+        ...field,
+        thunkType: ThunkType.AsyncFunction,
+      };
+    } else {
+      fieldDescriptor = field;
+    }
+
     const operationFieldDescriptor: OperationFieldDescriptor = {
       ...descriptor,
       kind: 'OperationFieldDescriptor',
@@ -623,13 +636,13 @@ export function isRootType(
 
 export function linkObjectTypes(
   typeDescriptor: ObjectTypeDescriptor,
-  result: TypesFileContents,
+  result: TypesFileContents | RootFileContents,
   linkingContext: LinkingContext,
 ) {
   // Update some of the stats that will be used to compute imports.
   typeDescriptor.fields.some(field => {
-    if (field.required) {
-      result.dependencyFlags.set('requiredObjectField', true);
+    if (!field.required) {
+      result.dependencyFlags.set('optionalObjectField', true);
     }
 
     if (field.thunkType !== ThunkType.None) {
@@ -637,7 +650,7 @@ export function linkObjectTypes(
     }
 
     return (
-      result.dependencyFlags.has('requiredObjectField') &&
+      result.dependencyFlags.has('optionalObjectField') &&
       result.dependencyFlags.has('thunkedField')
     );
   });
@@ -652,27 +665,23 @@ export function linkObjectTypes(
     return;
   }
 
-  result.typeDeclarations.push(typeDescriptor);
+  if (result.kind === 'TypesFile') {
+    result.typeDeclarations.push(typeDescriptor);
+  }
 }
 
-export function addTypesFileImports(
-  result: TypesFileContents,
-  linkingContext: LinkingContext,
+export function addCommonVendorImports(
+  result: TypesFileContents | RootFileContents,
+  // linkingContext: LinkingContext,
 ) {
-  if (linkingContext.linkingType !== LinkingType.TypesFile) {
-    throw new TypeError('Invalid linking type in linking context.');
-  }
-
-  // 1. Add vendor imports
-
   // - When there's a required field, Maybe must be included.
-  if (result.dependencyFlags.has('requiredObjectField')) {
+  if (result.dependencyFlags.has('optionalObjectField')) {
     addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
   }
 
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
   //   be included.
-  if (result.dependencyFlags.has('thunkedField')) {
+  if (result.dependencyFlags.get('thunkedField')) {
     addImport(
       result.vendorImports,
       'VendorImport',
@@ -687,6 +696,18 @@ export function addTypesFileImports(
       CONTEXT_NAME,
     );
   }
+}
+
+export function addTypesFileImports(
+  result: TypesFileContents,
+  linkingContext: LinkingContext,
+) {
+  if (linkingContext.linkingType !== LinkingType.TypesFile) {
+    throw new TypeError('Invalid linking type in linking context.');
+  }
+
+  // 1. Add vendor imports
+  addCommonVendorImports(result);
 
   // 2. Add dependencies coming from other files.
   //    For each field, when resolution filePath is different from the filePath
@@ -704,6 +725,13 @@ export function addTypesFileImports(
       );
     }
   }
+}
+
+export function addRootFileImports(
+  result: RootFileContents,
+  // linkingContext: LinkingContext,
+) {
+  addCommonVendorImports(result);
 }
 
 export function linkTypesFile(
@@ -830,34 +858,62 @@ export function linkRootFile(
     kind: 'RootFile',
     fileImports: new Map(),
     vendorImports: new Map(),
+    dependencyFlags: new Map(),
     operationDeclarations: [],
   };
 
-  // const linkingContext: LinkingContext = {
-  //   filePath,
-  //   fileGraph,
-  //   kind: OriginKind.Object,
-  //   linkingType: LinkingType.RootFile,
-  //   parsedFile,
-  //   referenceMap: new Map(),
-  // };
+  const linkingContext: LinkingContext = {
+    filePath,
+    fileGraph,
+    kind: OriginKind.Object,
+    linkingType: LinkingType.RootFile,
+    parsedFile,
+    referenceMap: new Map(),
+  };
 
-  // const operationTuples = Object.entries(
-  //   parsedFile.parsedDocument.operationNames,
-  // ) as ReadonlyArray<[SupportedOperation, string]>;
+  // Ensure that all the references for operations are resolved
+  const objectErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.objects.values()],
+    descriptor => {
+      updateReferenceMap(linkingContext, descriptor);
 
-  // operationTuples.forEach(([operation, operationTypeName]) => {
-  //   if (!operationTypeName) return;
-
-  //   linkOperationTypes(operation, operationTypeName, result, linkingContext);
-  // });
-
-  addImport(
-    result.vendorImports,
-    'VendorImport',
-    CORE_PACKAGE_NAME,
-    CONTEXT_NAME,
+      linkObjectTypes(descriptor, result, {
+        ...linkingContext,
+        kind: OriginKind.Object,
+      });
+    },
   );
+
+  const operationErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.operations.values()],
+    descriptor => {
+      updateReferenceMap(linkingContext, descriptor);
+    },
+  );
+
+  resolveReferences(linkingContext);
+
+  const linkingErrors = enforceReferencesPresence(linkingContext);
+
+  const operationLinkingErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.operations.values()],
+    descriptor => {
+      linkOperationTypes(descriptor, result, linkingContext);
+    },
+  );
+
+  const accumulatedErrors = [
+    ...objectErrors,
+    ...operationErrors,
+    ...linkingErrors,
+    ...operationLinkingErrors,
+  ];
+
+  if (accumulatedErrors.length > 0) {
+    throw new LinkingError(accumulatedErrors);
+  }
+
+  addRootFileImports(result);
 
   return result;
 }
