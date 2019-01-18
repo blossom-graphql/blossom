@@ -32,6 +32,7 @@ import {
   MUTATION_SIGNATURE_NAME,
   QUERY_SIGNATURE_NAME,
   OBJECT_SIGNATURE_NAME,
+  LoadersFileContents,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -52,6 +53,8 @@ export function createMockLiteral(
   descriptor: KnownScalarTypeDescriptor,
 ): ts.StringLiteral | ts.NumericLiteral | ts.BooleanLiteral {
   switch (descriptor.type) {
+    case KnownScalarTypes.ID:
+      return ts.createStringLiteral('a-unique-identifier');
     case KnownScalarTypes.String:
       return ts.createStringLiteral('Your returned string');
     case KnownScalarTypes.Number:
@@ -262,19 +265,21 @@ export function generateTerminalTypeNode(
     );
   }
 
-  let terminalType: ts.TypeNode = ts.createKeywordTypeNode(
-    ts.SyntaxKind.UnknownKeyword,
-  );
-
+  let terminalType: ts.TypeNode;
   if (field.type.kind === 'KnownScalarType') {
     const typeValue = field.type.type;
 
-    if (typeValue === KnownScalarTypes.String) {
+    if (
+      typeValue === KnownScalarTypes.String ||
+      typeValue === KnownScalarTypes.ID
+    ) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
     } else if (typeValue === KnownScalarTypes.Boolean) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
     } else if (typeValue === KnownScalarTypes.Number) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword);
+    } else {
+      terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
     }
   } else if (field.type.kind === 'ReferencedType') {
     terminalType = ts.createTypeReferenceNode(
@@ -282,8 +287,8 @@ export function generateTerminalTypeNode(
       undefined,
     );
   } else {
+    terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
     // TODO: Log warning.
-    return terminalType;
   }
 
   return wrapInOptionalType(terminalType, field.required);
@@ -676,6 +681,24 @@ export function generateRootFileNodes(
   ];
 }
 
+export function generateLoadersFileNodes(
+  contents: LoadersFileContents,
+): ReadonlyArray<CodeGroup> {
+  const vendorImports = [...contents.vendorImports.values()].map(
+    createImportDeclaration,
+  );
+
+  const fileImports = [...contents.fileImports.values()].map(
+    createImportDeclaration,
+  );
+
+  return [
+    { spacing: 0, nodes: vendorImports },
+    { spacing: 0, nodes: fileImports },
+  ];
+}
+
+// TODO: Move to common.
 export function generateCodeChunks(
   groups: ReadonlyArray<CodeGroup>,
 ): ReadonlyArray<string> {
@@ -698,6 +721,7 @@ export function generateCodeChunks(
   );
 }
 
+// TODO: Move to common.
 export async function formatOutput(codeOutput: string): Promise<string> {
   const prettierConfigExplorer = cosmiconfig('prettier');
 

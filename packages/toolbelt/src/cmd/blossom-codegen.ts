@@ -10,6 +10,7 @@ import program, { Command } from 'commander';
 
 import generateTypes from './codegen/types';
 import generateRoot from './codegen/root';
+import generateLoaders from './codegen/loaders';
 
 function addCommonOptions(program: Command) {
   return program
@@ -36,6 +37,13 @@ addCommonOptions(
     .alias('r')
     .description('Generates root values from a GraphQL SDL.'),
 ).action(generateRoot);
+
+addCommonOptions(
+  program
+    .command('loaders')
+    .alias('l')
+    .description('Generates **example** loaders from a GraphQL SDL.'),
+).action(generateLoaders);
 
 program.parse(process.argv);
 

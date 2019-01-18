@@ -250,3 +250,20 @@ export class DuplicateFieldError extends ExtendableError
     return '';
   }
 }
+
+export class EmptyLoadersFileError extends ExtendableError
+  implements FormattableError {
+  filePath: string;
+
+  constructor(filePath: string) {
+    super(`Loader file for ${filePath} would be empty.`);
+
+    this.filePath = filePath;
+  }
+
+  cliFormat() {
+    return `No loaders to generate in loaders file for ${
+      this.filePath
+    }. Add at least one ID type field to a type declaration within the file.`;
+  }
+}

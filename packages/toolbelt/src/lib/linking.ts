@@ -20,6 +20,7 @@ import {
   ThunkType,
   TypeDescriptor,
   UnionTypeDescriptor,
+  KnownScalarTypes,
 } from './parsing';
 import { blossomInstancePath, typesFilePath, resolversFilePath } from './paths';
 import {
@@ -28,6 +29,7 @@ import {
   ReferenceNotFoundError,
   LinkingError,
   DuplicateFieldError,
+  EmptyLoadersFileError,
 } from './errors';
 import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
 import {
@@ -39,6 +41,8 @@ import {
 const GRAPHQL_PACKAGE_NAME = 'graphql';
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
 const CONTEXT_NAME = 'RequestContext';
+const MAYBE_NAME = 'Maybe';
+const PRIME_NAME = 'prime';
 
 export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
 export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
@@ -86,6 +90,16 @@ export type RootFileContents = {
   vendorImports: ImportGroupMap;
   dependencyFlags: Map<DependencyFlag, any>;
   operationDeclarations: OperationFieldDescriptor[];
+};
+
+export type LoadersFileContents = {
+  kind: 'LoadersFile';
+  fileImports: ImportGroupMap;
+  vendorImports: ImportGroupMap;
+  loaderDeclarations: {
+    objectDescriptor: ObjectTypeDescriptor;
+    idFields: FieldDescriptor[];
+  }[];
 };
 
 export function addImport(
@@ -143,6 +157,7 @@ export enum PresenceResult {
 export enum LinkingType {
   TypesFile = 'TypesFile',
   RootFile = 'RootFile',
+  LoadersFile = 'LoadersFile',
 }
 
 export type OriginDescription =
@@ -748,7 +763,12 @@ export function addCommonVendorImports(
 ) {
   // - When there's a required field, Maybe must be included.
   if (result.dependencyFlags.has(DependencyFlag.HasOptionalReference)) {
-    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, 'Maybe');
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      CORE_PACKAGE_NAME,
+      MAYBE_NAME,
+    );
   }
 
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
@@ -879,6 +899,41 @@ export function addRootFileImports(
         resolverName(outputType.name),
       );
     }
+  });
+}
+
+export function addLoadersFileImports(
+  result: LoadersFileContents,
+  linkingContext: LinkingContext,
+) {
+  // Loaders signatures should always import maybe and prime.
+  addImport(
+    result.vendorImports,
+    'VendorImport',
+    CORE_PACKAGE_NAME,
+    MAYBE_NAME,
+  );
+
+  addImport(
+    result.vendorImports,
+    'VendorImport',
+    CORE_PACKAGE_NAME,
+    PRIME_NAME,
+  );
+
+  // For each of the fields import the definition from types file
+  result.loaderDeclarations.forEach(loaderDescriptor => {
+    loaderDescriptor.idFields.forEach(fieldDescriptor => {
+      const outputType = outputBaseType(fieldDescriptor);
+      if (outputType.kind === 'ReferencedType') {
+        addImport(
+          result.fileImports,
+          'FileImport',
+          typesFilePath(linkingContext.filePath),
+          referencedTypeName(outputType),
+        );
+      }
+    });
   });
 }
 
@@ -1070,6 +1125,63 @@ export function linkRootFile(
   }
 
   addRootFileImports(result, linkingContext);
+
+  return result;
+}
+
+export function linkLoadersFile(
+  filePath: string,
+  fileGraph: ParsedFileGraph,
+): LoadersFileContents {
+  const parsedFile = fileGraph.get(filePath);
+  if (!parsedFile) {
+    throw new FileNotFoundInGraph(filePath);
+  }
+
+  const result: LoadersFileContents = {
+    kind: 'LoadersFile',
+    fileImports: new Map(),
+    vendorImports: new Map(),
+    loaderDeclarations: [],
+  };
+
+  const linkingContext: LinkingContext = {
+    filePath,
+    fileGraph,
+    kind: OriginKind.Object,
+    linkingType: LinkingType.LoadersFile,
+    parsedFile,
+    referenceMap: new Map(),
+  };
+
+  // Generate declarations for all object types with at least one ID! field.
+  [...parsedFile.parsedDocument.objects.values()].forEach(objectDescriptor => {
+    // Immediately exclude if it's a root type
+    if (isRootType(objectDescriptor.name, linkingContext)) {
+      return;
+    }
+
+    const idFields = objectDescriptor.fields.filter(
+      fieldDescriptor =>
+        fieldDescriptor.kind === 'SingleFieldDescriptor' &&
+        fieldDescriptor.type.kind === 'KnownScalarType' &&
+        fieldDescriptor.type.type === KnownScalarTypes.ID,
+    );
+
+    if (idFields.length > 0) {
+      result.loaderDeclarations.push({
+        objectDescriptor,
+        idFields,
+      });
+    }
+  });
+
+  // Enforce that the file must have at least one import.
+  if (result.loaderDeclarations.length === 0) {
+    throw new LinkingError([[0, new EmptyLoadersFileError(filePath)]]);
+  }
+
+  addLoadersFileImports(result, linkingContext);
 
   return result;
 }

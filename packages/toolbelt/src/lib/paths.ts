@@ -41,6 +41,10 @@ export function resolversFilePath(schemaFilePath: string): string {
   return createDotName(schemaFilePath, 'resolvers');
 }
 
+export function loadersFilePath(schemaFilePath: string): string {
+  return createDotName(schemaFilePath, 'loaders');
+}
+
 export function blossomInstancePath(): string {
   return appPath('./blossom-instance.ts');
 }

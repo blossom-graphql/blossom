@@ -188,9 +188,10 @@ export type UnionTypeDescriptor = {
  * statements used in codegen.
  */
 export enum KnownScalarTypes {
-  String = 'string',
-  Boolean = 'boolean',
-  Number = 'number',
+  ID = 'ID',
+  String = 'String',
+  Boolean = 'Boolean',
+  Number = 'Number',
 }
 
 export enum ThunkImplementationType {
@@ -668,6 +669,7 @@ export function parseFieldType(
 
   switch (name) {
     case 'ID':
+      return { kind: 'KnownScalarType', type: KnownScalarTypes.ID };
     case 'String':
       return { kind: 'KnownScalarType', type: KnownScalarTypes.String };
     case 'Int':
