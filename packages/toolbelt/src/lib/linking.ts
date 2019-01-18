@@ -567,6 +567,67 @@ export function addFieldCommonDependencyFlags(
   }
 }
 
+export function extractDescriptor(
+  fieldName: string,
+  elementKind: ElementKind.Type,
+  linkingContext: LinkingContext,
+): ObjectTypeDescriptor | undefined;
+export function extractDescriptor(
+  fieldName: string,
+  elementKind: ElementKind.Input,
+  linkingContext: LinkingContext,
+): ObjectTypeDescriptor | undefined;
+export function extractDescriptor(
+  fieldName: string,
+  elementKind: ElementKind.Enum,
+  linkingContext: LinkingContext,
+): EnumTypeDescriptor | undefined;
+export function extractDescriptor(
+  fieldName: string,
+  elementKind: ElementKind.Union,
+  linkingContext: LinkingContext,
+): UnionTypeDescriptor | undefined;
+export function extractDescriptor(
+  fieldName: string,
+  elementKind: ElementKind,
+  linkingContext: LinkingContext,
+): ObjectTypeDescriptor | EnumTypeDescriptor | UnionTypeDescriptor | undefined {
+  const { referenceMap } = linkingContext;
+
+  const referenceDescriptor = referenceMap.get(fieldName);
+  if (!referenceDescriptor) {
+    // Descriptor must exist.
+    throw new Error('Name not found.'); // TODO: Internal.
+  }
+  if (!referenceDescriptor.resolution) {
+    // Must be resolved.
+    throw new Error(`Field ${fieldName} not resolved.`); // TODO: Internal.
+  }
+  if (referenceDescriptor.resolution.elementKind !== ElementKind.Type) {
+    // Must be Object type.
+    throw new Error(`${fieldName} is not an object type.`); // TODO: Internal.
+  }
+
+  // Extract definition from the file given by the path
+  const { fileGraph } = linkingContext;
+  const parsedFile = fileGraph.get(referenceDescriptor.resolution.filePath);
+  if (!parsedFile) {
+    throw new Error('Parsed file not found.'); // TODO: Internal.
+  }
+
+  const { parsedDocument } = parsedFile;
+  switch (elementKind) {
+    case ElementKind.Type:
+      return parsedDocument.objects.get(fieldName);
+    case ElementKind.Input:
+      return parsedDocument.inputs.get(fieldName);
+    case ElementKind.Enum:
+      return parsedDocument.enums.get(fieldName);
+    case ElementKind.Union:
+      return parsedDocument.unions.get(fieldName);
+  }
+}
+
 export function linkOperationTypes(
   descriptor: OperationDescriptor,
   result: TypesFileContents | RootFileContents,
@@ -577,36 +638,14 @@ export function linkOperationTypes(
 
   // 1. Get object type definition from resolved map. Ensure that exists.
   const { name } = descriptor.objectType;
-  const { referenceMap } = linkingContext;
 
-  const referenceDescriptor = referenceMap.get(name);
-  if (!referenceDescriptor) {
-    // Descriptor must exist.
-    throw new Error('Name not found.'); // TODO: Internal.
-  }
-  if (!referenceDescriptor.resolution) {
-    // Must be resolved.
-    throw new Error('Field not resolved.'); // TODO: Internal.
-  }
-  if (referenceDescriptor.resolution.elementKind !== ElementKind.Type) {
-    // Must be Object type.
-    throw new Error(`${name} is not an object type.`); // TODO: Internal.
-  }
-
-  // Extract definition from the file given by the path
-  const { fileGraph } = linkingContext;
-  const { filePath } = referenceDescriptor.resolution;
-  const parsedFile = fileGraph.get(referenceDescriptor.resolution.filePath);
-
-  if (!parsedFile) {
-    throw new Error('Parsed file not found.'); // TODO: Internal.
-  }
-
-  const objectDescriptor = parsedFile.parsedDocument.objects.get(name);
+  const objectDescriptor = extractDescriptor(
+    name,
+    ElementKind.Type,
+    linkingContext,
+  );
   if (!objectDescriptor) {
-    throw new Error(
-      `Object descriptor not found for name ${name} in file ${filePath}`,
-    );
+    throw new Error(`Object descriptor not found for name ${name}.`);
   }
 
   // 2. Create descriptor for each one of the fields.
@@ -722,14 +761,28 @@ export function addTypeReferencesImports(
     // It's already enforced because the enforcing function is called before.
     const resolution = referenceDescription.resolution as ResolutionDescription;
 
-    if (resolution.filePath !== linkingContext.filePath) {
-      addImport(
-        result.fileImports,
-        'FileImport',
-        typesFilePath(resolution.filePath),
-        referencedTypeName(field),
-      );
-    }
+    // Don't add the import if we are generating a types file and the files
+    // paths match.
+    if (
+      linkingContext.linkingType === LinkingType.TypesFile &&
+      resolution.filePath === linkingContext.filePath
+    )
+      continue;
+
+    // Don't add the import if we are generating a root file and the reference
+    // is to one of the root types.
+    if (
+      linkingContext.linkingType === LinkingType.RootFile &&
+      isRootType(field, linkingContext)
+    )
+      continue;
+
+    addImport(
+      result.fileImports,
+      'FileImport',
+      typesFilePath(resolution.filePath),
+      referencedTypeName(field),
+    );
   }
 }
 
@@ -919,39 +972,48 @@ export function linkRootFile(
   // Ensure that all the references for operations are resolved
   // Object errors must be included among the references because that way we
   // guarantee the resolution of outputs and arguments.
-  const objectErrors = forEachWithErrors(
-    [...parsedFile.parsedDocument.objects.values()],
-    descriptor => {
-      updateReferenceMap(linkingContext, descriptor);
-    },
-  );
+  const accumulatedErrors: [number, Error][] = [];
 
-  const operationErrors = forEachWithErrors(
-    [...parsedFile.parsedDocument.operations.values()],
-    descriptor => {
-      updateReferenceMap(linkingContext, descriptor);
-    },
+  accumulatedErrors.push(
+    ...forEachWithErrors(
+      [...parsedFile.parsedDocument.operations.values()],
+      descriptor => {
+        updateReferenceMap(linkingContext, descriptor);
+      },
+    ),
   );
 
   resolveReferences(linkingContext);
+  accumulatedErrors.push(...enforceReferencesPresence(linkingContext));
 
-  const linkingErrors = enforceReferencesPresence(linkingContext);
+  // Freeze keys since updateReferenceMap is going to mutate referenceMap.
+  const keys = [...linkingContext.referenceMap.keys()];
+  for (const field of keys) {
+    // Guard, because enforeReferencesPresence guarantees us that this is
+    // resolved.
+    const objectDescriptor = extractDescriptor(
+      field,
+      ElementKind.Type,
+      linkingContext,
+    );
+    if (!objectDescriptor) throw new Error('Type not found.'); // TODO: Internal
 
-  const operationLinkingErrors = forEachWithErrors(
-    [...parsedFile.parsedDocument.operations.values()],
-    descriptor => {
-      updateReferenceMap(linkingContext, descriptor);
+    updateReferenceMap(linkingContext, objectDescriptor);
+  }
 
-      linkOperationTypes(descriptor, result, linkingContext);
-    },
+  // Resolve and ensure again, now that we have the requirements of the object
+  // descriptors.
+  resolveReferences(linkingContext);
+  accumulatedErrors.push(...enforceReferencesPresence(linkingContext));
+
+  accumulatedErrors.push(
+    ...forEachWithErrors(
+      [...parsedFile.parsedDocument.operations.values()],
+      descriptor => {
+        linkOperationTypes(descriptor, result, linkingContext);
+      },
+    ),
   );
-
-  const accumulatedErrors = [
-    ...objectErrors,
-    ...operationErrors,
-    ...linkingErrors,
-    ...operationLinkingErrors,
-  ];
 
   if (accumulatedErrors.length > 0) {
     throw new LinkingError(accumulatedErrors);
