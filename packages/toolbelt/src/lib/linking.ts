@@ -21,7 +21,7 @@ import {
   ObjectTypeKind,
   OperationFieldDescriptor,
 } from './parsing';
-import { blossomInstancePath, typesFilePath } from './paths';
+import { blossomInstancePath, typesFilePath, resolversFilePath } from './paths';
 import {
   FileNotFoundInGraph,
   InvalidReferenceError,
@@ -30,6 +30,11 @@ import {
   DuplicateFieldError,
 } from './errors';
 import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
+import {
+  resolverSignatureName,
+  resolverName,
+  referencedTypeName,
+} from './naming';
 
 const CORE_PACKAGE_NAME = '@blossom-gql/core';
 const CONTEXT_NAME = 'RequestContext';
@@ -549,6 +554,19 @@ export function enforceReferencesPresence(
   );
 }
 
+export function addFieldCommonDependencyFlags(
+  field: FieldDescriptor,
+  result: TypesFileContents | RootFileContents,
+) {
+  if (!field.required) {
+    result.dependencyFlags.set('optionalObjectField', true);
+  }
+
+  if (field.thunkType !== ThunkType.None) {
+    result.dependencyFlags.set('thunkedField', true);
+  }
+}
+
 export function linkOperationTypes(
   descriptor: OperationDescriptor,
   result: TypesFileContents | RootFileContents,
@@ -595,8 +613,6 @@ export function linkOperationTypes(
   objectDescriptor.fields.forEach(field => {
     let fieldDescriptor: FieldDescriptor;
     if (linkingContext.linkingType === LinkingType.RootFile) {
-      result.dependencyFlags.set('thunkedField', true);
-
       fieldDescriptor = {
         ...field,
         thunkType: ThunkType.AsyncFunction,
@@ -604,6 +620,8 @@ export function linkOperationTypes(
     } else {
       fieldDescriptor = field;
     }
+
+    addFieldCommonDependencyFlags(fieldDescriptor, result);
 
     const operationFieldDescriptor: OperationFieldDescriptor = {
       ...descriptor,
@@ -641,13 +659,7 @@ export function linkObjectTypes(
 ) {
   // Update some of the stats that will be used to compute imports.
   typeDescriptor.fields.some(field => {
-    if (!field.required) {
-      result.dependencyFlags.set('optionalObjectField', true);
-    }
-
-    if (field.thunkType !== ThunkType.None) {
-      result.dependencyFlags.set('thunkedField', true);
-    }
+    addFieldCommonDependencyFlags(field, result);
 
     return (
       result.dependencyFlags.has('optionalObjectField') &&
@@ -655,8 +667,10 @@ export function linkObjectTypes(
     );
   });
 
-  // We are not adding types if this type is a root value and includeRootTypes
-  // option is marked as false.
+  // We are not adding types if this type is a root value and we are creating
+  // a types file.
+  //
+  // TODO: Make it optional maybe?
   if (
     linkingContext.kind === OriginKind.Object &&
     linkingContext.linkingType === LinkingType.TypesFile &&
@@ -698,6 +712,27 @@ export function addCommonVendorImports(
   }
 }
 
+export function addTypeReferencesImports(
+  result: TypesFileContents | RootFileContents,
+  linkingContext: LinkingContext,
+) {
+  // For each field, when resolution filePath is different from the filePath
+  // in the current linking context, an import must be created.
+  for (const [field, referenceDescription] of linkingContext.referenceMap) {
+    // It's already enforced because the enforcing function is called before.
+    const resolution = referenceDescription.resolution as ResolutionDescription;
+
+    if (resolution.filePath !== linkingContext.filePath) {
+      addImport(
+        result.fileImports,
+        'FileImport',
+        typesFilePath(resolution.filePath),
+        referencedTypeName(field),
+      );
+    }
+  }
+}
+
 export function addTypesFileImports(
   result: TypesFileContents,
   linkingContext: LinkingContext,
@@ -710,28 +745,38 @@ export function addTypesFileImports(
   addCommonVendorImports(result);
 
   // 2. Add dependencies coming from other files.
-  //    For each field, when resolution filePath is different from the filePath
-  //    in the current linking context, an import must be created.
-  for (const [field, referenceDescription] of linkingContext.referenceMap) {
-    // It's already enforced because the enforcing function is called before.
-    const resolution = referenceDescription.resolution as ResolutionDescription;
-
-    if (resolution.filePath !== linkingContext.filePath) {
-      addImport(
-        result.fileImports,
-        'FileImport',
-        typesFilePath(linkingContext.filePath),
-        field, // TODO: Maybe change naming?
-      );
-    }
-  }
+  addTypeReferencesImports(result, linkingContext);
 }
 
 export function addRootFileImports(
   result: RootFileContents,
-  // linkingContext: LinkingContext,
+  linkingContext: LinkingContext,
 ) {
+  // 1. Add common vendor imports.
   addCommonVendorImports(result);
+
+  // 2. Add dependencies coming from other files.
+  addTypeReferencesImports(result, linkingContext);
+
+  // 3. Add resolver signatures imports.
+  result.operationDeclarations.forEach(operationFieldDescriptor => {
+    addImport(
+      result.fileImports,
+      'FileImport',
+      typesFilePath(linkingContext.filePath),
+      resolverSignatureName(operationFieldDescriptor),
+    );
+
+    const outputType = outputBaseType(operationFieldDescriptor);
+    if (outputType.kind === 'ReferencedType') {
+      addImport(
+        result.fileImports,
+        'FileImport',
+        resolversFilePath(linkingContext.filePath),
+        resolverName(outputType.name),
+      );
+    }
+  });
 }
 
 export function linkTypesFile(
@@ -872,15 +917,12 @@ export function linkRootFile(
   };
 
   // Ensure that all the references for operations are resolved
+  // Object errors must be included among the references because that way we
+  // guarantee the resolution of outputs and arguments.
   const objectErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.objects.values()],
     descriptor => {
       updateReferenceMap(linkingContext, descriptor);
-
-      linkObjectTypes(descriptor, result, {
-        ...linkingContext,
-        kind: OriginKind.Object,
-      });
     },
   );
 
@@ -898,6 +940,8 @@ export function linkRootFile(
   const operationLinkingErrors = forEachWithErrors(
     [...parsedFile.parsedDocument.operations.values()],
     descriptor => {
+      updateReferenceMap(linkingContext, descriptor);
+
       linkOperationTypes(descriptor, result, linkingContext);
     },
   );
@@ -913,7 +957,7 @@ export function linkRootFile(
     throw new LinkingError(accumulatedErrors);
   }
 
-  addRootFileImports(result);
+  addRootFileImports(result, linkingContext);
 
   return result;
 }

@@ -12,9 +12,13 @@ import { OperationFieldDescriptor, FieldDescriptor } from './parsing';
 import { SupportedOperation, ReferencedTypeDescriptor } from './parsing';
 
 export function referencedTypeName(
-  descriptor: ReferencedTypeDescriptor,
+  descriptor: ReferencedTypeDescriptor | string,
 ): string {
-  return descriptor.name;
+  if (typeof descriptor === 'string') {
+    return descriptor;
+  } else {
+    return descriptor.name;
+  }
 }
 
 export function operationName(operation: SupportedOperation) {
