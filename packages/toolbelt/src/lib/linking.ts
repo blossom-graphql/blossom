@@ -19,6 +19,7 @@ import {
   TypeDescriptor,
   OperationDescriptor,
   ObjectTypeKind,
+  OperationFieldDescriptor,
 } from './parsing';
 import { blossomInstancePath, typesFilePath } from './paths';
 import {
@@ -59,14 +60,14 @@ export type TypesFileContents = {
   enumDeclarations: EnumTypeDescriptor[];
   typeDeclarations: ObjectTypeDescriptor[];
   unionDeclarations: UnionTypeDescriptor[];
-  operationDeclarations: OperationDescriptor[];
+  operationDeclarations: OperationFieldDescriptor[];
 };
 
 export type RootFileContents = {
   kind: 'RootFile';
   fileImports: ImportGroupMap;
   vendorImports: ImportGroupMap;
-  operationDeclarations: OperationDescriptor[];
+  operationDeclarations: OperationFieldDescriptor[];
 };
 
 export function addImport(
@@ -177,11 +178,11 @@ export type LinkingContext = Readonly<{
 }>;
 
 export function outputBaseType(
-  descriptor: OperationDescriptor | FieldDescriptor,
+  descriptor: OperationFieldDescriptor | FieldDescriptor,
 ): TypeDescriptor {
   if (descriptor.kind === 'ArrayFieldDescriptor') {
     return outputBaseType(descriptor.elementDescriptor);
-  } else if (descriptor.kind === 'OperationDescriptor') {
+  } else if (descriptor.kind === 'OperationFieldDescriptor') {
     return outputBaseType(descriptor.fieldDescriptor);
   } else {
     return descriptor.type;
@@ -548,56 +549,57 @@ export function enforceReferencesPresence(
 }
 
 export function linkOperationTypes(
-  _operation: SupportedOperation, // ! Not used at this time.
-  _operationTypeName: string,
-  _result: TypesFileContents | RootFileContents,
-  _linkingContext: LinkingContext,
+  descriptor: OperationDescriptor,
+  result: TypesFileContents,
+  linkingContext: LinkingContext,
 ) {
-  // const { linkingType, fileGraph, filePath } = linkingContext;
-  // const schemaPath = enforceTypePresence(operationTypeName, linkingContext);
-  // // Ensure that the thunk imports are going to be present.
-  // if (linkingType === LinkingType.TypesFile && result.kind === 'TypesFile') {
-  //   result.requiredDeps.add(THUNK_IMPORTS_DEP_NAME);
-  // }
-  // const referencePath = schemaPath || filePath;
-  // const fileDescriptor = fileGraph.get(referencePath);
-  // if (!fileDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
-  // const { parsedDocument } = fileDescriptor;
-  // const objectDescriptor = parsedDocument.objects.get(operationTypeName);
-  // if (!objectDescriptor) throw new Error('Descriptor not found.'); // TODO: Error.
-  // // Add fields to the list of operation declarations.
-  // objectDescriptor.fields.forEach(fieldDescriptor => {
-  //   const operationDescriptor: OperationDescriptor = {
-  //     kind: 'OperationDescriptor',
-  //     fieldDescriptor,
-  //     operation,
-  //   };
-  //   const outputType = outputBaseType(operationDescriptor);
-  //   if (linkingType === LinkingType.RootFile) {
-  //     outputType.kind === 'ReferencedType' &&
-  //       addImport(
-  //         result.fileImports,
-  //         'FileImport',
-  //         typesFilePath(filePath),
-  //         referencedTypeName(outputType),
-  //       );
-  //     addImport(
-  //       result.fileImports,
-  //       'FileImport',
-  //       typesFilePath(filePath),
-  //       resolverSignatureName(operationDescriptor),
-  //     );
-  //   }
-  //   result.operationDeclarations.push({
-  //     kind: 'OperationDescriptor',
-  //     fieldDescriptor: {
-  //       // We are always forcing these fields to become promises.
-  //       ...fieldDescriptor,
-  //       thunkType: ThunkType.AsyncFunction,
-  //     },
-  //     operation,
-  //   });
-  // });
+  // TODO: If extracting types given a resolution is going to happen often,
+  // then this should be abstracted away in a helper.
+
+  // 1. Get object type definition from resolved map. Ensure that exists.
+  const { name } = descriptor.objectType;
+  const { referenceMap } = linkingContext;
+
+  const referenceDescriptor = referenceMap.get(name);
+  if (!referenceDescriptor) {
+    // Descriptor must exist.
+    throw new Error('Name not found.'); // TODO: Internal.
+  }
+  if (!referenceDescriptor.resolution) {
+    // Must be resolved.
+    throw new Error('Field not resolved.'); // TODO: Internal.
+  }
+  if (referenceDescriptor.resolution.elementKind !== ElementKind.Type) {
+    // Must be Object type.
+    throw new Error(`${name} is not an object type.`); // TODO: Internal.
+  }
+
+  // Extract definition from the file given by the path
+  const { fileGraph } = linkingContext;
+  const { filePath } = referenceDescriptor.resolution;
+  const parsedFile = fileGraph.get(referenceDescriptor.resolution.filePath);
+
+  if (!parsedFile) {
+    throw new Error('Parsed file not found.'); // TODO: Internal.
+  }
+
+  const objectDescriptor = parsedFile.parsedDocument.objects.get(name);
+  if (!objectDescriptor) {
+    throw new Error(
+      `Object descriptor not found for name ${name} in file ${filePath}`,
+    );
+  }
+
+  // 2. Create descriptor for each one of the fields.
+  objectDescriptor.fields.forEach(fieldDescriptor => {
+    const operationFieldDescriptor: OperationFieldDescriptor = {
+      ...descriptor,
+      kind: 'OperationFieldDescriptor',
+      fieldDescriptor,
+    };
+
+    result.operationDeclarations.push(operationFieldDescriptor);
+  });
 }
 
 export function linkUnionTypes(
@@ -707,7 +709,6 @@ export function addTypesFileImports(
 export function linkTypesFile(
   filePath: string,
   fileGraph: ParsedFileGraph,
-  options: { parseRootOperations: boolean } = { parseRootOperations: true },
 ): TypesFileContents {
   const parsedFile = fileGraph.get(filePath);
   if (!parsedFile) {
@@ -789,6 +790,14 @@ export function linkTypesFile(
 
   const linkingErrors = enforceReferencesPresence(linkingContext);
 
+  // Resolve operation fields
+  const operationLinkingErrors = forEachWithErrors(
+    [...parsedFile.parsedDocument.operations.values()],
+    descriptor => {
+      linkOperationTypes(descriptor, result, linkingContext);
+    },
+  );
+
   // Show errors
   const accumulatedErrors = [
     ...objectErrors,
@@ -796,6 +805,7 @@ export function linkTypesFile(
     ...unionErrors,
     ...linkingErrors,
     ...operationErrors,
+    ...operationLinkingErrors,
   ];
 
   if (accumulatedErrors.length > 0) {
@@ -823,24 +833,24 @@ export function linkRootFile(
     operationDeclarations: [],
   };
 
-  const linkingContext: LinkingContext = {
-    filePath,
-    fileGraph,
-    kind: OriginKind.Object,
-    linkingType: LinkingType.RootFile,
-    parsedFile,
-    referenceMap: new Map(),
-  };
+  // const linkingContext: LinkingContext = {
+  //   filePath,
+  //   fileGraph,
+  //   kind: OriginKind.Object,
+  //   linkingType: LinkingType.RootFile,
+  //   parsedFile,
+  //   referenceMap: new Map(),
+  // };
 
-  const operationTuples = Object.entries(
-    parsedFile.parsedDocument.operationNames,
-  ) as ReadonlyArray<[SupportedOperation, string]>;
+  // const operationTuples = Object.entries(
+  //   parsedFile.parsedDocument.operationNames,
+  // ) as ReadonlyArray<[SupportedOperation, string]>;
 
-  operationTuples.forEach(([operation, operationTypeName]) => {
-    if (!operationTypeName) return;
+  // operationTuples.forEach(([operation, operationTypeName]) => {
+  //   if (!operationTypeName) return;
 
-    linkOperationTypes(operation, operationTypeName, result, linkingContext);
-  });
+  //   linkOperationTypes(operation, operationTypeName, result, linkingContext);
+  // });
 
   addImport(
     result.vendorImports,

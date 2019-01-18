@@ -149,10 +149,18 @@ type ArrayFieldDescriptor = FieldDescriptorBase & {
  */
 export type FieldDescriptor = SingleFieldDescriptor | ArrayFieldDescriptor;
 
-export type OperationDescriptor = {
-  kind: 'OperationDescriptor';
+type OperationBaseDescriptor = {
   operation: SupportedOperation;
   objectType: ReferencedTypeDescriptor;
+};
+
+export type OperationDescriptor = OperationBaseDescriptor & {
+  kind: 'OperationDescriptor';
+};
+
+export type OperationFieldDescriptor = OperationBaseDescriptor & {
+  kind: 'OperationFieldDescriptor';
+  fieldDescriptor: FieldDescriptor;
 };
 
 export type EnumValueDescriptor = {

@@ -8,7 +8,7 @@
 
 import { camelCase, upperFirst } from 'lodash';
 
-import { OperationDescriptor } from './parsing';
+import { OperationFieldDescriptor, FieldDescriptor } from './parsing';
 import { SupportedOperation, ReferencedTypeDescriptor } from './parsing';
 
 export function referencedTypeName(
@@ -30,7 +30,7 @@ export function operationName(operation: SupportedOperation) {
 export function resolverSignatureName({
   fieldDescriptor: descriptor,
   operation,
-}: OperationDescriptor): string {
+}: OperationFieldDescriptor): string {
   return (
     upperFirst(camelCase(descriptor.name)) +
     operationName(operation) +
@@ -41,10 +41,18 @@ export function resolverSignatureName({
 export function rootResolverName({
   fieldDescriptor: descriptor,
   operation,
-}: OperationDescriptor): string {
+}: OperationFieldDescriptor): string {
   return camelCase(descriptor.name) + operationName(operation) + 'Resolver';
 }
 
 export function resolverName(gqlTypeName: string): string {
   return camelCase(gqlTypeName) + 'Resolver';
+}
+
+export function signatureName(
+  descriptor: OperationFieldDescriptor | FieldDescriptor,
+) {
+  if (descriptor.hasOwnProperty('operation')) {
+    descriptor;
+  }
 }

@@ -15,13 +15,13 @@ import wrap from 'word-wrap';
 import {
   FieldDescriptor,
   ObjectTypeDescriptor,
-  OperationDescriptor,
   ThunkType,
   KnownScalarTypes,
   EnumTypeDescriptor,
   UnionTypeDescriptor,
   KnownScalarTypeDescriptor,
   SupportedOperation,
+  OperationFieldDescriptor,
 } from './parsing';
 import {
   TypesFileContents,
@@ -51,14 +51,6 @@ export function createMockLiteral(
       return ts.createNumericLiteral('0');
     case KnownScalarTypes.Boolean:
       return ts.createLiteral(false);
-  }
-}
-
-export function signatureName(
-  descriptor: OperationDescriptor | FieldDescriptor,
-) {
-  if (descriptor.hasOwnProperty('operation')) {
-    descriptor;
   }
 }
 
@@ -148,13 +140,13 @@ export function getOutputType(terminalType: ts.TypeNode, isAsync: boolean) {
  * @param isAsync Should this be an async function?
  */
 export function generateFunctionTypeNode(
-  descriptor: OperationDescriptor | FieldDescriptor,
+  descriptor: OperationFieldDescriptor | FieldDescriptor,
   operation?: SupportedOperation,
   // terminalType: ts.TypeNode,
   // args: FieldDescriptor[] | undefined,
   // isAsync: boolean = false,
 ): ts.TypeReferenceNode {
-  if (descriptor.kind === 'OperationDescriptor')
+  if (descriptor.kind === 'OperationFieldDescriptor')
     return generateFunctionTypeNode(
       descriptor.fieldDescriptor,
       descriptor.operation,
@@ -254,9 +246,9 @@ export function wrapInOptionalType(
  * computed.
  */
 export function generateTerminalTypeNode(
-  field: OperationDescriptor | FieldDescriptor,
+  field: OperationFieldDescriptor | FieldDescriptor,
 ): ts.TypeNode {
-  if (field.kind === 'OperationDescriptor')
+  if (field.kind === 'OperationFieldDescriptor')
     return generateTerminalTypeNode(field.fieldDescriptor);
 
   // If it's an array, then we must recurse based on the element descriptor
@@ -442,7 +434,7 @@ export function generateUnionTypeAlias(
 }
 
 export function generateResolverSignatureDeclaration(
-  descriptor: OperationDescriptor,
+  descriptor: OperationFieldDescriptor,
 ): ts.TypeAliasDeclaration {
   const functionTypeNode = generateFunctionTypeNode(descriptor);
   const { fieldDescriptor } = descriptor;
@@ -561,9 +553,9 @@ export function generateTypesFileNodes(
 }
 
 export function generateRootValueReturnExpression(
-  descriptor: OperationDescriptor | FieldDescriptor,
+  descriptor: OperationFieldDescriptor | FieldDescriptor,
 ): ts.Expression {
-  if (descriptor.kind === 'OperationDescriptor') {
+  if (descriptor.kind === 'OperationFieldDescriptor') {
     return generateRootValueReturnExpression(descriptor.fieldDescriptor);
   } else if (descriptor.kind === 'ArrayFieldDescriptor') {
     if (
