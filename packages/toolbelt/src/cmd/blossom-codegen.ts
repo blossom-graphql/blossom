@@ -12,6 +12,7 @@ import generateTypes from './codegen/types';
 import generateRoot from './codegen/root';
 import generateSources from './codegen/sources';
 import generateResolvers from './codegen/resolvers';
+import generateResources from './codegen/resources';
 
 function addCommonOptions(program: Command) {
   return program
@@ -54,6 +55,15 @@ addCommonOptions(
     .alias('re')
     .description('Generates **example** resolvers from a GraphQL SDL.'),
 ).action(generateResolvers);
+
+addCommonOptions(
+  program
+    .command('resources')
+    .alias('r')
+    .description(
+      'Generates types, root, resolvers and loaders from a GraphQL SDL.',
+    ),
+).action(generateResources);
 
 program.parse(process.argv);
 

@@ -13,18 +13,19 @@ import { cliRunWrapper } from '../../lib/runtime';
 import {
   makeGraphCodegenPipeline,
   codegenPipelineMaker,
+  nodeGroupGeneratorMaker,
+  GeneratorPair,
 } from '../../lib/cmd/codegen/common';
 
-const generateResolversFile = codegenPipelineMaker((filePath, fileGraph) => {
-  const linkedResolversFile = linkResolversFile(filePath, fileGraph);
-
-  // Generate file
-  return generateResolversFileNodes(linkedResolversFile);
-});
+export const resolversCodegenPair: GeneratorPair = [
+  codegenPipelineMaker(
+    nodeGroupGeneratorMaker(linkResolversFile, generateResolversFileNodes),
+  ),
+  resolversFilePath,
+];
 
 export const generateResolvers = makeGraphCodegenPipeline({
-  codeGenerator: generateResolversFile,
-  pathGenerator: resolversFilePath,
+  generatorPairs: [resolversCodegenPair],
 });
 
 export default cliRunWrapper(generateResolvers);

@@ -26,7 +26,6 @@ export type CommonCodegenOptions = {
   stdout?: boolean;
 };
 
-// TODO: Move to common.
 export function generateCodeChunks(
   groups: ReadonlyArray<CodeGroup>,
 ): ReadonlyArray<string> {
@@ -49,7 +48,6 @@ export function generateCodeChunks(
   );
 }
 
-// TODO: Move to common.
 export async function formatOutput(codeOutput: string): Promise<string> {
   const prettierConfigExplorer = cosmiconfig('prettier');
 
@@ -73,8 +71,22 @@ export async function formatOutput(codeOutput: string): Promise<string> {
   });
 }
 
+export function nodeGroupGeneratorMaker<T>(
+  linker: (filePath: string, fileGraph: ParsedFileGraph) => T,
+  nodeGenerator: (contents: T) => ReadonlyArray<CodeGroup>,
+) {
+  return function nodeGroupGenerator(
+    filePath: string,
+    fileGraph: ParsedFileGraph,
+  ): ReadonlyArray<CodeGroup> {
+    const fileContents = linker(filePath, fileGraph);
+
+    return nodeGenerator(fileContents);
+  };
+}
+
 export function codegenPipelineMaker(
-  nodeGroupMaker: (
+  nodeGroupGenerator: (
     filePath: string,
     fileGraph: ParsedFileGraph,
   ) => ReadonlyArray<CodeGroup>,
@@ -84,7 +96,7 @@ export function codegenPipelineMaker(
     filePath: string,
     fileGraph: ParsedFileGraph,
   ) {
-    const nodeGroups = nodeGroupMaker(filePath, fileGraph);
+    const nodeGroups = nodeGroupGenerator(filePath, fileGraph);
 
     let generatedCode: string;
     if (headerText) {
@@ -99,14 +111,15 @@ export function codegenPipelineMaker(
   };
 }
 
+export type GeneratorPair = [
+  (filePath: string, fileGraph: ParsedFileGraph) => Promise<string>,
+  (schemaFilePath: string) => string
+];
+
 export function makeGraphCodegenPipeline(opts: {
-  codeGenerator: (
-    filePath: string,
-    fileGraph: ParsedFileGraph,
-  ) => Promise<string>;
-  pathGenerator: (schemaFilePath: string) => string;
+  generatorPairs: GeneratorPair[];
 }) {
-  const { codeGenerator, pathGenerator } = opts;
+  const { generatorPairs } = opts;
 
   return async function codegenPipeline(options: CommonCodegenOptions) {
     let fullInputFilePath: string = path.join(process.cwd(), 'schema.gql');
@@ -119,40 +132,52 @@ export function makeGraphCodegenPipeline(opts: {
     }
 
     const filesOutput: { [key: string]: string } = {};
-    const parsedFileGraph = await parseFileGraph(fullInputFilePath);
 
-    // Generate the base file and check other files to generate by checking
-    // the recursive option.
-    const baseGenerator = async () => {
-      filesOutput[fullInputFilePath] = await codeGenerator(
-        fullInputFilePath,
-        parsedFileGraph,
+    // Generate all the files based on the pairs.
+    const codegenPromises = generatorPairs.map(
+      async ([codeGenerator, pathGenerator]) => {
+        const outputFilePath = pathGenerator(fullInputFilePath);
+        const parsedFileGraph = await parseFileGraph(fullInputFilePath);
+
+        // Generate the base file and check other files to generate by checking
+        // the recursive option.
+        const baseGenerator = async () => {
+          filesOutput[outputFilePath] = await codeGenerator(
+            fullInputFilePath,
+            parsedFileGraph,
+          );
+        };
+
+        // On recursive mode, generate code for all the extra files in the
+        // file graph.
+        let extraGenerators: Promise<void>[] = [];
+        if (options.recursive) {
+          extraGenerators = [...parsedFileGraph.keys()].map(async fullPath => {
+            const typesFilePathname = pathGenerator(fullPath);
+
+            filesOutput[typesFilePathname] = await codeGenerator(
+              fullPath,
+              parsedFileGraph,
+            );
+          });
+        }
+
+        await Promise.all([baseGenerator(), ...extraGenerators]);
+
+        if (options.stdout && !options.recursive) {
+          console.log(filesOutput[outputFilePath]);
+        }
+      },
+    );
+
+    await Promise.all(codegenPromises);
+
+    if (!options.stdout) {
+      const writePromises = Object.entries(filesOutput).map(
+        ([path, contents]) => fs.promises.writeFile(path, contents),
       );
-    };
 
-    let extraGenerators: Promise<void>[] = [];
-    if (options.recursive) {
-      extraGenerators = Object.entries(filesOutput).map(
-        async ([fullPath, contents]) => {
-          const typesFilePathname = pathGenerator(fullPath);
-
-          await fs.promises.writeFile(typesFilePathname, contents);
-        },
-      );
-    }
-
-    await Promise.all([baseGenerator(), ...extraGenerators]);
-
-    if (options.stdout && !options.recursive) {
-      console.log(filesOutput[fullInputFilePath]);
-    } else {
-      await Promise.all(
-        Object.entries(filesOutput).map(async ([fullPath, contents]) => {
-          const typesFilePathname = pathGenerator(fullPath);
-
-          await fs.promises.writeFile(typesFilePathname, contents);
-        }),
-      );
+      await writePromises;
     }
   };
 }

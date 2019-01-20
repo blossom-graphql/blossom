@@ -14,6 +14,8 @@ import { cliRunWrapper } from '../../lib/runtime';
 import {
   codegenPipelineMaker,
   makeGraphCodegenPipeline,
+  nodeGroupGeneratorMaker,
+  GeneratorPair,
 } from '../../lib/cmd/codegen/common';
 
 const HEADER_TEXT = `/**
@@ -22,15 +24,16 @@ const HEADER_TEXT = `/**
 * DO NOT MODIFY UNLESS YOU KNOW WHAT YOU ARE DOING.
 */`;
 
-const generateTypesFile = codegenPipelineMaker((filePath, fileGraph) => {
-  const linkedTypesFile = linkTypesFile(filePath, fileGraph);
-
-  return generateTypesFileNodes(linkedTypesFile);
-}, HEADER_TEXT);
+export const typesCodegenPair: GeneratorPair = [
+  codegenPipelineMaker(
+    nodeGroupGeneratorMaker(linkTypesFile, generateTypesFileNodes),
+    HEADER_TEXT,
+  ),
+  typesFilePath,
+];
 
 export const generateTypes = makeGraphCodegenPipeline({
-  codeGenerator: generateTypesFile,
-  pathGenerator: typesFilePath,
+  generatorPairs: [typesCodegenPair],
 });
 
 export default cliRunWrapper(generateTypes);
