@@ -102,6 +102,13 @@ export type SourcesFileContents = {
   }[];
 };
 
+export type ResolversFileContents = {
+  kind: 'ResolversFile';
+  fileImports: ImportGroupMap;
+  vendorImports: ImportGroupMap;
+  typeDeclarations: ObjectTypeDescriptor[];
+};
+
 export function addImport(
   importGroupMap: ImportGroupMap,
   kind: 'VendorImport' | 'FileImport',
@@ -157,7 +164,8 @@ export enum PresenceResult {
 export enum LinkingType {
   TypesFile = 'TypesFile',
   RootFile = 'RootFile',
-  LoadersFile = 'LoadersFile',
+  SourcesFile = 'SourcesFile',
+  ResolversFile = 'ResolversFile',
 }
 
 export type OriginDescription =
@@ -920,16 +928,21 @@ export function addSourcesFileImports(
     CORE_PACKAGE_NAME,
     PRIME_NAME,
   );
+}
 
-  // For each of the fields import the definition from types file
-  // result.batchFnDeclarations.forEach(loaderDescriptor => {
-  //   addImport(
-  //     result.fileImports,
-  //     'FileImport',
-  //     typesFilePath(linkingContext.filePath),
-  //     referencedTypeName(loaderDescriptor.objectDescriptor.name),
-  //   );
-  // });
+export function addResolversFileImports(
+  result: ResolversFileContents,
+  linkingContext: LinkingContext,
+) {
+  // For each of the types import the definition from types file
+  result.typeDeclarations.forEach(objectDescriptor => {
+    addImport(
+      result.fileImports,
+      'FileImport',
+      typesFilePath(linkingContext.filePath),
+      referencedTypeName(objectDescriptor.name),
+    );
+  });
 }
 
 export function linkTypesFile(
@@ -1144,7 +1157,7 @@ export function linkSourcesFile(
     filePath,
     fileGraph,
     kind: OriginKind.Object,
-    linkingType: LinkingType.LoadersFile,
+    linkingType: LinkingType.SourcesFile,
     parsedFile,
     referenceMap: new Map(),
   };
@@ -1177,6 +1190,46 @@ export function linkSourcesFile(
   }
 
   addSourcesFileImports(result, linkingContext);
+
+  return result;
+}
+
+export function linkResolversFile(
+  filePath: string,
+  fileGraph: ParsedFileGraph,
+): ResolversFileContents {
+  const parsedFile = fileGraph.get(filePath);
+  if (!parsedFile) {
+    throw new FileNotFoundInGraph(filePath);
+  }
+
+  const result: ResolversFileContents = {
+    kind: 'ResolversFile',
+    fileImports: new Map(),
+    vendorImports: new Map(),
+    typeDeclarations: [],
+  };
+
+  const linkingContext: LinkingContext = {
+    filePath,
+    fileGraph,
+    kind: OriginKind.Object,
+    linkingType: LinkingType.ResolversFile,
+    parsedFile,
+    referenceMap: new Map(),
+  };
+
+  // Immediately exclude if it's a root type
+  [...parsedFile.parsedDocument.objects.values()].forEach(objectDescriptor => {
+    // Immediately exclude if it's a root type
+    if (isRootType(objectDescriptor.name, linkingContext)) {
+      return;
+    }
+
+    result.typeDeclarations.push(objectDescriptor);
+  });
+
+  addResolversFileImports(result, linkingContext);
 
   return result;
 }

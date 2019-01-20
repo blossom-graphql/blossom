@@ -32,6 +32,7 @@ import {
   QUERY_SIGNATURE_NAME,
   OBJECT_SIGNATURE_NAME,
   SourcesFileContents,
+  ResolversFileContents,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -738,5 +739,22 @@ export function generateSourcesFileNodes(
     { spacing: 0, nodes: vendorImports },
     { spacing: 0, nodes: fileImports },
     { spacing: 1, nodes: batchFnStatements },
+  ];
+}
+
+export function generateResolversFileNodes(
+  contents: ResolversFileContents,
+): ReadonlyArray<CodeGroup> {
+  const vendorImports = [...contents.vendorImports.values()].map(
+    createImportDeclaration,
+  );
+
+  const fileImports = [...contents.fileImports.values()].map(
+    createImportDeclaration,
+  );
+
+  return [
+    { spacing: 0, nodes: vendorImports },
+    { spacing: 0, nodes: fileImports },
   ];
 }

@@ -37,12 +37,12 @@ export function rootFilePath(schemaFilePath: string): string {
   return createDotName(schemaFilePath, 'root');
 }
 
-export function resolversFilePath(schemaFilePath: string): string {
-  return createDotName(schemaFilePath, 'resolvers');
-}
-
 export function sourcesFilePath(schemaFilePath: string): string {
   return createDotName(schemaFilePath, 'sources');
+}
+
+export function resolversFilePath(schemaFilePath: string): string {
+  return createDotName(schemaFilePath, 'resolvers');
 }
 
 export function blossomInstancePath(): string {
