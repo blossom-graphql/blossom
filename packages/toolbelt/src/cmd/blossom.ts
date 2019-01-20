@@ -17,6 +17,10 @@ program
   .alias('s');
 
 program
+  .command('bootstrap', 'Bootstraps a new Blossom project from a template.')
+  .alias('b');
+
+program
   .command('codegen', 'General utility for automatic code generation.')
   .alias('cg');
 
