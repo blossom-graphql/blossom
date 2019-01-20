@@ -108,7 +108,7 @@ export function generateResolverFunctionArguments(
       undefined,
       undefined,
       undefined,
-      ts.createIdentifier('context'),
+      ts.createIdentifier('ctx'),
       undefined,
       ts.createTypeReferenceNode(
         ts.createIdentifier('RequestContext'),
