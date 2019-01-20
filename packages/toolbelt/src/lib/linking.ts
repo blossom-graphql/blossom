@@ -904,7 +904,7 @@ export function addRootFileImports(
 
 export function addLoadersFileImports(
   result: LoadersFileContents,
-  linkingContext: LinkingContext,
+  _linkingContext: LinkingContext,
 ) {
   // Loaders signatures should always import maybe and prime.
   addImport(
@@ -922,19 +922,14 @@ export function addLoadersFileImports(
   );
 
   // For each of the fields import the definition from types file
-  result.batchFnDeclarations.forEach(loaderDescriptor => {
-    loaderDescriptor.idFields.forEach(fieldDescriptor => {
-      const outputType = outputBaseType(fieldDescriptor);
-      if (outputType.kind === 'ReferencedType') {
-        addImport(
-          result.fileImports,
-          'FileImport',
-          typesFilePath(linkingContext.filePath),
-          referencedTypeName(outputType),
-        );
-      }
-    });
-  });
+  // result.batchFnDeclarations.forEach(loaderDescriptor => {
+  //   addImport(
+  //     result.fileImports,
+  //     'FileImport',
+  //     typesFilePath(linkingContext.filePath),
+  //     referencedTypeName(loaderDescriptor.objectDescriptor.name),
+  //   );
+  // });
 }
 
 export function linkTypesFile(
