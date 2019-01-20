@@ -41,8 +41,8 @@ export function resolversFilePath(schemaFilePath: string): string {
   return createDotName(schemaFilePath, 'resolvers');
 }
 
-export function loadersFilePath(schemaFilePath: string): string {
-  return createDotName(schemaFilePath, 'loaders');
+export function sourcesFilePath(schemaFilePath: string): string {
+  return createDotName(schemaFilePath, 'sources');
 }
 
 export function blossomInstancePath(): string {

@@ -8,7 +8,11 @@
 
 import { camelCase, upperFirst } from 'lodash';
 
-import { OperationFieldDescriptor, FieldDescriptor } from './parsing';
+import {
+  OperationFieldDescriptor,
+  FieldDescriptor,
+  ObjectTypeDescriptor,
+} from './parsing';
 import { SupportedOperation, ReferencedTypeDescriptor } from './parsing';
 
 export function referencedTypeName(
@@ -59,4 +63,15 @@ export function signatureName(
   if (descriptor.hasOwnProperty('operation')) {
     descriptor;
   }
+}
+
+export function loaderName(
+  objectDescriptor: ObjectTypeDescriptor,
+  fieldDescriptor: FieldDescriptor,
+) {
+  return (
+    camelCase(objectDescriptor.name) +
+    'By' +
+    upperFirst(camelCase(fieldDescriptor.name))
+  );
 }

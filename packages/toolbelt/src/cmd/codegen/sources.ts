@@ -6,8 +6,8 @@
  *
  */
 
-import { generateLoadersFileNodes } from '../../lib/codegen';
-import { loadersFilePath } from '../../lib/paths';
+import { generateSourcesFileNodes } from '../../lib/codegen';
+import { sourcesFilePath } from '../../lib/paths';
 import { linkLoadersFile } from '../../lib/linking';
 import { cliRunWrapper } from '../../lib/runtime';
 import {
@@ -15,16 +15,16 @@ import {
   codegenPipelineMaker,
 } from '../../lib/cmd/codegen/common';
 
-const generateLoaderFile = codegenPipelineMaker((filePath, fileGraph) => {
+const generateSourcesFile = codegenPipelineMaker((filePath, fileGraph) => {
   const linkedLoaderFile = linkLoadersFile(filePath, fileGraph);
 
   // Generate file
-  return generateLoadersFileNodes(linkedLoaderFile);
+  return generateSourcesFileNodes(linkedLoaderFile);
 });
 
-export const generateLoaders = makeGraphCodegenPipeline({
-  codeGenerator: generateLoaderFile,
-  pathGenerator: loadersFilePath,
+export const generateSources = makeGraphCodegenPipeline({
+  codeGenerator: generateSourcesFile,
+  pathGenerator: sourcesFilePath,
 });
 
-export default cliRunWrapper(generateLoaders);
+export default cliRunWrapper(generateSources);

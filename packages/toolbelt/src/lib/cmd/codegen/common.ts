@@ -9,14 +9,14 @@
 import fs from 'fs';
 import path from 'path';
 
+import ts from 'typescript';
+import cosmiconfig from 'cosmiconfig';
+import prettier from 'prettier';
+
 import { appPath } from '../../paths';
 import { parseFileGraph, ParsedFileGraph } from '../../parsing';
-import {
-  generateCodeChunks,
-  CODE_GROUP_SPACING,
-  formatOutput,
-  CodeGroup,
-} from '../../codegen';
+import { CODE_GROUP_SPACING, CodeGroup } from '../../codegen';
+import { repeatChar } from '../../utils';
 
 export type CommonCodegenOptions = {
   file?: string;
@@ -25,6 +25,53 @@ export type CommonCodegenOptions = {
   stdin?: boolean;
   stdout?: boolean;
 };
+
+// TODO: Move to common.
+export function generateCodeChunks(
+  groups: ReadonlyArray<CodeGroup>,
+): ReadonlyArray<string> {
+  const sourceFile = ts.createSourceFile(
+    'output.ts',
+    '',
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS,
+  );
+
+  const printer = ts.createPrinter({
+    newLine: ts.NewLineKind.LineFeed,
+  });
+
+  return groups.map(nodeGroup =>
+    nodeGroup.nodes
+      .map(node => printer.printNode(ts.EmitHint.Unspecified, node, sourceFile))
+      .join(repeatChar('\n', nodeGroup.spacing + 1)),
+  );
+}
+
+// TODO: Move to common.
+export async function formatOutput(codeOutput: string): Promise<string> {
+  const prettierConfigExplorer = cosmiconfig('prettier');
+
+  let prettierConfig: any = {};
+
+  try {
+    const result = await prettierConfigExplorer.search();
+
+    if (result && !result.isEmpty) {
+      prettierConfig = result.config;
+    }
+  } catch (error) {
+    // Prettier settings not found. Do anything to code.
+    // TODO: Logging.
+    return codeOutput;
+  }
+
+  return prettier.format(codeOutput, {
+    parser: 'typescript',
+    ...prettierConfig,
+  });
+}
 
 export function codegenPipelineMaker(
   nodeGroupMaker: (

@@ -9,10 +9,9 @@
 import path from 'path';
 
 import ts from 'typescript';
-import { camelCase, upperFirst } from 'lodash';
+import { camelCase, flatMap, upperFirst } from 'lodash';
 import wrap from 'word-wrap';
-import cosmiconfig from 'cosmiconfig';
-import prettier from 'prettier';
+import pluralize from 'pluralize';
 
 import {
   FieldDescriptor,
@@ -39,8 +38,9 @@ import {
   resolverSignatureName,
   rootResolverName,
   resolverName,
+  loaderName,
 } from './naming';
-import { repeatChar } from './utils';
+import { SOURCE_COMMENT } from './cmd/codegen/comments';
 
 export const CODE_GROUP_SPACING = '\n\n';
 const GRAPHQL_TYPENAME_FIELD = '__typename';
@@ -681,7 +681,7 @@ export function generateRootFileNodes(
   ];
 }
 
-export function generateLoadersFileNodes(
+export function generateSourcesFileNodes(
   contents: LoadersFileContents,
 ): ReadonlyArray<CodeGroup> {
   const vendorImports = [...contents.vendorImports.values()].map(
@@ -692,55 +692,51 @@ export function generateLoadersFileNodes(
     createImportDeclaration,
   );
 
+  const batchFnStatements = flatMap(
+    contents.batchFnDeclarations,
+    declaration => {
+      return declaration.idFields.map(fieldDescriptor => {
+        const exceptionExpression = ts.createThrow(
+          ts.createNew(ts.createIdentifier('Error'), undefined, [
+            ts.createStringLiteral('Not implemented.'),
+          ]),
+        );
+        preprendComments(exceptionExpression, SOURCE_COMMENT);
+
+        return ts.createFunctionDeclaration(
+          undefined,
+          [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+          undefined,
+          ts.createIdentifier(
+            loaderName(declaration.objectDescriptor, fieldDescriptor),
+          ),
+          undefined,
+          [
+            ts.createParameter(
+              undefined,
+              undefined,
+              undefined,
+              ts.createIdentifier(pluralize.plural(fieldDescriptor.name)),
+              undefined,
+              ts.createTypeReferenceNode(ts.createIdentifier('ReadonlyArray'), [
+                generateTerminalTypeNode(fieldDescriptor),
+              ]),
+            ),
+          ],
+          ts.createTypeReferenceNode(ts.createIdentifier('ReadonlyArray'), [
+            ts.createTypeReferenceNode(ts.createIdentifier('Maybe'), [
+              ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+            ]),
+          ]),
+          ts.createBlock([exceptionExpression]),
+        );
+      });
+    },
+  );
+
   return [
     { spacing: 0, nodes: vendorImports },
     { spacing: 0, nodes: fileImports },
+    { spacing: 1, nodes: batchFnStatements },
   ];
-}
-
-// TODO: Move to common.
-export function generateCodeChunks(
-  groups: ReadonlyArray<CodeGroup>,
-): ReadonlyArray<string> {
-  const sourceFile = ts.createSourceFile(
-    'output.ts',
-    '',
-    ts.ScriptTarget.Latest,
-    false,
-    ts.ScriptKind.TS,
-  );
-
-  const printer = ts.createPrinter({
-    newLine: ts.NewLineKind.LineFeed,
-  });
-
-  return groups.map(nodeGroup =>
-    nodeGroup.nodes
-      .map(node => printer.printNode(ts.EmitHint.Unspecified, node, sourceFile))
-      .join(repeatChar('\n', nodeGroup.spacing + 1)),
-  );
-}
-
-// TODO: Move to common.
-export async function formatOutput(codeOutput: string): Promise<string> {
-  const prettierConfigExplorer = cosmiconfig('prettier');
-
-  let prettierConfig: any = {};
-
-  try {
-    const result = await prettierConfigExplorer.search();
-
-    if (result && !result.isEmpty) {
-      prettierConfig = result.config;
-    }
-  } catch (error) {
-    // Prettier settings not found. Do anything to code.
-    // TODO: Logging.
-    return codeOutput;
-  }
-
-  return prettier.format(codeOutput, {
-    parser: 'typescript',
-    ...prettierConfig,
-  });
 }

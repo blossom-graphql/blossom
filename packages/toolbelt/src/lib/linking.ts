@@ -96,7 +96,7 @@ export type LoadersFileContents = {
   kind: 'LoadersFile';
   fileImports: ImportGroupMap;
   vendorImports: ImportGroupMap;
-  loaderDeclarations: {
+  batchFnDeclarations: {
     objectDescriptor: ObjectTypeDescriptor;
     idFields: FieldDescriptor[];
   }[];
@@ -922,7 +922,7 @@ export function addLoadersFileImports(
   );
 
   // For each of the fields import the definition from types file
-  result.loaderDeclarations.forEach(loaderDescriptor => {
+  result.batchFnDeclarations.forEach(loaderDescriptor => {
     loaderDescriptor.idFields.forEach(fieldDescriptor => {
       const outputType = outputBaseType(fieldDescriptor);
       if (outputType.kind === 'ReferencedType') {
@@ -1142,7 +1142,7 @@ export function linkLoadersFile(
     kind: 'LoadersFile',
     fileImports: new Map(),
     vendorImports: new Map(),
-    loaderDeclarations: [],
+    batchFnDeclarations: [],
   };
 
   const linkingContext: LinkingContext = {
@@ -1169,7 +1169,7 @@ export function linkLoadersFile(
     );
 
     if (idFields.length > 0) {
-      result.loaderDeclarations.push({
+      result.batchFnDeclarations.push({
         objectDescriptor,
         idFields,
       });
@@ -1177,7 +1177,7 @@ export function linkLoadersFile(
   });
 
   // Enforce that the file must have at least one import.
-  if (result.loaderDeclarations.length === 0) {
+  if (result.batchFnDeclarations.length === 0) {
     throw new LinkingError([[0, new EmptyLoadersFileError(filePath)]]);
   }
 
