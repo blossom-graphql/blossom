@@ -8,7 +8,7 @@
 
 import { generateSourcesFileNodes } from '../../lib/codegen';
 import { sourcesFilePath } from '../../lib/paths';
-import { linkLoadersFile } from '../../lib/linking';
+import { linkSourcesFile } from '../../lib/linking';
 import { cliRunWrapper } from '../../lib/runtime';
 import {
   makeGraphCodegenPipeline,
@@ -16,7 +16,7 @@ import {
 } from '../../lib/cmd/codegen/common';
 
 const generateSourcesFile = codegenPipelineMaker((filePath, fileGraph) => {
-  const linkedLoaderFile = linkLoadersFile(filePath, fileGraph);
+  const linkedLoaderFile = linkSourcesFile(filePath, fileGraph);
 
   // Generate file
   return generateSourcesFileNodes(linkedLoaderFile);

@@ -92,8 +92,8 @@ export type RootFileContents = {
   operationDeclarations: OperationFieldDescriptor[];
 };
 
-export type LoadersFileContents = {
-  kind: 'LoadersFile';
+export type SourcesFileContents = {
+  kind: 'SourcesFile';
   fileImports: ImportGroupMap;
   vendorImports: ImportGroupMap;
   batchFnDeclarations: {
@@ -902,8 +902,8 @@ export function addRootFileImports(
   });
 }
 
-export function addLoadersFileImports(
-  result: LoadersFileContents,
+export function addSourcesFileImports(
+  result: SourcesFileContents,
   _linkingContext: LinkingContext,
 ) {
   // Loaders signatures should always import maybe and prime.
@@ -1124,17 +1124,17 @@ export function linkRootFile(
   return result;
 }
 
-export function linkLoadersFile(
+export function linkSourcesFile(
   filePath: string,
   fileGraph: ParsedFileGraph,
-): LoadersFileContents {
+): SourcesFileContents {
   const parsedFile = fileGraph.get(filePath);
   if (!parsedFile) {
     throw new FileNotFoundInGraph(filePath);
   }
 
-  const result: LoadersFileContents = {
-    kind: 'LoadersFile',
+  const result: SourcesFileContents = {
+    kind: 'SourcesFile',
     fileImports: new Map(),
     vendorImports: new Map(),
     batchFnDeclarations: [],
@@ -1176,7 +1176,7 @@ export function linkLoadersFile(
     throw new LinkingError([[0, new EmptyLoadersFileError(filePath)]]);
   }
 
-  addLoadersFileImports(result, linkingContext);
+  addSourcesFileImports(result, linkingContext);
 
   return result;
 }

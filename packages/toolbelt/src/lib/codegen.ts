@@ -31,7 +31,7 @@ import {
   MUTATION_SIGNATURE_NAME,
   QUERY_SIGNATURE_NAME,
   OBJECT_SIGNATURE_NAME,
-  LoadersFileContents,
+  SourcesFileContents,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -682,7 +682,7 @@ export function generateRootFileNodes(
 }
 
 export function generateSourcesFileNodes(
-  contents: LoadersFileContents,
+  contents: SourcesFileContents,
 ): ReadonlyArray<CodeGroup> {
   const vendorImports = [...contents.vendorImports.values()].map(
     createImportDeclaration,
