@@ -39,6 +39,7 @@ import {
   CORE_BATCHFN_NAME,
   MAYBE_NAME,
   CORE_RESOLVER_NAME,
+  CORE_CONTEXT_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -198,6 +199,10 @@ export function generateFunctionTypeNode(
   return ts.createTypeReferenceNode(ts.createIdentifier(signatureName), [
     ts.createTypeLiteralNode(members),
     getOutputType(terminalType, isAsync),
+    ts.createTypeReferenceNode(
+      ts.createIdentifier(CORE_CONTEXT_NAME),
+      undefined,
+    ),
   ]);
 }
 

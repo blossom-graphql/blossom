@@ -803,12 +803,12 @@ export function addCommonVendorImports(
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
   //   be included.
   if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      GRAPHQL_PACKAGE_NAME,
-      'GraphQLResolveInfo',
-    );
+    // addImport(
+    //   result.vendorImports,
+    //   'VendorImport',
+    //   GRAPHQL_PACKAGE_NAME,
+    //   'GraphQLResolveInfo',
+    // );
 
     addImport(
       result.fileImports,
