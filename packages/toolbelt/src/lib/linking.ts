@@ -33,7 +33,7 @@ import {
 } from './errors';
 import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
 import {
-  resolverSignatureName,
+  rootResolverSignatureName,
   resolverName,
   referencedTypeName,
 } from './naming';
@@ -42,8 +42,10 @@ export const GRAPHQL_PACKAGE_NAME = 'graphql';
 export const CORE_PACKAGE_NAME = '@blossom-gql/core';
 export const CORE_RESOLVE_NAME = 'resolve';
 export const CORE_CONTEXT_NAME = 'RequestContext';
-export const CORE_ROOT_QUERY_NAME = 'RootQuery';
-export const CORE_ROOT_MUTATION_NAME = 'RootMutation';
+export const CORE_BATCHFN_NAME = 'BatchFunction';
+export const CORE_RESOLVER_NAME = 'Resolver';
+export const INSTANCE_ROOT_QUERY_NAME = 'RootQuery';
+export const INSTANCE_ROOT_MUTATION_NAME = 'RootMutation';
 export const MAYBE_NAME = 'Maybe';
 export const PRIME_NAME = 'prime';
 
@@ -919,7 +921,7 @@ export function addRootFileImports(
       result.fileImports,
       'FileImport',
       blossomInstancePath(),
-      CORE_ROOT_QUERY_NAME,
+      INSTANCE_ROOT_QUERY_NAME,
     );
 
   if (result.dependencyFlags.get(DependencyFlag.HasRootMutation))
@@ -927,7 +929,7 @@ export function addRootFileImports(
       result.fileImports,
       'FileImport',
       blossomInstancePath(),
-      CORE_ROOT_MUTATION_NAME,
+      INSTANCE_ROOT_MUTATION_NAME,
     );
 
   // 3. Add dependencies coming from other files.
@@ -939,7 +941,7 @@ export function addRootFileImports(
       result.fileImports,
       'FileImport',
       typesFilePath(linkingContext.filePath),
-      resolverSignatureName(operationFieldDescriptor),
+      rootResolverSignatureName(operationFieldDescriptor),
     );
 
     const outputType = outputBaseType(operationFieldDescriptor);
@@ -972,12 +974,26 @@ export function addSourcesFileImports(
     CORE_PACKAGE_NAME,
     PRIME_NAME,
   );
+
+  addImport(
+    result.vendorImports,
+    'VendorImport',
+    CORE_PACKAGE_NAME,
+    CORE_BATCHFN_NAME,
+  );
 }
 
 export function addResolversFileImports(
   result: ResolversFileContents,
   linkingContext: LinkingContext,
 ) {
+  addImport(
+    result.vendorImports,
+    'VendorImport',
+    CORE_PACKAGE_NAME,
+    CORE_RESOLVER_NAME,
+  );
+
   // For each of the types import the definition from types file
   result.typeDeclarations.forEach(objectDescriptor => {
     addImport(

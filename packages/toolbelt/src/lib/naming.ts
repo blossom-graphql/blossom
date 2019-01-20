@@ -35,22 +35,18 @@ export function operationName(operation: SupportedOperation) {
   }
 }
 
-export function resolverSignatureName({
+export function rootResolverSignatureName({
   fieldDescriptor: descriptor,
   operation,
 }: OperationFieldDescriptor): string {
-  return (
-    upperFirst(camelCase(descriptor.name)) +
-    operationName(operation) +
-    'Resolver'
-  );
+  return upperFirst(camelCase(descriptor.name)) + operationName(operation);
 }
 
 export function rootResolverName({
   fieldDescriptor: descriptor,
   operation,
 }: OperationFieldDescriptor): string {
-  return camelCase(descriptor.name) + operationName(operation) + 'Resolver';
+  return camelCase(descriptor.name) + 'Root' + operationName(operation);
 }
 
 export function resolverName(gqlTypeName: string): string {

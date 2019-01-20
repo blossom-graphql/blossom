@@ -34,12 +34,15 @@ import {
   SourcesFileContents,
   ResolversFileContents,
   CORE_RESOLVE_NAME,
-  CORE_ROOT_QUERY_NAME,
-  CORE_ROOT_MUTATION_NAME,
+  INSTANCE_ROOT_QUERY_NAME,
+  INSTANCE_ROOT_MUTATION_NAME,
+  CORE_BATCHFN_NAME,
+  MAYBE_NAME,
+  CORE_RESOLVER_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
-  resolverSignatureName,
+  rootResolverSignatureName,
   rootResolverName,
   resolverName,
   loaderName,
@@ -47,7 +50,6 @@ import {
 } from './naming';
 import {
   SOURCE_COMMENT,
-  RESOLVER_ATTRIBUTES_COMMENT,
   RESOLVER_OTHER_PROPS_COMMENT,
   RESOLVER_COMMENTS,
   RESOLVER_TYPENAME_COMMENT,
@@ -87,14 +89,12 @@ export function createMockLiteral(
 export function generateArgumentsTypeLiteral(
   args: ReadonlyArray<FieldDescriptor> | undefined,
 ): ts.ParameterDeclaration {
-  const name = ts.createIdentifier('args');
-
   if (!args || args.length === 0) {
     return ts.createParameter(
       undefined,
       undefined,
       undefined,
-      name,
+      ts.createIdentifier('_args'),
       undefined,
       ts.createTypeLiteralNode([]),
     );
@@ -104,7 +104,7 @@ export function generateArgumentsTypeLiteral(
     undefined,
     undefined,
     undefined,
-    name,
+    ts.createIdentifier('args'),
     undefined,
     ts.createTypeLiteralNode(args.map(generateTypeElement)),
   );
@@ -176,7 +176,6 @@ export function generateFunctionTypeNode(
     );
 
   let signatureName: string;
-
   switch (operation) {
     case SupportedOperation.Mutation:
       signatureName = MUTATION_SIGNATURE_NAME;
@@ -251,7 +250,9 @@ export function wrapInOptionalType(
   if (required) {
     return typeNode;
   } else {
-    return ts.createTypeReferenceNode(ts.createIdentifier('Maybe'), [typeNode]);
+    return ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [
+      typeNode,
+    ]);
   }
 }
 
@@ -461,7 +462,7 @@ export function generateResolverSignatureDeclaration(
   const declaration = ts.createTypeAliasDeclaration(
     undefined,
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-    ts.createIdentifier(resolverSignatureName(descriptor)),
+    ts.createIdentifier(rootResolverSignatureName(descriptor)),
     undefined,
     functionTypeNode,
   );
@@ -669,7 +670,9 @@ export function generateRootFileNodes(
             ts.createVariableDeclaration(
               ts.createIdentifier(name),
               ts.createTypeReferenceNode(
-                ts.createIdentifier(resolverSignatureName(operationDescriptor)),
+                ts.createIdentifier(
+                  rootResolverSignatureName(operationDescriptor),
+                ),
                 undefined,
               ),
               functionExpression,
@@ -682,10 +685,10 @@ export function generateRootFileNodes(
       let operationRegistrationFunctionName: string;
       switch (operationDescriptor.operation) {
         case SupportedOperation.Query:
-          operationRegistrationFunctionName = CORE_ROOT_QUERY_NAME;
+          operationRegistrationFunctionName = INSTANCE_ROOT_QUERY_NAME;
           break;
         case SupportedOperation.Mutation:
-          operationRegistrationFunctionName = CORE_ROOT_MUTATION_NAME;
+          operationRegistrationFunctionName = INSTANCE_ROOT_MUTATION_NAME;
           break;
         default:
           throw new Error(
@@ -738,6 +741,18 @@ export function generateSourcesFileNodes(
     contents.batchFnDeclarations,
     declaration => {
       return declaration.idFields.map(fieldDescriptor => {
+        const name = loaderName(declaration.objectDescriptor, fieldDescriptor);
+
+        const loaderSignature = ts.createTypeReferenceNode(
+          ts.createIdentifier(CORE_BATCHFN_NAME),
+          [
+            generateTerminalTypeNode(fieldDescriptor),
+            ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [
+              ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+            ]),
+          ],
+        );
+
         const exceptionExpression = ts.createThrow(
           ts.createNew(ts.createIdentifier('Error'), undefined, [
             ts.createStringLiteral('Not implemented.'),
@@ -745,13 +760,10 @@ export function generateSourcesFileNodes(
         );
         preprendComments(exceptionExpression, SOURCE_COMMENT);
 
-        return ts.createFunctionDeclaration(
+        const functionExpression = ts.createFunctionExpression(
+          [ts.createModifier(ts.SyntaxKind.AsyncKeyword)],
           undefined,
-          [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-          undefined,
-          ts.createIdentifier(
-            loaderName(declaration.objectDescriptor, fieldDescriptor),
-          ),
+          ts.createIdentifier(name),
           undefined,
           [
             ts.createParameter(
@@ -760,17 +772,25 @@ export function generateSourcesFileNodes(
               undefined,
               ts.createIdentifier(pluralize.plural(fieldDescriptor.name)),
               undefined,
-              ts.createTypeReferenceNode(ts.createIdentifier('ReadonlyArray'), [
-                generateTerminalTypeNode(fieldDescriptor),
-              ]),
+              undefined,
             ),
           ],
-          ts.createTypeReferenceNode(ts.createIdentifier('ReadonlyArray'), [
-            ts.createTypeReferenceNode(ts.createIdentifier('Maybe'), [
-              ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-            ]),
-          ]),
+          undefined,
           ts.createBlock([exceptionExpression]),
+        );
+
+        return ts.createVariableStatement(
+          [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+          ts.createVariableDeclarationList(
+            [
+              ts.createVariableDeclaration(
+                ts.createIdentifier(name),
+                loaderSignature, // TODO
+                functionExpression,
+              ),
+            ],
+            ts.NodeFlags.Const,
+          ),
         );
       });
     },
@@ -797,15 +817,25 @@ export function generateResolversFileNodes(
   const resolverStatements = contents.typeDeclarations.map(objectDescriptor => {
     const functionName = resolverName(objectDescriptor.name);
 
+    const resolverSignature = ts.createTypeReferenceNode(
+      ts.createIdentifier(CORE_RESOLVER_NAME),
+      [
+        ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+        ts.createTypeReferenceNode(
+          ts.createIdentifier(referencedTypeName(objectDescriptor.name)),
+          undefined,
+        ),
+      ],
+    );
+
     const attributesParameter = ts.createParameter(
       undefined,
       undefined,
       undefined,
       ts.createIdentifier('attributes'),
       undefined,
-      ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+      undefined,
     );
-    preprendComments(attributesParameter, RESOLVER_ATTRIBUTES_COMMENT);
 
     const commentsStatement = ts.createEmptyStatement();
     preprendComments(commentsStatement, RESOLVER_COMMENTS);
@@ -827,17 +857,14 @@ export function generateResolversFileNodes(
         [
           ts.createVariableDeclaration(
             ts.createIdentifier(functionName),
-            undefined, // TODO: Change to resolver signature
+            resolverSignature, // TODO: Change to resolver signature
             ts.createFunctionExpression(
               undefined,
               undefined,
               ts.createIdentifier(functionName),
               undefined,
               [attributesParameter],
-              ts.createTypeReferenceNode(
-                referencedTypeName(objectDescriptor.name),
-                undefined,
-              ),
+              undefined,
               ts.createBlock([
                 commentsStatement,
                 ts.createReturn(

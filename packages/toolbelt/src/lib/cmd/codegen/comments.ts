@@ -78,10 +78,6 @@ export const RESOLVER_TYPENAME_COMMENT = comment`
 Must always be present.
 `;
 
-export const RESOLVER_ATTRIBUTES_COMMENT = comment`
-TODO: Change this to the type of your data source.
-`;
-
 export const RESOLVER_COMMENTS = comment`
 A resolver is a function that maps the elements from the data source to
 the elements of the type definition in the GraphQL SDL. This way, you have
@@ -97,6 +93,9 @@ Finally, you can get GraphQL.JS's GraphQLResolveInfo (i.e. the AST of the)
 request, by accepting a third argument. This can be used for further
 optimizations.
 
+TODO:
+- Change unknown in the signature.
+- Implement the function contents.
 `;
 
 export const RESOLVER_OTHER_PROPS_COMMENT = comment`
