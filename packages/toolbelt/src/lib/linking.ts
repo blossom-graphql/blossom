@@ -38,11 +38,14 @@ import {
   referencedTypeName,
 } from './naming';
 
-const GRAPHQL_PACKAGE_NAME = 'graphql';
-const CORE_PACKAGE_NAME = '@blossom-gql/core';
-const CONTEXT_NAME = 'RequestContext';
-const MAYBE_NAME = 'Maybe';
-const PRIME_NAME = 'prime';
+export const GRAPHQL_PACKAGE_NAME = 'graphql';
+export const CORE_PACKAGE_NAME = '@blossom-gql/core';
+export const CORE_RESOLVE_NAME = 'resolve';
+export const CORE_CONTEXT_NAME = 'RequestContext';
+export const CORE_ROOT_QUERY_NAME = 'RootQuery';
+export const CORE_ROOT_MUTATION_NAME = 'RootMutation';
+export const MAYBE_NAME = 'Maybe';
+export const PRIME_NAME = 'prime';
 
 export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
 export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
@@ -53,6 +56,9 @@ export enum DependencyFlag {
   HasThunkedField = 'HasThunkedField',
   HasQuerySignatures = 'HasQuerySignatures',
   HasMutationSignatures = 'HasMutationSignatures',
+  HasReferencedTypeOperation = 'HasReferencedTypeOperation',
+  HasRootQuery = 'HasRootQuery',
+  HasRootMutation = 'HasRootMutation',
 }
 
 type ImportMembersMap = Map<'default' | string, string | undefined>;
@@ -701,7 +707,20 @@ export function linkOperationTypes(
     };
 
     result.operationDeclarations.push(operationFieldDescriptor);
+
+    if (outputBaseType(fieldDescriptor).kind === 'ReferencedType') {
+      result.dependencyFlags.set(
+        DependencyFlag.HasReferencedTypeOperation,
+        true,
+      );
+    }
   });
+
+  if (descriptor.operation === SupportedOperation.Query) {
+    result.dependencyFlags.set(DependencyFlag.HasRootQuery, true);
+  } else if (descriptor.operation === SupportedOperation.Mutation) {
+    result.dependencyFlags.set(DependencyFlag.HasRootMutation, true);
+  }
 
   // 3. Add dependency flags for properly resolving imports when we are
   //    generating a types file.
@@ -793,7 +812,7 @@ export function addCommonVendorImports(
       result.fileImports,
       'FileImport',
       blossomInstancePath(),
-      CONTEXT_NAME,
+      CORE_CONTEXT_NAME,
     );
   }
 
@@ -886,10 +905,35 @@ export function addRootFileImports(
   // 1. Add common vendor imports.
   addCommonVendorImports(result, linkingContext);
 
-  // 2. Add dependencies coming from other files.
+  // 2. Add resolve import when necessary
+  if (result.dependencyFlags.get(DependencyFlag.HasReferencedTypeOperation))
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      CORE_PACKAGE_NAME,
+      CORE_RESOLVE_NAME,
+    );
+
+  if (result.dependencyFlags.get(DependencyFlag.HasRootQuery))
+    addImport(
+      result.fileImports,
+      'FileImport',
+      blossomInstancePath(),
+      CORE_ROOT_QUERY_NAME,
+    );
+
+  if (result.dependencyFlags.get(DependencyFlag.HasRootMutation))
+    addImport(
+      result.fileImports,
+      'FileImport',
+      blossomInstancePath(),
+      CORE_ROOT_MUTATION_NAME,
+    );
+
+  // 3. Add dependencies coming from other files.
   addTypeReferencesImports(result, linkingContext);
 
-  // 3. Add resolver signatures imports.
+  // 4. Add resolver signatures imports.
   result.operationDeclarations.forEach(operationFieldDescriptor => {
     addImport(
       result.fileImports,

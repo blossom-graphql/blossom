@@ -33,6 +33,9 @@ import {
   OBJECT_SIGNATURE_NAME,
   SourcesFileContents,
   ResolversFileContents,
+  CORE_RESOLVE_NAME,
+  CORE_ROOT_QUERY_NAME,
+  CORE_ROOT_MUTATION_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -40,8 +43,17 @@ import {
   rootResolverName,
   resolverName,
   loaderName,
+  referencedTypeName,
 } from './naming';
-import { SOURCE_COMMENT } from './cmd/codegen/comments';
+import {
+  SOURCE_COMMENT,
+  RESOLVER_ATTRIBUTES_COMMENT,
+  RESOLVER_OTHER_PROPS_COMMENT,
+  RESOLVER_COMMENTS,
+  RESOLVER_TYPENAME_COMMENT,
+  ROOT_BLOCK_COMMENT,
+  ROOT_REGISTRATION_COMMENT,
+} from './cmd/codegen/comments';
 
 export const CODE_GROUP_SPACING = '\n\n';
 const GRAPHQL_TYPENAME_FIELD = '__typename';
@@ -581,19 +593,19 @@ export function generateRootValueReturnExpression(
     if (descriptor.type.kind === 'KnownScalarType') {
       return createMockLiteral(descriptor.type);
     } else {
-      return ts.createCall(
-        ts.createIdentifier(resolverName(terminalTypeName)),
-        undefined,
-        [
-          ts.createObjectLiteral(
-            [
-              ts.createShorthandPropertyAssignment('attributes'),
-              ts.createShorthandPropertyAssignment('context'),
-            ],
-            true,
-          ),
-        ],
-      );
+      return ts.createCall(ts.createIdentifier(CORE_RESOLVE_NAME), undefined, [
+        ts.createObjectLiteral(
+          [
+            ts.createShorthandPropertyAssignment('data'),
+            ts.createShorthandPropertyAssignment('ctx'),
+            ts.createPropertyAssignment(
+              ts.createIdentifier('using'),
+              ts.createIdentifier(resolverName(terminalTypeName)),
+            ),
+          ],
+          true,
+        ),
+      ]);
     }
   }
 }
@@ -609,7 +621,8 @@ export function generateRootFileNodes(
     createImportDeclaration,
   );
 
-  const functionDeclarations = contents.operationDeclarations.map(
+  const functionDeclarations = flatMap(
+    contents.operationDeclarations,
     operationDescriptor => {
       const { fieldDescriptor } = operationDescriptor;
       const terminalType = getOutputType(
@@ -621,12 +634,7 @@ export function generateRootFileNodes(
       const name = rootResolverName(operationDescriptor);
 
       const commentStatement = ts.createEmptyStatement();
-      preprendComments(
-        commentStatement,
-        'Inside this function you must find a way to retrieve attributes in order' +
-          '\nto pass it to the resolver. Example: call a loader or a connection. Use' +
-          '\nargs for this purpose.',
-      );
+      preprendComments(commentStatement, ROOT_BLOCK_COMMENT);
 
       const returnStatement: ts.ReturnStatement = ts.createReturn(
         generateRootValueReturnExpression(operationDescriptor),
@@ -654,7 +662,7 @@ export function generateRootFileNodes(
         functionContents,
       );
 
-      const declaration = ts.createVariableStatement(
+      const functionDeclaration = ts.createVariableStatement(
         [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
         ts.createVariableDeclarationList(
           [
@@ -671,7 +679,40 @@ export function generateRootFileNodes(
         ),
       );
 
-      return declaration;
+      let operationRegistrationFunctionName: string;
+      switch (operationDescriptor.operation) {
+        case SupportedOperation.Query:
+          operationRegistrationFunctionName = CORE_ROOT_QUERY_NAME;
+          break;
+        case SupportedOperation.Mutation:
+          operationRegistrationFunctionName = CORE_ROOT_MUTATION_NAME;
+          break;
+        default:
+          throw new Error(
+            `Operation ${operationDescriptor.operation} not supported`,
+          );
+          break;
+      }
+
+      const operationRegistrationCall = ts.createCall(
+        ts.createIdentifier(operationRegistrationFunctionName),
+        undefined,
+        [
+          ts.createObjectLiteral([
+            ts.createPropertyAssignment(
+              ts.createIdentifier('implements'),
+              ts.createStringLiteral(operationDescriptor.fieldDescriptor.name),
+            ),
+            ts.createPropertyAssignment(
+              ts.createIdentifier('using'),
+              ts.createIdentifier(name),
+            ),
+          ]),
+        ],
+      );
+      preprendComments(operationRegistrationCall, ROOT_REGISTRATION_COMMENT);
+
+      return [functionDeclaration, operationRegistrationCall];
     },
   );
 
@@ -753,8 +794,70 @@ export function generateResolversFileNodes(
     createImportDeclaration,
   );
 
+  const resolverStatements = contents.typeDeclarations.map(objectDescriptor => {
+    const functionName = resolverName(objectDescriptor.name);
+
+    const attributesParameter = ts.createParameter(
+      undefined,
+      undefined,
+      undefined,
+      ts.createIdentifier('attributes'),
+      undefined,
+      ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+    );
+    preprendComments(attributesParameter, RESOLVER_ATTRIBUTES_COMMENT);
+
+    const commentsStatement = ts.createEmptyStatement();
+    preprendComments(commentsStatement, RESOLVER_COMMENTS);
+
+    const typenameAssignment = ts.createPropertyAssignment(
+      ts.createIdentifier(GRAPHQL_TYPENAME_FIELD),
+      ts.createStringLiteral(objectDescriptor.name),
+    );
+    preprendComments(typenameAssignment, RESOLVER_TYPENAME_COMMENT);
+
+    const otherPropsAssignment = ts.createSpreadAssignment(
+      ts.createIdentifier('otherProps'),
+    );
+    preprendComments(otherPropsAssignment, RESOLVER_OTHER_PROPS_COMMENT);
+
+    return ts.createVariableStatement(
+      [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+      ts.createVariableDeclarationList(
+        [
+          ts.createVariableDeclaration(
+            ts.createIdentifier(functionName),
+            undefined, // TODO: Change to resolver signature
+            ts.createFunctionExpression(
+              undefined,
+              undefined,
+              ts.createIdentifier(functionName),
+              undefined,
+              [attributesParameter],
+              ts.createTypeReferenceNode(
+                referencedTypeName(objectDescriptor.name),
+                undefined,
+              ),
+              ts.createBlock([
+                commentsStatement,
+                ts.createReturn(
+                  ts.createObjectLiteral([
+                    typenameAssignment,
+                    otherPropsAssignment,
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+        ],
+        ts.NodeFlags.Const,
+      ),
+    );
+  });
+
   return [
     { spacing: 0, nodes: vendorImports },
     { spacing: 0, nodes: fileImports },
+    { spacing: 1, nodes: resolverStatements },
   ];
 }

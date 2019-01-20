@@ -17,6 +17,24 @@ function comment(
   return joined.slice(start, end);
 }
 
+export const ROOT_BLOCK_COMMENT = comment`
+A root function is where the graph starts! Here you're supposed to retrieve
+data from a data source (loader or connection), do whatever is necessary with
+provided inputs and pass it down to a resolver, just like the controller of a
+MVC pattern.
+
+You can call a loader here by doing ctx.loader(/* Name of batch fn */) and
+a resolver by calling resolve({ data, ctx, using: /* Name of the resolver */ }).
+
+TODO: Implement me! i.e. Find what \`data\` needs to be here in order for
+this to properly resolve.
+
+`;
+
+export const ROOT_REGISTRATION_COMMENT = comment`
+Registers the functon above as a root value in the Blossom instance.
+`;
+
 export const SOURCE_COMMENT = comment`
 Here you are receiving an array of scalars used as IDs. You're expected to
 return an array where the position "n" of the array contains the entity
@@ -54,4 +72,33 @@ TODO:
 
 - Implement the function contents.
 
+`;
+
+export const RESOLVER_TYPENAME_COMMENT = comment`
+Must always be present.
+`;
+
+export const RESOLVER_ATTRIBUTES_COMMENT = comment`
+TODO: Change this to the type of your data source.
+`;
+
+export const RESOLVER_COMMENTS = comment`
+A resolver is a function that maps the elements from the data source to
+the elements of the type definition in the GraphQL SDL. This way, you have
+freedom not only to choose what properties from the data source are
+exposed or not, but also to create computed properties and call nested
+elements by calling other loaders and resolvers.
+
+You can also get access to the request context by accepting a second
+argument in the resolver. This can be useful for calling other resolvers
+or doing things based on user permissions.
+
+Finally, you can get GraphQL.JS's GraphQLResolveInfo (i.e. the AST of the)
+request, by accepting a third argument. This can be used for further
+optimizations.
+
+`;
+
+export const RESOLVER_OTHER_PROPS_COMMENT = comment`
+TODO: Remove this and map attributes to the properties of the output type.
 `;
