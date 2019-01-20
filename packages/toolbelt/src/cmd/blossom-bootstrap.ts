@@ -20,10 +20,16 @@ program
     'Template to use for bootstrapping.',
     coerceTemplateInput,
   )
+  .option(
+    '-d, --dry',
+    'Do not write anything, just print what will be done.',
+    undefined,
+    false,
+  )
   .parse(process.argv);
 
 if (!program.template) {
   program.help();
 }
 
-bootstrapProject({ template: program.template });
+bootstrapProject({ template: program.template, dry: program.dry });

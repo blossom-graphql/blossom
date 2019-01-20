@@ -6,7 +6,10 @@
  *
  */
 
+import fs from 'fs';
+import path from 'path';
 import { inspect } from 'util';
+
 import { OriginDescription, OriginKind } from './linking';
 
 export type ErrorsOutput = [number, Error][];
@@ -109,4 +112,34 @@ export function makeTitleOriginDescriptor(
     case OriginKind.Operation:
       return `Operation: ${originDescriptor.operationType}`;
   }
+}
+
+export async function listDirFilesRecursive(
+  pathName: string,
+): Promise<string[] | undefined> {
+  const pathStat = await fs.promises.stat(pathName);
+
+  if (!pathStat.isDirectory()) {
+    return undefined;
+  }
+
+  const fileList = await fs.promises.readdir(pathName);
+
+  const lists = await Promise.all(
+    fileList.map(async file => {
+      const fullpath = path.join(pathName, file);
+
+      const filePathStat = await fs.promises.stat(fullpath);
+      if (filePathStat.isDirectory()) {
+        return (await listDirFilesRecursive(fullpath)) as string[];
+      } else {
+        return [fullpath];
+      }
+    }),
+  );
+
+  const finalList: string[] = [];
+  lists.forEach(list => finalList.push(...list));
+
+  return finalList;
 }
