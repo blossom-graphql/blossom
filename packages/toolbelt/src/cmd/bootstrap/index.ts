@@ -57,7 +57,7 @@ export async function bootstrapProject(opts: BootstrapOptions) {
     );
     console.log(
       'You can now start your development server using ' +
-        chalk.blue('npx blossom serve') +
+        chalk.blue('npx blossom server') +
         '.',
     );
     console.log(

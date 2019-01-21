@@ -181,3 +181,14 @@ export function makeGraphCodegenPipeline(opts: {
     }
   };
 }
+
+export function comment(
+  segments: ReadonlyArray<string>,
+  ..._replacements: any[]
+): string {
+  const joined = segments.join('');
+  const start = joined.startsWith('\n') ? 1 : 0;
+  const end = joined.endsWith('\n') ? joined.length - 1 : joined.length;
+
+  return joined.slice(start, end);
+}

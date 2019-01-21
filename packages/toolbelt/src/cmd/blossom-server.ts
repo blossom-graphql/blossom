@@ -118,7 +118,7 @@ function handleWebpackWatch(_: Error, stats: Stats) {
  * ! functions and this should just become the entrypoint based on the template
  * ! file.
  */
-export default function devServer() {
+export function devServer() {
   // Start on a clean slate
   clearConsole();
 
@@ -153,3 +153,6 @@ export default function devServer() {
     handleWebpackWatch,
   );
 }
+
+// Run
+devServer();
