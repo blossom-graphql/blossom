@@ -6,9 +6,11 @@
  *
  */
 
+import fs from 'fs';
 import path from 'path';
 import { execSync, spawn, ChildProcess } from 'child_process';
 
+import { merge } from 'lodash';
 import chalk from 'chalk';
 
 import { listDirFilesRecursive } from '../../lib/utils';
@@ -47,7 +49,20 @@ export function addDependencies(
     dryDescription: `add the following dependencies to package.json:\n${printPackageList(
       packages,
     )}`,
-    perform: async () => {},
+    perform: async () => {
+      const packagePath = appPath('./package.json');
+      const packageContents = await fs.promises.readFile(packagePath);
+      const packageJSON = JSON.parse(packageContents.toString('utf-8'));
+
+      // Merge both objects. packages will override whatever version is there.
+      // TODO: Maybe warn about this?
+      merge(packageJSON, packages);
+
+      await fs.promises.writeFile(
+        packagePath,
+        JSON.stringify(packageJSON, null, 2),
+      );
+    },
   };
 }
 
