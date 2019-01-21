@@ -6,11 +6,12 @@
  *
  */
 
+import chalk from 'chalk';
+
 import { cliRunWrapper } from '../../lib/runtime';
 
 import { ActionDescriptor } from './common';
 import koaBootstrap from './koa/koa.bootstrap';
-import chalk from 'chalk';
 
 export type BootstrapOptions = {
   dry: boolean;
@@ -32,13 +33,37 @@ export async function bootstrapProject(opts: BootstrapOptions) {
 
   if (opts.dry) {
     console.log(
-      chalk.yellow.bold('Bootstrap will perform the following actions:') + '\n',
+      chalk.cyan.bold('Bootstrap will perform the following actions:') + '\n',
     );
 
-    actions.forEach(action => console.log(`Will ${action.description}\n`));
+    actions.forEach(action => console.log(`Will ${action.dryDescription}\n`));
 
     console.log(
-      chalk.yellow('Run this command without the -d / --dry flag to continue.'),
+      chalk.cyan('Run this command without the -d / --dry flag to continue.'),
+    );
+  } else {
+    for (const action of actions) {
+      console.log(action.description + chalk.bold.blue('...'));
+
+      await action.perform();
+
+      console.log(chalk.bold.green('Done!'));
+    }
+
+    console.log(
+      '\n' +
+        chalk.green.bold('Done!') +
+        ' Your project has been bootstraped succesfully 🌺.',
+    );
+    console.log(
+      'You can now start your development server using ' +
+        chalk.blue('npx blossom serve') +
+        '.',
+    );
+    console.log(
+      'Check your ' +
+        chalk.blue('README.md') +
+        ' file for more information / tutorials about common ops.',
     );
   }
 }

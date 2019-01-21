@@ -15,6 +15,7 @@ export default {
     'source-map-support': '^0.5.9',
   },
   devDependencies: {
+    jest: '^23.3.10',
     '@types/jest': '^23.3.10',
     '@types/node': `^${NODE_VERSION}`,
     '@types/koa': '^2.0.47',

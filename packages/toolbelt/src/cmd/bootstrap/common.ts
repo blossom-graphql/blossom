@@ -7,12 +7,16 @@
  */
 
 import path from 'path';
+import { execSync, spawn, ChildProcess } from 'child_process';
+
+import chalk from 'chalk';
 
 import { listDirFilesRecursive } from '../../lib/utils';
 import { appPath } from '../../lib/paths';
 
 export type ActionDescriptor = {
   description: string;
+  dryDescription: string;
   perform: () => Promise<void>;
 };
 
@@ -39,7 +43,8 @@ export function addDependencies(
   packages: DependenciesDescription,
 ): ActionDescriptor {
   return {
-    description: `add the following dependencies to package.json:\n${printPackageList(
+    description: chalk.blue.bold('Updating package.json file'),
+    dryDescription: `add the following dependencies to package.json:\n${printPackageList(
       packages,
     )}`,
     perform: async () => {},
@@ -59,14 +64,50 @@ export async function copyFiles(basePath: string): Promise<ActionDescriptor> {
     .join('\n');
 
   return {
-    description: `copy the following files in your project:\n${fileList}`,
+    description: chalk.blue.bold('Copying template files'),
+    dryDescription: `copy the following files in your project:\n${fileList}`,
     perform: async () => {},
   };
 }
 
-export async function installDependencies(): Promise<ActionDescriptor> {
+export function shouldUseYarn(): boolean {
+  try {
+    execSync('yarnpkg --version', { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    // Something went wrong, we can't use yarn.
+    return false;
+  }
+}
+
+export async function installDependencies(
+  useNpm: boolean = false,
+): Promise<ActionDescriptor> {
+  const useYarn = useNpm ? false : shouldUseYarn();
+  const pkgManager = useYarn ? 'yarn' : 'npm install';
+
   return {
-    description: 'install dependencies (yarn / npm install)',
-    perform: async () => {},
+    description: chalk.blue.bold(`Installing dependencies (${pkgManager})`),
+    dryDescription: `install dependencies (${pkgManager})`,
+    perform: () => {
+      return new Promise((resolve, reject) => {
+        const cwd = appPath('.');
+
+        let childProcess: ChildProcess;
+        if (useYarn) {
+          childProcess = spawn('yarn', [], { stdio: 'inherit', cwd });
+        } else {
+          childProcess = spawn('npm', ['install'], { stdio: 'inherit', cwd });
+        }
+
+        childProcess.on('close', code => {
+          if (code !== 0) {
+            reject(new Error(`Program exited with code ${code}.`));
+            return;
+          }
+          resolve();
+        });
+      });
+    },
   };
 }
