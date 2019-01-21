@@ -41,17 +41,17 @@ import {
 export const GRAPHQL_PACKAGE_NAME = 'graphql';
 export const CORE_PACKAGE_NAME = '@blossom-gql/core';
 export const CORE_RESOLVE_NAME = 'resolve';
-export const CORE_CONTEXT_NAME = 'RequestContext';
+export const INSTANCE_CONTEXT_NAME = 'RequestContext';
 export const CORE_BATCHFN_NAME = 'BatchFunction';
 export const CORE_RESOLVER_NAME = 'Resolver';
-export const INSTANCE_ROOT_QUERY_NAME = 'RootQuery';
-export const INSTANCE_ROOT_MUTATION_NAME = 'RootMutation';
+export const INSTANCE_ROOT_QUERY_NAME = 'BlossomRootQuery';
+export const INSTANCE_ROOT_MUTATION_NAME = 'BlossomRootMutation';
 export const MAYBE_NAME = 'Maybe';
-export const PRIME_NAME = 'prime';
+export const CORE_DELIVER_NAME = 'deliver';
 
 export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
 export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
-export const OBJECT_SIGNATURE_NAME = 'ObjectSignatureName';
+export const OBJECT_SIGNATURE_NAME = 'ObjectResolverSignature';
 
 export enum DependencyFlag {
   HasOptionalReference = 'HasOptionalReference',
@@ -535,13 +535,31 @@ export function resolveReferences(
 export function isValidResolution(
   resolution: ResolutionDescription,
   reference: OriginDescription,
+  linkingContext: LinkingContext,
 ): boolean {
   switch (reference.originKind) {
     case OriginKind.Object:
-    case OriginKind.ObjectArgument:
       return [ElementKind.Type, ElementKind.Enum, ElementKind.Union].includes(
         resolution.elementKind,
       );
+    case OriginKind.ObjectArgument:
+      const typeRepresentsRootMutation = isRootType(
+        reference.fieldOriginDescription.objectName,
+        linkingContext,
+        SupportedOperation.Mutation,
+      );
+
+      if (typeRepresentsRootMutation) {
+        return [
+          ElementKind.Input,
+          ElementKind.Enum,
+          ElementKind.Union,
+        ].includes(resolution.elementKind);
+      } else {
+        return [ElementKind.Type, ElementKind.Enum, ElementKind.Union].includes(
+          resolution.elementKind,
+        );
+      }
     case OriginKind.Input:
     case OriginKind.InputArgument:
       return [ElementKind.Input, ElementKind.Enum].includes(
@@ -581,6 +599,7 @@ export function enforceReferencesPresence(
             !isValidResolution(
               referenceDescription.resolution as ResolutionDescription,
               reference,
+              linkingContext,
             )
           ) {
             throw new InvalidReferenceError(
@@ -690,16 +709,10 @@ export function linkOperationTypes(
 
   // 2. Create descriptor for each one of the fields.
   objectDescriptor.fields.forEach(field => {
-    let fieldDescriptor: FieldDescriptor;
-    if (linkingContext.linkingType === LinkingType.RootFile) {
-      fieldDescriptor = {
-        ...field,
-        thunkType: ThunkType.AsyncFunction,
-      };
-    } else {
-      fieldDescriptor = field;
-    }
-
+    const fieldDescriptor: FieldDescriptor = {
+      ...field,
+      thunkType: ThunkType.AsyncFunction,
+    };
     addFieldCommonDependencyFlags(fieldDescriptor, result);
 
     const operationFieldDescriptor: OperationFieldDescriptor = {
@@ -746,9 +759,18 @@ export function linkUnionTypes(
 export function isRootType(
   fieldName: string,
   linkingContext: LinkingContext,
+  expectedOperation?: SupportedOperation,
 ): boolean {
   for (const operationDescriptor of linkingContext.parsedFile.parsedDocument.operations.values()) {
-    if (operationDescriptor.objectType.name === fieldName) return true;
+    const isExpectedOperation = expectedOperation
+      ? expectedOperation === operationDescriptor.operation
+      : true;
+
+    if (
+      isExpectedOperation &&
+      operationDescriptor.objectType.name === fieldName
+    )
+      return true;
   }
 
   return false;
@@ -814,7 +836,7 @@ export function addCommonVendorImports(
       result.fileImports,
       'FileImport',
       blossomInstancePath(),
-      CORE_CONTEXT_NAME,
+      INSTANCE_CONTEXT_NAME,
     );
   }
 
@@ -960,6 +982,13 @@ export function addSourcesFileImports(
   result: SourcesFileContents,
   _linkingContext: LinkingContext,
 ) {
+  addImport(
+    result.vendorImports,
+    'VendorImport',
+    CORE_PACKAGE_NAME,
+    CORE_BATCHFN_NAME,
+  );
+
   // Loaders signatures should always import maybe and prime.
   addImport(
     result.vendorImports,
@@ -972,14 +1001,14 @@ export function addSourcesFileImports(
     result.vendorImports,
     'VendorImport',
     CORE_PACKAGE_NAME,
-    PRIME_NAME,
+    CORE_DELIVER_NAME,
   );
 
   addImport(
-    result.vendorImports,
-    'VendorImport',
-    CORE_PACKAGE_NAME,
-    CORE_BATCHFN_NAME,
+    result.fileImports,
+    'FileImport',
+    blossomInstancePath(),
+    INSTANCE_CONTEXT_NAME,
   );
 }
 
@@ -992,6 +1021,13 @@ export function addResolversFileImports(
     'VendorImport',
     CORE_PACKAGE_NAME,
     CORE_RESOLVER_NAME,
+  );
+
+  addImport(
+    result.fileImports,
+    'FileImport',
+    blossomInstancePath(),
+    INSTANCE_CONTEXT_NAME,
   );
 
   // For each of the types import the definition from types file

@@ -53,8 +53,8 @@ operation. THIS IS THE ONLY WAY TO AVOID A n+1 QUERY. Examples:
 - If you're hitting an Elastic server, try to use _mget.
 
 Your data source will probably give you the results unordered or some of them
-might be missing. Use the prime function from the @blossom-gql/core module for
-automatically sorting them for you.
+might be missing. Use the \`deliver\` and \`deliverGroup\` functions from the
+\`@blossom-gql/core\` module for automatically re-sorting them for you.
 
 You can also return an array on this position if you need to return multiple
 results / entities by ID.

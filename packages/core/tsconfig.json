@@ -1,13 +1,14 @@
 {
   "extends": "../../scripts/typescript/tsconfig.base.json",
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.js"
   ],
   "exclude": [
     "**/__tests__"
   ],
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist",
+    "outDir": "./dist"
   }
 }

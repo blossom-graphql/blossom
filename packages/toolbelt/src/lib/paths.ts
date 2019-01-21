@@ -46,7 +46,7 @@ export function resolversFilePath(schemaFilePath: string): string {
 }
 
 export function blossomInstancePath(): string {
-  return appPath('./blossom-instance.ts');
+  return appPath('./blossom/instance.ts');
 }
 
 export function projectImportPath(fullPath: string): string {

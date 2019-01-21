@@ -39,7 +39,7 @@ import {
   CORE_BATCHFN_NAME,
   MAYBE_NAME,
   CORE_RESOLVER_NAME,
-  CORE_CONTEXT_NAME,
+  INSTANCE_CONTEXT_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -200,7 +200,7 @@ export function generateFunctionTypeNode(
     ts.createTypeLiteralNode(members),
     getOutputType(terminalType, isAsync),
     ts.createTypeReferenceNode(
-      ts.createIdentifier(CORE_CONTEXT_NAME),
+      ts.createIdentifier(INSTANCE_CONTEXT_NAME),
       undefined,
     ),
   ]);
@@ -755,6 +755,10 @@ export function generateSourcesFileNodes(
             ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [
               ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
             ]),
+            ts.createTypeReferenceNode(
+              ts.createIdentifier(INSTANCE_CONTEXT_NAME),
+              undefined,
+            ),
           ],
         );
 
@@ -790,7 +794,7 @@ export function generateSourcesFileNodes(
             [
               ts.createVariableDeclaration(
                 ts.createIdentifier(name),
-                loaderSignature, // TODO
+                loaderSignature,
                 functionExpression,
               ),
             ],
@@ -828,6 +832,10 @@ export function generateResolversFileNodes(
         ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
         ts.createTypeReferenceNode(
           ts.createIdentifier(referencedTypeName(objectDescriptor.name)),
+          undefined,
+        ),
+        ts.createTypeReferenceNode(
+          ts.createIdentifier(INSTANCE_CONTEXT_NAME),
           undefined,
         ),
       ],

@@ -8,9 +8,17 @@
 
 export { blossom } from './blossom';
 
-export { createBlossomDecorators } from './instance';
+export { BlossomInstance, createBlossomDecorators } from './instance';
 
-export { Maybe, MaybePromise } from './common';
+export {
+  BatchFunction,
+  Maybe,
+  MaybePromise,
+  MutationResolverSignature,
+  ObjectResolverSignature,
+  Resolver,
+  QueryResolverSignature,
+} from './common';
 
 export { BlossomContext } from './context';
 
