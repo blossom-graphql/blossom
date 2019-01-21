@@ -6,15 +6,17 @@
  *
  */
 
+import { BLOSSOM_CORE_VERSION } from '../../../lib/constants';
+
 export default {
   dependencies: {
+    graphql: '^14.0.2',
+    '@blossom-gql/core': BLOSSOM_CORE_VERSION,
     koa: '^2.6.2',
     'koa-bodyparser': '^4.2.1',
     'koa-router': '^7.4.0',
-    graphql: '^14.0.2',
     'graphql-playground-middleware-koa': '^1.6.8',
     'source-map-support': '^0.5.9',
-    // '@blossom-gql/core': CORE_VERSION,
   },
   devDependencies: {
     jest: '^23.3.10',
