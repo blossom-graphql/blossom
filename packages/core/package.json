@@ -6,9 +6,7 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "@types/lodash.merge": "^4.6.4",
-    "dataloader": "^1.4.0",
-    "lodash.merge": "^4.6.1"
+    "dataloader": "^1.4.0"
   },
   "peerDependencies": {
     "@types/graphql": "^14.0.3",
