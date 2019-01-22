@@ -12,6 +12,7 @@ import { cliRunWrapper } from '../../lib/runtime';
 
 import { ActionDescriptor } from '../../lib/cmd/bootstrap/common';
 import koaBootstrap from './koa/koa.bootstrap';
+import { writeInSameLine } from '../../lib/utils';
 
 export type BootstrapOptions = {
   dry: boolean;
@@ -43,11 +44,17 @@ export async function bootstrapProject(opts: BootstrapOptions) {
     );
   } else {
     for (const action of actions) {
-      console.log(action.description + chalk.bold.blue('...'));
+      writeInSameLine(action.description + chalk.bold.blue('...'), false);
 
       await action.perform();
 
-      console.log(chalk.bold.green('Done!'));
+      writeInSameLine(
+        action.description +
+          chalk.bold.blue('...') +
+          ' ' +
+          chalk.bold.green('Done!'),
+        true,
+      );
     }
 
     console.log(

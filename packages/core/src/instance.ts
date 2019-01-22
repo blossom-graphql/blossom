@@ -21,6 +21,7 @@ import {
 
 import { BaseResolverSignature } from './common';
 import { BlossomError, BlossomEmptyHandlerError } from './errors';
+import { resolve, resolveArray } from './resolver';
 import COMMON_DEFINITIONS from './common-definitions';
 
 const CONSOLIDATED_QUERY_NAMES: { [key in OperationTypeNode]: string } = {
@@ -336,5 +337,10 @@ export function createBlossomDecorators(instance: IBlossomInstance) {
         return errorClass;
       };
     },
+    // At the moment we are directly exposing these. In the future, we'd like
+    // to stack middleware chains that the user can configure. Tracing,
+    // monitoring, logging come to mind.
+    resolve,
+    resolveArray,
   };
 }

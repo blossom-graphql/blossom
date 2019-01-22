@@ -23,5 +23,3 @@ export {
 export { BlossomContext } from './context';
 
 export { deliver, deliverGroup } from './helpers';
-
-export { createResolver, createConnectionResolver, resolve } from './resolver';

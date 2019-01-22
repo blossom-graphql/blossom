@@ -8,6 +8,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { inspect } from 'util';
 
 import { OriginDescription, OriginKind } from './linking';
@@ -142,4 +143,14 @@ export async function listDirFilesRecursive(
   lists.forEach(list => finalList.push(...list));
 
   return finalList;
+}
+
+export function writeInSameLine(text: string, end: boolean) {
+  readline.clearLine(process.stdout, 0);
+  readline.cursorTo(process.stdout, 0, undefined);
+  process.stdout.write(text);
+
+  if (end) {
+    process.stdout.write('\n');
+  }
 }
