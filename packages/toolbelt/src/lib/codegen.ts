@@ -33,13 +33,14 @@ import {
   OBJECT_SIGNATURE_NAME,
   SourcesFileContents,
   ResolversFileContents,
-  CORE_RESOLVE_NAME,
+  INSTANCE_RESOLVE_NAME,
   INSTANCE_ROOT_QUERY_NAME,
   INSTANCE_ROOT_MUTATION_NAME,
   CORE_BATCHFN_NAME,
   MAYBE_NAME,
   CORE_RESOLVER_NAME,
   INSTANCE_CONTEXT_NAME,
+  INSTANCE_RESOLVE_ARRAY_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -138,7 +139,7 @@ export function generateResolverFunctionArguments(
         undefined,
         undefined,
         undefined,
-        ts.createIdentifier('resolveInfo'),
+        ts.createIdentifier('ast'),
         undefined,
         ts.createTypeReferenceNode(
           ts.createIdentifier('GraphQLResolveInfo'),
@@ -583,13 +584,33 @@ export function generateRootValueReturnExpression(
   if (descriptor.kind === 'OperationFieldDescriptor') {
     return generateRootValueReturnExpression(descriptor.fieldDescriptor);
   } else if (descriptor.kind === 'ArrayFieldDescriptor') {
-    if (
-      descriptor.elementDescriptor.kind === 'SingleFieldDescriptor' &&
-      descriptor.elementDescriptor.type.kind === 'KnownScalarType'
-    ) {
-      return ts.createArrayLiteral([
-        createMockLiteral(descriptor.elementDescriptor.type),
-      ]);
+    if (descriptor.elementDescriptor.kind === 'SingleFieldDescriptor') {
+      if (descriptor.elementDescriptor.type.kind === 'KnownScalarType') {
+        return ts.createArrayLiteral([
+          createMockLiteral(descriptor.elementDescriptor.type),
+        ]);
+      } else {
+        const terminalTypeName = getTerminalTypeName(descriptor);
+
+        return ts.createCall(
+          ts.createIdentifier(INSTANCE_RESOLVE_ARRAY_NAME),
+          undefined,
+          [
+            ts.createObjectLiteral(
+              [
+                ts.createShorthandPropertyAssignment('data'),
+                ts.createShorthandPropertyAssignment('ctx'),
+                ts.createPropertyAssignment(
+                  ts.createIdentifier('using'),
+                  ts.createIdentifier(resolverName(terminalTypeName)),
+                ),
+                ts.createShorthandPropertyAssignment('ast'),
+              ],
+              true,
+            ),
+          ],
+        );
+      }
     } else {
       return generateRootValueReturnExpression(descriptor.elementDescriptor);
     }
@@ -599,19 +620,24 @@ export function generateRootValueReturnExpression(
     if (descriptor.type.kind === 'KnownScalarType') {
       return createMockLiteral(descriptor.type);
     } else {
-      return ts.createCall(ts.createIdentifier(CORE_RESOLVE_NAME), undefined, [
-        ts.createObjectLiteral(
-          [
-            ts.createShorthandPropertyAssignment('data'),
-            ts.createShorthandPropertyAssignment('ctx'),
-            ts.createPropertyAssignment(
-              ts.createIdentifier('using'),
-              ts.createIdentifier(resolverName(terminalTypeName)),
-            ),
-          ],
-          true,
-        ),
-      ]);
+      return ts.createCall(
+        ts.createIdentifier(INSTANCE_RESOLVE_NAME),
+        undefined,
+        [
+          ts.createObjectLiteral(
+            [
+              ts.createShorthandPropertyAssignment('data'),
+              ts.createShorthandPropertyAssignment('ctx'),
+              ts.createPropertyAssignment(
+                ts.createIdentifier('using'),
+                ts.createIdentifier(resolverName(terminalTypeName)),
+              ),
+              ts.createShorthandPropertyAssignment('ast'),
+            ],
+            true,
+          ),
+        ],
+      );
     }
   }
 }
@@ -663,7 +689,7 @@ export function generateRootFileNodes(
         // Thus, this should be wired to a setting, a directive or something
         // similar. E.g. if we use a different kind of loader for this resource,
         // then resolveInfo should be included in the list of arguments.
-        generateResolverFunctionArguments(fieldDescriptor.arguments, false),
+        generateResolverFunctionArguments(fieldDescriptor.arguments, true),
         terminalType,
         functionContents,
       );

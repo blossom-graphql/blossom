@@ -40,7 +40,8 @@ import {
 
 export const GRAPHQL_PACKAGE_NAME = 'graphql';
 export const CORE_PACKAGE_NAME = '@blossom-gql/core';
-export const CORE_RESOLVE_NAME = 'resolve';
+export const INSTANCE_RESOLVE_NAME = 'resolve';
+export const INSTANCE_RESOLVE_ARRAY_NAME = 'resolveArray';
 export const INSTANCE_CONTEXT_NAME = 'RequestContext';
 export const CORE_BATCHFN_NAME = 'BatchFunction';
 export const CORE_RESOLVER_NAME = 'Resolver';
@@ -59,6 +60,7 @@ export enum DependencyFlag {
   HasQuerySignatures = 'HasQuerySignatures',
   HasMutationSignatures = 'HasMutationSignatures',
   HasReferencedTypeOperation = 'HasReferencedTypeOperation',
+  HasReferencedArrayTypeOperation = 'HasReferencedArrayTypeOperation',
   HasRootQuery = 'HasRootQuery',
   HasRootMutation = 'HasRootMutation',
 }
@@ -724,10 +726,17 @@ export function linkOperationTypes(
     result.operationDeclarations.push(operationFieldDescriptor);
 
     if (outputBaseType(fieldDescriptor).kind === 'ReferencedType') {
-      result.dependencyFlags.set(
-        DependencyFlag.HasReferencedTypeOperation,
-        true,
-      );
+      if (fieldDescriptor.kind === 'ArrayFieldDescriptor') {
+        result.dependencyFlags.set(
+          DependencyFlag.HasReferencedArrayTypeOperation,
+          true,
+        );
+      } else {
+        result.dependencyFlags.set(
+          DependencyFlag.HasReferencedTypeOperation,
+          true,
+        );
+      }
     }
   });
 
@@ -825,12 +834,13 @@ export function addCommonVendorImports(
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
   //   be included.
   if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
-    // addImport(
-    //   result.vendorImports,
-    //   'VendorImport',
-    //   GRAPHQL_PACKAGE_NAME,
-    //   'GraphQLResolveInfo',
-    // );
+    linkingContext.linkingType === LinkingType.RootFile &&
+      addImport(
+        result.vendorImports,
+        'VendorImport',
+        GRAPHQL_PACKAGE_NAME,
+        'GraphQLResolveInfo',
+      );
 
     addImport(
       result.fileImports,
@@ -932,10 +942,20 @@ export function addRootFileImports(
   // 2. Add resolve import when necessary
   if (result.dependencyFlags.get(DependencyFlag.HasReferencedTypeOperation))
     addImport(
-      result.vendorImports,
-      'VendorImport',
-      CORE_PACKAGE_NAME,
-      CORE_RESOLVE_NAME,
+      result.fileImports,
+      'FileImport',
+      blossomInstancePath(),
+      INSTANCE_RESOLVE_NAME,
+    );
+
+  if (
+    result.dependencyFlags.get(DependencyFlag.HasReferencedArrayTypeOperation)
+  )
+    addImport(
+      result.fileImports,
+      'FileImport',
+      blossomInstancePath(),
+      INSTANCE_RESOLVE_ARRAY_NAME,
     );
 
   if (result.dependencyFlags.get(DependencyFlag.HasRootQuery))

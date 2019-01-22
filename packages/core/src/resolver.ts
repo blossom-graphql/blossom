@@ -73,6 +73,18 @@ export function createConnectionResolver<I, O, C>(
 }
 
 export function resolveArray<I, O, C>(resolveParams: {
+  data: ReadonlyArray<null | undefined>;
+  ctx: C;
+  ast: GraphQLResolveInfo;
+  using: Resolver<I, O, C>;
+}): ReadonlyArray<null>;
+export function resolveArray<I, O, C>(resolveParams: {
+  data: ReadonlyArray<I>;
+  ctx: C;
+  ast: GraphQLResolveInfo;
+  using: Resolver<I, O, C>;
+}): ReadonlyArray<O>;
+export function resolveArray<I, O, C>(resolveParams: {
   data: ReadonlyArray<Maybe<I>>;
   ctx: C;
   ast: GraphQLResolveInfo;
