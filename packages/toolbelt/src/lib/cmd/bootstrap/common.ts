@@ -7,6 +7,7 @@
  */
 
 import fs from 'fs';
+import fsExtra from 'fs-extra';
 import path from 'path';
 import { execSync, spawn, ChildProcess } from 'child_process';
 
@@ -98,7 +99,11 @@ export async function copyFiles(basePath: string): Promise<ActionDescriptor> {
     perform: async () => {
       await Promise.all(
         Object.entries(filesMap).map(async ([origin, destination]) => {
-          if (destination) await fs.promises.copyFile(origin, destination);
+          if (!destination) return;
+          const parse = path.parse(destination);
+
+          await fsExtra.ensureDir(parse.dir);
+          await fsExtra.copy(origin, destination);
         }),
       );
     },
