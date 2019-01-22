@@ -1,3 +1,11 @@
+/**
+ * Copyright (c) The Blossom GraphQL Team.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
 import {
   buildASTSchema,
   DefinitionNode,
@@ -13,6 +21,7 @@ import {
 
 import { BaseResolverSignature } from './common';
 import { BlossomError, BlossomEmptyHandlerError } from './errors';
+import COMMON_DEFINITIONS from './common-definitions';
 
 const CONSOLIDATED_QUERY_NAMES: { [key in OperationTypeNode]: string } = {
   query: 'BlossomQuery',
@@ -134,6 +143,9 @@ export class BlossomInstance implements IBlossomInstance {
 
   get finalDocument(): DocumentNode {
     const definitions: DefinitionNode[] = [];
+
+    // Push common definitions
+    definitions.push(...(COMMON_DEFINITIONS as DefinitionNode[]));
 
     // Push all definitions from filtered documents
     this.filteredDocuments.forEach(document => {
