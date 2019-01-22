@@ -13,8 +13,8 @@ import { execSync, spawn, ChildProcess } from 'child_process';
 import { merge } from 'lodash';
 import chalk from 'chalk';
 
-import { listDirFilesRecursive } from '../../lib/utils';
-import { appPath } from '../../lib/paths';
+import { listDirFilesRecursive } from '../../utils';
+import { appPath } from '../../paths';
 
 export type ActionDescriptor = {
   description: string;
@@ -66,22 +66,42 @@ export function addDependencies(
   };
 }
 
+export function pathMapper(basePath: string, filePath: string): string {
+  if (filePath.endsWith('.DS_Store')) return '';
+
+  const dotFileRegex = '.dotfile$';
+
+  let finalPath = filePath;
+  if (new RegExp(dotFileRegex).test(filePath)) {
+    finalPath = finalPath.replace(new RegExp(dotFileRegex), '');
+  }
+
+  return appPath(path.relative(basePath, finalPath));
+}
+
 export async function copyFiles(basePath: string): Promise<ActionDescriptor> {
   const files = (await listDirFilesRecursive(basePath)) as string[];
-  const filesMap: any = {};
+  const filesMap: { [key: string]: string } = {};
 
   files.forEach(filePath => {
-    filesMap[filePath] = appPath(path.relative(basePath, filePath));
+    filesMap[filePath] = pathMapper(basePath, filePath);
   });
 
   const fileList = files
+    .filter(filePath => filesMap[filePath])
     .map(filePath => `- From: ${filePath}\n  To:   ${filesMap[filePath]}`)
     .join('\n');
 
   return {
     description: chalk.blue.bold('Copying template files'),
     dryDescription: `copy the following files in your project:\n${fileList}`,
-    perform: async () => {},
+    perform: async () => {
+      await Promise.all(
+        Object.entries(filesMap).map(async ([origin, destination]) => {
+          if (destination) await fs.promises.copyFile(origin, destination);
+        }),
+      );
+    },
   };
 }
 

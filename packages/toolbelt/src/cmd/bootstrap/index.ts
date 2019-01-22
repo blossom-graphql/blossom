@@ -10,7 +10,7 @@ import chalk from 'chalk';
 
 import { cliRunWrapper } from '../../lib/runtime';
 
-import { ActionDescriptor } from './common';
+import { ActionDescriptor } from '../../lib/cmd/bootstrap/common';
 import koaBootstrap from './koa/koa.bootstrap';
 
 export type BootstrapOptions = {

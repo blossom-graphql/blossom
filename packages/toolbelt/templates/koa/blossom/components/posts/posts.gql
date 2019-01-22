@@ -1,0 +1,158 @@
+# This is a GraphQL Schema Definition Language (SDL), an official feature
+# of GraphQL and it's considered the source of truth in Blossom since it's
+# the actual definition between what gets in and out between the client
+# and the server.
+#
+# This is an example component in order to show most of the available
+# features in the toolbelt. Here are some example commands you can run:
+# from project root:
+#
+# To generate types file:
+# $ npx blossom codegen types -f blossom/components/example/example.gql
+#
+# To generate root file:
+# $ npx blossom codegen root -f blossom/components/example/example.gql
+#
+# To generate resolvers file:
+# $ npx blossom codegen resolvers -f blossom/components/example/example.gql
+#
+# To generate loaders file:
+# $ npx blossom codegen resolvers -f blossom/components/example/example.gql
+#
+# To generate them all at once:
+# $ npx blossom codegen resources -f blossom/components/example/example.gql
+#
+# Definitions from other files that must be used in this file must be
+# imported, otherwise the codegen tool will throw an error. To import
+# an entire file use: (the line below will actually do it!)
+#
+# import '../comments/comments.gql'
+#
+# To import specific elements from a file run (won't do anything because of
+# the hyphen)
+#
+#-import { Comment } from '../comments/comment.gql'
+#
+# Read the documenetation for more information and always consider that you
+# must run the types generation again when you update this file.
+#
+
+"""
+A single post resource.
+
+This, unlike the comments above, are doctstrings and are meant to generate
+documentation. The can be placed above almost anything: types definitions,
+field definitions, argument definitions, etc.
+
+Blossom Toolbelt will automatically map them to the types file, thus they
+will also be available in your codebase! Also, when you use the IDE for
+testing queries, they'll also appear there.
+"""
+type Post {
+  """
+  Unique identifier of the post. These fields are always casted to string in
+  order to be comprehensive with all the possible id types: slugs, uuids,
+  numbers (which can be casted to strings), etc.
+  """
+  id: ID!
+  """
+  Self-explanatory.
+  """
+  title: String!
+  """
+  Self-explanatory.
+  """
+  contents: String!
+  """
+  Summary of the post. See that this field is optional (doesn't have the !).
+  Look what happens in the types definition 👀.
+  """
+  summary: String
+  """
+  Is this article visible to the user?
+  """
+  visible: Boolean!
+  """
+  The total comments count. The directive indicates that this is going to
+  be implemented as a function because it needs to be computed on-demand.
+  """
+  totalComments: Int! @blossomImpl(type: async)
+  """
+  Most recent comments for this post. This is used to show an example:
+
+  (1) On how to simply reference types from other file (see the import above).
+
+  (2) On how to comment arguments of a function.
+  """
+  comments(
+    """
+    Quantity of comments to retrieve for this particular post.
+    """
+    last: Int = 10
+  ): [Comment!]! @blossomImpl(type: async)
+}
+
+# Since the SDL is the source of truth, and we expect these files to be
+# modularized, you can declare the signature of your root query / mutations
+# here and Blossom Toolbelt will only generate the root placeholders for the
+# functions declared in this file.
+#
+# When importing this file into your project,t all these definitions will be
+# automatically merged for you. Thus, you need to define the schema {} statement
+# and the associated types that implement the queries and mutations for you.
+schema {
+  query: PostsQuery
+  mutation: PostsMutation
+}
+
+"""
+Definitions for post queries.
+"""
+type PostsQuery {
+  """
+  Returns a post with an specific ID. Returns `null` if the Post doesn't exist.
+  """
+  post(id: ID!): Post
+  """
+  Return the latest `last` posts as an array.
+  """
+  posts(last: Int = 10): [Post!]!
+}
+
+"""
+Definitions for post mutations.
+"""
+type PostsMutation {
+  """
+  Creates a new Post entity given the payload. If the post is created succesfully,
+  returns the `Post` of the newly created post.
+  """
+  createPost(
+    """
+    Payload of the post to be created.
+    """
+    post: PostCreationPayload
+  ): Post!
+}
+
+"""
+Payload for creating a new post.
+"""
+input PostCreationPayload {
+  """
+  Title for the yet to be created post.
+  """
+  title: String!
+  """
+  Self-explanatory.
+  """
+  contents: String!
+  """
+  (Optional) A summary of the post.
+  """
+  summary: String
+  """
+  Is this post visible?
+  """
+  visible: Boolean!
+}

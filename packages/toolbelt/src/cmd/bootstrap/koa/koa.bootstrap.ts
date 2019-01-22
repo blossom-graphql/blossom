@@ -14,7 +14,7 @@ import {
   addDependencies,
   copyFiles,
   installDependencies,
-} from '../common';
+} from '../../../lib/cmd/bootstrap/common';
 
 export default async function koaBootstrap(): Promise<ActionDescriptor[]> {
   const actions: ActionDescriptor[] = [

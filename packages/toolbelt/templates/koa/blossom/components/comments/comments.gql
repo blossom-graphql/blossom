@@ -1,0 +1,67 @@
+# Open components/posts/posts.gql for a more detailed explanation about how
+# GraphQL SDLs work.
+#
+# Here you can see that you can also import dependencies from the Posts file,
+# which should be a circular dependency, but the Toolbelt can resolve it anyway!
+#
+# import '../posts/posts.gql'
+
+"""
+A single comment entity.
+"""
+type Comment {
+  """
+  Unique identifier of the post. These fields are always casted to string in
+  order to be comprehensive with all the possible id types: slugs, uuids,
+  numbers (which can be casted to strings), etc.
+  """
+  id: ID!
+  """
+  Name of the author of this comment.
+  """
+  author: String!
+  """
+  Title of this comment. Optional.
+  """
+  title: String
+  """
+  Contents of the comment.
+  """
+  contents: String!
+  """
+  Descriptor of the quantity of likes of this entry.
+  """
+  likes: Likes! @blossomImpl(type: async)
+  """
+  Is this comment visible?
+  """
+  visible: Boolean!
+  """
+  Identifier of the associated post.
+  """
+  postId: String!
+  """
+  Associated post entity.
+  """
+  post: Post @blossomImpl(type: async)
+}
+
+"""
+A descriptor of the likes quantity of an entry. This is used to show how object
+nesting also works with the toolbelt.
+"""
+type Likes {
+  """
+  Total of upvotes.
+  """
+  upvotes: Int!
+  """
+  Total of downvotes.
+  """
+  downvotes: Int!
+  """
+  Net amount of downvotes (i.e. `upvotes - downvotes`). We mark it as a
+  computed property.
+  """
+  net: Int! @blossomImpl(type: function)
+}
