@@ -1,171 +1,259 @@
-/**
- * Copyright (c) The Blossom GraphQL Team.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- *
- */
-
-import merge from 'lodash.merge';
-
 import {
-  BlossomError,
-  BlossomEmptyHandlerError,
-  BlossomRootValueAlreadyInUse,
-  BlossomErrorHandlerDict,
-  ErrorHandlingFunction,
-} from './errors';
-import {
-  Enum,
-  RPCDescriptionBase,
-  renderEnumToSchema,
-  renderRPCDescriptionToSchema,
-  renderSchema,
-  RPCDescription,
-  RPCCallback,
-} from './schema';
-import { GraphQLSchema, buildSchema } from 'graphql';
+  buildASTSchema,
+  DefinitionNode,
+  DocumentNode,
+  FieldDefinitionNode,
+  GraphQLSchema,
+  GraphQLError,
+  ObjectTypeDefinitionNode,
+  OperationTypeDefinitionNode,
+  OperationTypeNode,
+  SchemaDefinitionNode,
+} from 'graphql';
 
-/**
- * Prototype of a Blossom instance.
- */
-export interface IBlossomInstance {
-  errorHandlers: Map<Function, ErrorHandlingFunction>;
-  registerSchema: (schema: string) => void;
-  registerEnum: (enumItem: Enum) => void;
-  registerRootQuery: (query: RPCDescription) => void;
-  registerRootMutation: (mutation: RPCDescription) => void;
-  registerErrorHandler: (
-    errorClass: BlossomError,
-    handlingFunction?: ErrorHandlingFunction,
-  ) => void;
-  getRootSchema: () => RootSchema;
-  getRootValue: () => any;
-  rootSchemaString: string;
-  rootSchema: GraphQLSchema;
-  rootValue: any;
-}
+import { BaseResolverSignature } from './common';
+import { BlossomError, BlossomEmptyHandlerError } from './errors';
 
-/**
- * Type for storing root schema state.
- */
-export type RootSchema = {
-  schemaString: string;
-  parsedSchema: GraphQLSchema;
+const CONSOLIDATED_QUERY_NAMES: { [key in OperationTypeNode]: string } = {
+  query: 'BlossomQuery',
+  mutation: 'BlossomMutation',
+  subscription: 'BlossomSubscription',
+};
+
+export type ResolverSignature = BaseResolverSignature<any, any, any>;
+
+export type RootValueOutput = {
+  [key: string]: ResolverSignature;
 };
 
 /**
- * An instance class of a GraphQL engine.
- *
- * TODO: Add memoization to the common parameters + a reload() function.
- * TODO: Convert rootQueries and rootMutation to dict in order to get O(1) R/W.
+ * This type just keeps track of the extension format from the original API.
  */
+type ExtensionFormat = typeof GraphQLError.prototype.extensions;
+
+/**
+ * Output of the error handling function.
+ */
+type ErrorHandlerOutput = {
+  render: boolean;
+  extensions?: ExtensionFormat;
+};
+
+/**
+ * A function that receives an error (which will be available on the originalError
+ * entry from GraphQLError type) and converts it to the GraphQL extension format.
+ */
+export type ErrorHandlingFunction = <E extends Error>(
+  error: E,
+) => ErrorHandlerOutput;
+
+/**
+ * Dict that associates error class to error handler.
+ */
+export type BlossomErrorHandlerDict = Map<Function, ErrorHandlingFunction>;
+
+/**
+ * Options for the Blossom Error accumulator function.
+ */
+type BlossomErrorInput = {
+  /**
+   * Error handling function. If empty, the handler must be provided as a static
+   * handler method in the error class.
+   */
+  handler?: ErrorHandlingFunction;
+};
+
+export interface IBlossomInstance {
+  errorHandlers: BlossomErrorHandlerDict;
+  addDocument: (document: DocumentNode) => void;
+  finalDocument: DocumentNode;
+  rootSchema: GraphQLSchema;
+  addRootOperation: (
+    operation: OperationTypeNode,
+    name: string,
+    callback: ResolverSignature,
+  ) => void;
+  rootValue: RootValueOutput;
+  addErrorHandler: (
+    errorClass: BlossomError,
+    handlingFunction?: ErrorHandlingFunction,
+  ) => void;
+}
+
 export class BlossomInstance implements IBlossomInstance {
-  /**
-   * Function that receives a string or a source and converts it to a parsed
-   * GraphQL Schema.
-   */
-  schemaBuilder: typeof buildSchema;
+  rawDocuments: DocumentNode[] = [];
+  filteredDocuments: DocumentNode[] = [];
+  operationDefinitions: SchemaDefinitionNode[] = [];
+  objectTypeMap: Map<string, ObjectTypeDefinitionNode> = new Map();
 
-  /**
-   * The list of schemas saved in this instance.
-   */
-  schemaStrings: string[] = [];
-
-  /**
-   * The list of registered enums saved in this instance.
-   */
-  enums: Enum[] = [];
-
-  /**
-   * The list of root queries stored on this instance.
-   */
-  rootQueries: RPCDescription[] = [];
-
-  /**
-   * The list of root mutations stored on this instance.
-   */
-  rootMutations: RPCDescription[] = [];
+  rootOperationsMap: Map<
+    string,
+    {
+      operation: OperationTypeNode;
+      callback: ResolverSignature;
+    }
+  > = new Map();
 
   /**
    * Mapping for introducing error handlers in the instance.
    */
-  errorHandlers: BlossomErrorHandlerDict = new Map<
-    Function,
-    ErrorHandlingFunction
-  >();
+  errorHandlers: BlossomErrorHandlerDict = new Map();
 
-  /**
-   * Cache of the computed values of the instance for memoization.
-   */
-  memoValues: { rootSchema?: RootSchema; rootValue?: any } = {
-    rootSchema: undefined,
-    rootValue: undefined,
-  };
+  addDocument(document: DocumentNode) {
+    this.rawDocuments.push(document);
 
-  /**
-   * Returns a new BlossomInstance class instance.
-   *
-   * @param schemaBuilder Function that converts schema string to parsed
-   * GraphQL string.
-   */
-  constructor(schemaBuilder = buildSchema) {
-    this.schemaBuilder = schemaBuilder;
+    const nonOperationDefinitions: DefinitionNode[] = [];
+    const operationDefinitions: SchemaDefinitionNode[] = [];
+
+    document.definitions.forEach(definition => {
+      if (definition.kind === 'ObjectTypeDefinition') {
+        if (this.objectTypeMap.has(definition.name.value)) {
+          throw new Error(
+            `Object with name ${
+              definition.name.value
+            } is already registered. This makes impossible to consolidate root queries and will throw a GraphQLError.`,
+          );
+        }
+
+        this.objectTypeMap.set(definition.name.value, definition);
+      }
+
+      if (definition.kind === 'SchemaDefinition') {
+        operationDefinitions.push(definition);
+      } else {
+        nonOperationDefinitions.push(definition);
+      }
+    });
+
+    this.operationDefinitions.push(...operationDefinitions);
+    this.filteredDocuments.push({
+      ...document,
+      definitions: nonOperationDefinitions,
+    });
   }
 
-  /**
-   * Take a schema chunk and adds it to the schema pool
-   * to be built.
-   *
-   * @param schema The schema chunk to register.
-   */
-  registerSchema(schema: string) {
-    this.schemaStrings.push(schema);
-  }
+  get finalDocument(): DocumentNode {
+    const definitions: DefinitionNode[] = [];
 
-  /**
-   * Adds an enumeration to the pool. Even though this can be made
-   * through schemas, this way might be better for programatical
-   * purposes.
-   *
-   * @param enumItem The descriptor of the enumeration
-   */
-  registerEnum(enumItem: Enum) {
-    this.enums.push(enumItem);
-  }
+    // Push all definitions from filtered documents
+    this.filteredDocuments.forEach(document => {
+      definitions.push(...document.definitions);
+    });
 
-  /**
-   * Registers a root query on the pool based on the descriptor.
-   *
-   * @param query The descriptor of the root query.
-   */
-  registerRootQuery(query: RPCDescription) {
-    if (this.hasRPC(query.name)) {
-      throw new BlossomRootValueAlreadyInUse(
-        `Root Query / Mutation with name ${
-          query.name
-        } already registered on instance.`,
+    const fields: { [key in OperationTypeNode]: FieldDefinitionNode[] } = {
+      query: [],
+      mutation: [],
+      subscription: [],
+    };
+
+    const operationTypes: OperationTypeDefinitionNode[] = [];
+
+    this.operationDefinitions.forEach(definition => {
+      definition.operationTypes.forEach(operationType => {
+        const typeName = operationType.type.name.value;
+        const objectTypeDefinition = this.objectTypeMap.get(typeName);
+
+        if (!objectTypeDefinition) {
+          throw new ReferenceError(
+            `Reference to name ${typeName} not found for operation type ${
+              operationType.operation
+            }. Is it present in any of the imported files?`,
+          );
+        }
+        if (
+          !objectTypeDefinition.fields ||
+          objectTypeDefinition.fields.length === 0
+        ) {
+          return;
+        }
+
+        fields[operationType.operation].push(...objectTypeDefinition.fields);
+      });
+    });
+
+    Object.entries(fields).forEach(([operation, fields]) => {
+      if (fields.length === 0) return;
+
+      const objectName =
+        CONSOLIDATED_QUERY_NAMES[operation as OperationTypeNode];
+
+      // Push to the list of operation types
+      operationTypes.push({
+        kind: 'OperationTypeDefinition',
+        operation: operation as OperationTypeNode,
+        type: {
+          kind: 'NamedType',
+          name: {
+            kind: 'Name',
+            value: objectName,
+          },
+        },
+      });
+
+      // Create the object definition and push it to the list of definitions
+      const finalDefinition: ObjectTypeDefinitionNode = {
+        kind: 'ObjectTypeDefinition',
+        name: {
+          kind: 'Name',
+          value: objectName,
+        },
+        description: {
+          kind: 'StringValue',
+          value: `Consolidated list of Blossom ${operation}s.`, // <- Nasty
+        },
+        fields,
+      };
+      definitions.push(finalDefinition);
+    });
+
+    if (operationTypes.length === 0) {
+      throw new Error(
+        "No root values registered in this schema. Won't be able to resolve anything.",
       );
     }
 
-    this.rootQueries.push(query);
+    // Create the final, consolidated, schema definition
+    const finalSchemaDefinition: SchemaDefinitionNode = {
+      kind: 'SchemaDefinition',
+      operationTypes,
+    };
+    definitions.push(finalSchemaDefinition);
+
+    return {
+      kind: 'Document',
+      definitions,
+    };
   }
 
-  /**
-   * Registers a root query on the pool based on the descriptor.
-   *
-   * @param mutation The descriptor of the root mutation.
-   */
-  registerRootMutation(mutation: RPCDescription) {
-    if (this.hasRPC(mutation.name)) {
-      throw new BlossomRootValueAlreadyInUse(
-        `Root Query / Mutation with name ${
-          mutation.name
-        } already registered on instance.`,
+  get rootSchema(): GraphQLSchema {
+    return buildASTSchema(this.finalDocument);
+  }
+
+  addRootOperation(
+    operation: OperationTypeNode,
+    name: string,
+    callback: ResolverSignature,
+  ): void {
+    const existingOperation = this.rootOperationsMap.get(name);
+    if (existingOperation) {
+      throw new ReferenceError(
+        `Operation ${name} already registered as ${existingOperation} on instance.`,
       );
     }
 
-    this.rootMutations.push(mutation);
+    this.rootOperationsMap.set(name, { operation, callback });
+  }
+
+  get rootValue(): RootValueOutput {
+    const finalObject: {
+      [key: string]: ResolverSignature;
+    } = {};
+
+    for (const [name, { callback }] of this.rootOperationsMap) {
+      finalObject[name] = callback;
+    }
+
+    return finalObject;
   }
 
   /**
@@ -177,7 +265,7 @@ export class BlossomInstance implements IBlossomInstance {
    * provided, will try to retrieve handler from the static handler() method
    * of the constructor.
    */
-  registerErrorHandler(
+  addErrorHandler(
     errorClass: BlossomError,
     handlingFunction?: ErrorHandlingFunction,
   ) {
@@ -197,174 +285,41 @@ export class BlossomInstance implements IBlossomInstance {
       );
     }
   }
-
-  /**
-   * Collapses all the elements of the instance into a single
-   * schema to be passed to a `buildSchema` or `makeExecutableSchema`
-   * method of your favorite GraphQL server.
-   */
-  getRootSchema({ force = false }: { force?: boolean } = {}): RootSchema {
-    // Try to retrieve memoization first.
-    if (this.memoValues.rootSchema && !force) return this.memoValues.rootSchema;
-
-    // Convert the enums to strings.
-    const enumsStrings = this.enums.map(enumDescription =>
-      renderEnumToSchema(enumDescription),
-    );
-
-    // Convert RPC Descriptors to string
-    const rootQueriesStrings = this.rootQueries.map(rootQuery =>
-      renderRPCDescriptionToSchema(rootQuery),
-    );
-    const rootMutationsStrings = this.rootMutations.map(rootMutation =>
-      renderRPCDescriptionToSchema(rootMutation),
-    );
-
-    // Stitch them together, memoize and return
-    const schemaString = renderSchema(
-      enumsStrings,
-      this.schemaStrings,
-      rootQueriesStrings,
-      rootMutationsStrings,
-    );
-    const parsedSchema = this.schemaBuilder(schemaString);
-
-    this.memoValues.rootSchema = {
-      schemaString,
-      parsedSchema,
-    };
-
-    return this.memoValues.rootSchema;
-  }
-
-  /**
-   * Takes root queries and mutations and convolves them on a single
-   * object to be pased to the GraphQL engine.
-   */
-  getRootValue({ force = false }: { force?: boolean } = {}): any {
-    if (this.memoValues.rootValue && !force) return this.memoValues.rootValue;
-
-    const mutations = this.rootMutations.map(({ name, callback }) => ({
-      [name]: callback,
-    }));
-    const queries = this.rootQueries.map(({ name, callback }) => ({
-      [name]: callback,
-    }));
-
-    // Create the object in the memo and return it
-    this.memoValues.rootValue = merge({}, ...mutations, ...queries);
-
-    return this.memoValues.rootValue;
-  }
-
-  /**
-   * Does this instance already have a RPC (query or mutation) with a given
-   * name?
-   *
-   * @param name Name of the RPC to search for.
-   */
-  hasRPC(name: string): boolean {
-    return (
-      this.rootQueries.findIndex(query => name === query.name) > -1 ||
-      this.rootMutations.findIndex(mutation => name === mutation.name) > -1
-    );
-  }
-
-  /**
-   * Returns rootValue. If not computed yet, will be computed for you.
-   */
-  get rootValue(): any {
-    return this.getRootValue({ force: false });
-  }
-
-  /**
-   * Returns rootSchema String. If not computed yet, will be computed for you.
-   */
-  get rootSchemaString(): string {
-    return this.getRootSchema({ force: false }).schemaString;
-  }
-
-  /**
-   * Return parsed root schema. If not computed yet, will be computed for you.
-   */
-  get rootSchema(): GraphQLSchema {
-    return this.getRootSchema({ force: false }).parsedSchema;
-  }
 }
 
-/**
- * A function that receives a RPCCallback, proxies it to the Blossom instance
- * and returns the exact same function, which in turn can be exported.
- *
- * These functions are meant to be used as top level decorators in the future
- * if TC39 decides to bring support for them.
- */
-type AccumulatorFunction = <R>(base: RPCCallback<R>) => RPCCallback<R>;
-
-/**
- * Options for the Blossom Error accumulator function.
- */
-type BlossomErrorInput = {
-  /**
-   * Error handling function. If empty, the handler must be provided as a static
-   * handler method in the error class.
-   */
-  handler?: ErrorHandlingFunction;
+export type RootDescriptor = {
+  implements: string;
+  using: ResolverSignature;
 };
 
-/**
- * A proxy to the Blossom instance in order to functionally access all of the
- * user-facing concerns.
- */
-type BlossomInstanceProxy = {
-  /**
-   * Accumulator function for registering a root query.
-   */
-  BlossomRootQuery: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
-  /**
-   * Accumulator function for registering a root mutation.
-   */
-  BlossomRootMutation: (descriptor: RPCDescriptionBase) => AccumulatorFunction;
-  /**
-   * Accumulator for adding custom blossom errors.
-   */
-  BlossomError: (
-    opts?: BlossomErrorInput,
-  ) => (constructor: BlossomError) => BlossomError;
-};
-
-/**
- * Receives a Blossom instance and returns a group of decorators that can be
- * used to register multiple kinds of components.
- */
-export function createBlossomDecorators(
-  blossomInstance: IBlossomInstance,
-): BlossomInstanceProxy {
+export function createBlossomDecorators(instance: IBlossomInstance) {
   return {
-    BlossomRootQuery(descriptor: RPCDescriptionBase) {
-      return function<R>(base: RPCCallback<R>): RPCCallback<R> {
-        blossomInstance.registerRootQuery({
-          ...descriptor,
-          callback: base,
-        });
+    BlossomRootQuery(descriptor: RootDescriptor) {
+      return function registerRoot(callback: ResolverSignature) {
+        instance.addRootOperation(
+          'query',
+          descriptor.implements,
+          descriptor.using,
+        );
 
-        return base;
+        return callback;
       };
     },
-    BlossomRootMutation(descriptor: RPCDescriptionBase) {
-      return function<R>(base: RPCCallback<R>): RPCCallback<R> {
-        blossomInstance.registerRootMutation({
-          ...descriptor,
-          callback: base,
-        });
+    BlossomRootMutation(descriptor: RootDescriptor) {
+      return function registerRoot(callback: ResolverSignature) {
+        instance.addRootOperation(
+          'mutation',
+          descriptor.implements,
+          descriptor.using,
+        );
 
-        return base;
+        return callback;
       };
     },
     BlossomError(opts: BlossomErrorInput = {}) {
       return function(errorClass: BlossomError) {
         const { handler } = opts;
-        blossomInstance.registerErrorHandler(errorClass, handler);
+        instance.addErrorHandler(errorClass, handler);
 
         return errorClass;
       };

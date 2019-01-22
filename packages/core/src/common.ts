@@ -21,7 +21,7 @@ export type MaybePromise<T> = Promise<Maybe<T>>;
 /**
  * Base signature of a resolving function.
  */
-type BaseResolverSignature<I, O, C> = (
+export type BaseResolverSignature<I, O, C> = (
   args: I,
   ctx: C,
   ast: GraphQLResolveInfo,

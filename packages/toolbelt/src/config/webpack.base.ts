@@ -6,6 +6,8 @@
  *
  */
 
+import path from 'path';
+
 import { BannerPlugin } from 'webpack';
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
 
@@ -31,6 +33,10 @@ const baseConfig = {
   },
   module: {
     rules: [
+      {
+        test: /\.(gql|graphql)/,
+        use: path.resolve(__dirname, '..', 'loaders', 'schema-loader.js'),
+      },
       {
         test: /\.ts/,
         use: 'ts-loader',
