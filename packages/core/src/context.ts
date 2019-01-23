@@ -6,7 +6,7 @@
  *
  */
 
-import * as Dataloader from 'dataloader';
+import { BlossomLoaderSignature } from './new-loader';
 
 /**
  * A context for an specific Blossom request.
@@ -20,5 +20,5 @@ export type BlossomContext<R> = {
   /**
    * Function to retrieve a loader instance in this particular request.
    */
-  loader: <K, V>(loader: Dataloader.BatchLoadFn<K, V>) => Dataloader<K, V>;
+  loader: BlossomLoaderSignature<BlossomContext<R>>;
 };

@@ -16,13 +16,17 @@ if (process.env.NODE_ENV !== 'production') {
 // in the future however you find best.
 
 // GraphQL SDL files must automatically added as documents
-const schemas = require.context('./components', true, /.(gql|graphql)$/i);
+const schemas = require.context('./components', true, /\.(gql|graphql)$/i);
 schemas.keys().forEach(key => {
   const imported = schemas(key);
   const document: DocumentNode = imported.default;
 
   instance.addDocument(document);
 });
+
+// Blossom root files register files in the instance
+const blossomRootFiles = require.context('./components', true, /\.root\.ts$/i);
+blossomRootFiles.keys().forEach(blossomRootFiles);
 
 // Create resolve instance and add a route
 const blossomResolve = blossom(instance);

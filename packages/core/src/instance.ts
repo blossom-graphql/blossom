@@ -308,26 +308,18 @@ export type RootDescriptor = {
 export function createBlossomDecorators(instance: IBlossomInstance) {
   return {
     BlossomRootQuery(descriptor: RootDescriptor) {
-      return function registerRoot(callback: ResolverSignature) {
-        instance.addRootOperation(
-          'query',
-          descriptor.implements,
-          descriptor.using,
-        );
-
-        return callback;
-      };
+      instance.addRootOperation(
+        'query',
+        descriptor.implements,
+        descriptor.using,
+      );
     },
     BlossomRootMutation(descriptor: RootDescriptor) {
-      return function registerRoot(callback: ResolverSignature) {
-        instance.addRootOperation(
-          'mutation',
-          descriptor.implements,
-          descriptor.using,
-        );
-
-        return callback;
-      };
+      instance.addRootOperation(
+        'mutation',
+        descriptor.implements,
+        descriptor.using,
+      );
     },
     BlossomError(opts: BlossomErrorInput = {}) {
       return function(errorClass: BlossomError) {

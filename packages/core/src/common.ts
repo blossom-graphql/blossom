@@ -53,6 +53,6 @@ export type Resolver<I, O, C> = BaseResolverSignature<I, O, C>;
  * Signature of the batch function.
  */
 export type BatchFunction<I, O, C> = (
-  ids: I[],
+  ids: ReadonlyArray<I>,
   ctx: C,
-) => Promise<ReadonlyArray<O>>;
+) => Promise<O[]>;

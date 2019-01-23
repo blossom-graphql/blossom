@@ -89,6 +89,12 @@ export function resolveArray<I, O, C>(resolveParams: {
   ctx: C;
   ast: GraphQLResolveInfo;
   using: Resolver<I, O, C>;
+}): ReadonlyArray<O | null>;
+export function resolveArray<I, O, C>(resolveParams: {
+  data: ReadonlyArray<Maybe<I>>;
+  ctx: C;
+  ast: GraphQLResolveInfo;
+  using: Resolver<I, O, C>;
 }): ReadonlyArray<O | null> {
   const { data, ctx, ast, using: callback } = resolveParams;
 

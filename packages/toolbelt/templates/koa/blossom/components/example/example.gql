@@ -1,0 +1,12 @@
+type Example {
+  name: ID!
+  message: String!
+}
+
+type ExampleQuery {
+  example(names: [ID!]!): [Example]!
+}
+
+schema {
+  query: ExampleQuery
+}

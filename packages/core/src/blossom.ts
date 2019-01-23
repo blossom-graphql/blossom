@@ -9,8 +9,9 @@
 import { graphql, ExecutionResult } from 'graphql';
 
 import { IBlossomInstance } from './instance';
-import { createLoaderInstance } from './loader';
 import { formatGraphQLErrors } from './errors';
+import { generateLoaderInstance } from './new-loader';
+import { BlossomContext } from './context';
 
 /**
  * The body of a (already pre-processed) Blossom request.
@@ -47,17 +48,18 @@ export function blossom(instance: IBlossomInstance) {
   // We extract here to save on the request resolving operation.
   const { errorHandlers, rootSchema, rootValue } = instance;
 
-  return async function blossomRequestResolver(
+  return async function blossomRequestResolver<C>(
     body: BlossomRequestBody,
-    requestContext?: any,
+    requestContext: C,
   ): Promise<ExecutionResult<any>> {
     // Prepare information to be passed to the parser.
     const { operationName, query, variables } = body;
 
-    const context = {
+    const context: BlossomContext<C> = {
       requestContext,
-      loader: createLoaderInstance(),
+      loader: generateLoaderInstance<C>(),
     };
+    context.loader.instance.setContext(context); // ! -> Circular!!
 
     // Actually pass the information to the parser
     const response = await graphql(
