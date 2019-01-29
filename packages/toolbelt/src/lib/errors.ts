@@ -15,6 +15,11 @@ import {
   OriginDescription,
 } from './linking';
 import { ErrorsOutput, makeTitleOriginDescriptor } from './utils';
+import {
+  ObjectTypeDescriptor,
+  EnumTypeDescriptor,
+  UnionTypeDescriptor,
+} from './parsing';
 
 export class ExtendableError extends Error {
   constructor(error?: string | undefined) {
@@ -265,5 +270,53 @@ export class EmptyLoadersFileError extends ExtendableError
     return `No loaders to generate in loaders file for ${
       this.filePath
     }. Add at least one ID type field to a type declaration within the file.`;
+  }
+}
+
+export class NoFieldsTypeError extends ExtendableError
+  implements FormattableError {
+  typeDescriptor: ObjectTypeDescriptor;
+
+  constructor(typeDescriptor: ObjectTypeDescriptor) {
+    super(`Object type ${typeDescriptor} has no fields.`);
+
+    this.typeDescriptor = typeDescriptor;
+  }
+
+  cliFormat() {
+    const title = chalk.red(`${this.typeDescriptor.name} has no fields`);
+
+    const help = `\nObject type ${
+      this.typeDescriptor.name
+    } has no fields. Did you forget to ${chalk.blue(
+      'extend',
+    )} it or an ${chalk.gray('# import')} statement?`;
+
+    return title + help;
+  }
+}
+
+export class NoMembersError extends ExtendableError
+  implements FormattableError {
+  descriptor: EnumTypeDescriptor | UnionTypeDescriptor;
+
+  constructor(descriptor: EnumTypeDescriptor | UnionTypeDescriptor) {
+    super(`${descriptor} has no members.`);
+
+    this.descriptor = descriptor;
+  }
+
+  cliFormat() {
+    const title = chalk.red(`${this.descriptor.name} has no members`);
+    const type =
+      this.descriptor.kind === 'EnumTypeDescriptor' ? 'Enum' : 'Union';
+
+    const help = `\n${type} ${
+      this.descriptor.name
+    } has no fields. Did you forget to ${chalk.blue(
+      'extend',
+    )} it or an ${chalk.gray('# import')} statement?`;
+
+    return title + help;
   }
 }

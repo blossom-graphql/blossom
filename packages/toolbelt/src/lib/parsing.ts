@@ -913,30 +913,27 @@ export function parseDocumentObjectType(
 export function parseDocumentEnumType(
   enumDesc: EnumTypeDefinitionNode,
 ): EnumTypeDescriptor {
-  if (!enumDesc.values || enumDesc.values.length === 0) {
-    // TODO: Create error.
-    throw new Error('Any enum expected to be parsed must have values');
-  }
+  const fields = enumDesc.values
+    ? enumDesc.values.map(value => ({
+        originalName: value.name.value,
+        comments: value.description && value.description.value,
+      }))
+    : [];
 
   return {
     kind: 'EnumTypeDescriptor',
     name: enumDesc.name.value,
     comments: enumDesc.description && enumDesc.description.value,
-    fields: enumDesc.values.map(value => ({
-      originalName: value.name.value,
-      comments: value.description && value.description.value,
-    })),
+    fields,
   };
 }
 
 export function parseDocumentUnionType(
   unionDesc: UnionTypeDefinitionNode,
 ): UnionTypeDescriptor {
-  if (!unionDesc.types || unionDesc.types.length === 0) {
-    throw new Error('Any union expected to be parsed must have members');
-  }
-
-  const members = unionDesc.types.map(type => type.name.value);
+  const members = unionDesc.types
+    ? unionDesc.types.map(type => type.name.value)
+    : [];
 
   return {
     kind: 'UnionTypeDescriptor',

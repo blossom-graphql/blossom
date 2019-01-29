@@ -16,7 +16,7 @@ export function printFormattedError(error: Error) {
 
     console.error(result);
   } else {
-    console.error(error.toString() + error.stack);
+    console.error(error.stack);
   }
 }
 

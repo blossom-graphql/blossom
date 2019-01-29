@@ -31,6 +31,8 @@ import {
   LinkingError,
   DuplicateFieldError,
   EmptyLoadersFileError,
+  NoFieldsTypeError,
+  NoMembersError,
 } from './errors';
 import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
 import {
@@ -816,7 +818,19 @@ export function linkUnionTypes(
   result: TypesFileContents,
   _linkingContext: LinkingContext,
 ) {
+  if (unionDescriptor.members.length === 0) {
+    throw new NoMembersError(unionDescriptor);
+  }
+
   result.unionDeclarations.push(unionDescriptor);
+}
+
+export function linkEnumTypes(
+  enumDescriptor: EnumTypeDescriptor,
+  result: TypesFileContents,
+  _linkingContext: LinkingContext,
+) {
+  result.enumDeclarations.push(enumDescriptor);
 }
 
 export function isRootType(
@@ -842,6 +856,12 @@ export function linkObjectTypes(
   result: TypesFileContents | RootFileContents,
   linkingContext: LinkingContext,
 ) {
+  // TODO: When extensions are available, this must also consider extensions
+  // as a by updating fields and whatever's new.
+  if (typeDescriptor.fields.length === 0) {
+    throw new NoFieldsTypeError(typeDescriptor);
+  }
+
   // Update some of the stats that will be used to compute imports.
   typeDescriptor.fields.some(field => {
     addFieldCommonDependencyFlags(field, result);
@@ -1169,7 +1189,7 @@ export function linkTypesFile(
 
   // Push enums. If this gets more complicated, a new function can be created.
   [...parsedFile.parsedDocument.enums.values()].forEach(descriptor => {
-    result.enumDeclarations.push(descriptor);
+    linkEnumTypes(descriptor, result, linkingContext);
   });
 
   // Push unions.
