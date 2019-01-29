@@ -904,7 +904,7 @@ export function linkObjectTypes(
 
 export function addCommonVendorImports(
   result: TypesFileContents | RootFileContents,
-  linkingContext: LinkingContext,
+  _linkingContext: LinkingContext,
 ) {
   // - When there's a required field, Maybe must be included.
   if (result.dependencyFlags.has(DependencyFlag.HasOptionalReference)) {
@@ -919,14 +919,6 @@ export function addCommonVendorImports(
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
   //   be included.
   if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
-    linkingContext.linkingType === LinkingType.RootFile &&
-      addImport(
-        result.vendorImports,
-        'VendorImport',
-        GRAPHQL_PACKAGE_NAME,
-        'GraphQLResolveInfo',
-      );
-
     addImport(
       result.fileImports,
       'FileImport',
@@ -954,10 +946,7 @@ export function addCommonVendorImports(
     );
   }
 
-  if (
-    linkingContext.linkingType === LinkingType.TypesFile &&
-    result.dependencyFlags.get(DependencyFlag.HasThunkedField)
-  ) {
+  if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
     addImport(
       result.vendorImports,
       'VendorImport',
@@ -1022,7 +1011,9 @@ export function addRootFileImports(
   linkingContext: LinkingContext,
 ) {
   // 1. Add common vendor imports.
-  addCommonVendorImports(result, linkingContext);
+  // ! No longer required. They are absorbed by the signatures.
+  // ! To be removed.
+  // addCommonVendorImports(result, linkingContext);
 
   // 2. Add resolve import when necessary
   if (result.dependencyFlags.get(DependencyFlag.HasReferencedTypeOperation))
@@ -1060,7 +1051,9 @@ export function addRootFileImports(
     );
 
   // 3. Add dependencies coming from other files.
-  addTypeReferencesImports(result, linkingContext);
+  // ! No longer required since signatures include them.
+  // ! To be removed once we are sure about this.
+  // addTypeReferencesImports(result, linkingContext);
 
   // 4. Add resolver signatures imports.
   result.operationDeclarations.forEach(operationFieldDescriptor => {
