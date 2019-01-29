@@ -1,0 +1,15 @@
+# This file will automatically be imported by index.ts along all the .gql or
+# .graphql file inside this directory.
+#
+# This is a good place to place any type that should be extended across multiple
+# files. The most common example is extending the root query and root mutation
+# types, which will happen here.
+
+type Query @schemaQuery;
+
+type Mutation @schemaMutation;
+
+schema {
+  query: Query;
+  mutation: Mutation;
+}

@@ -656,13 +656,6 @@ export function generateRootFileNodes(
   const functionDeclarations = flatMap(
     contents.operationDeclarations,
     operationDescriptor => {
-      const { fieldDescriptor } = operationDescriptor;
-      const terminalType = getOutputType(
-        generateTerminalTypeNode(operationDescriptor),
-        operationDescriptor.fieldDescriptor.thunkType ===
-          ThunkType.AsyncFunction,
-      );
-
       const name = rootResolverName(operationDescriptor);
 
       const commentStatement = ts.createEmptyStatement();
@@ -682,15 +675,36 @@ export function generateRootFileNodes(
         undefined,
         ts.createIdentifier(name),
         undefined,
-        // At the moment we are hardwiring this to false. However, when we try
-        // to further optimize the loading of specific fields, the actual field
-        // list should be retrieved from resolveInfo.
-        //
-        // Thus, this should be wired to a setting, a directive or something
-        // similar. E.g. if we use a different kind of loader for this resource,
-        // then resolveInfo should be included in the list of arguments.
-        generateResolverFunctionArguments(fieldDescriptor.arguments, true),
-        terminalType,
+        [
+          ts.createParameter(
+            undefined,
+            undefined,
+            undefined,
+            ts.createIdentifier('args'),
+            undefined,
+            undefined,
+            undefined,
+          ),
+          ts.createParameter(
+            undefined,
+            undefined,
+            undefined,
+            ts.createIdentifier('ctx'),
+            undefined,
+            undefined,
+            undefined,
+          ),
+          ts.createParameter(
+            undefined,
+            undefined,
+            undefined,
+            ts.createIdentifier('ast'),
+            undefined,
+            undefined,
+            undefined,
+          ),
+        ],
+        undefined,
         functionContents,
       );
 

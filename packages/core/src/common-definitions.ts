@@ -18,7 +18,11 @@ enum BlossomThunkType {
   async
 }
 
-directive @blossomImpl(type: BlossomThunkType!) on FIELD_DEFINITION
+directive @blossomImpl(type: BlossomThunkType!) on FIELD_DEFINITION;
+
+directive @schemaQuery on FIELD_DEFINITION;
+
+directive @schemaMutation on FIELD_DEFINITION;
 `);
 
 export default parsed.definitions;

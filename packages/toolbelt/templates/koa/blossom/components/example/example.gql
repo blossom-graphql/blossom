@@ -3,10 +3,6 @@ type Example {
   message: String!
 }
 
-type ExampleQuery {
+extend type Query {
   example(names: [ID!]!): [Example]!
-}
-
-schema {
-  query: ExampleQuery
 }

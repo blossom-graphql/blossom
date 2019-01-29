@@ -94,21 +94,16 @@ type Post {
 
 # Since the SDL is the source of truth, and we expect these files to be
 # modularized, you can declare the signature of your root query / mutations
-# here and Blossom Toolbelt will only generate the root placeholders for the
-# functions declared in this file.
+# by extending the Query / Mutation types and Blossom Toolbelt will only
+# generate the root placeholders for the functions declared in this file.
 #
-# When importing this file into your project,t all these definitions will be
-# automatically merged for you. Thus, you need to define the schema {} statement
-# and the associated types that implement the queries and mutations for you.
-schema {
-  query: PostsQuery
-  mutation: PostsMutation
-}
+# Extensions from other files will not be considered by the codegen tool, since
+# these will be generated in their own files.
 
 """
 Definitions for post queries.
 """
-type PostsQuery {
+extend type Query {
   """
   Returns a post with an specific ID. Returns `null` if the Post doesn't exist.
   """
@@ -122,7 +117,7 @@ type PostsQuery {
 """
 Definitions for post mutations.
 """
-type PostsMutation {
+extend type Mutation {
   """
   Creates a new Post entity given the payload. If the post is created succesfully,
   returns the `Post` of the newly created post.

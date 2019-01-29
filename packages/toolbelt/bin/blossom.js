@@ -10,4 +10,11 @@
 'use strict';
 
 const path = require('path').join(__dirname, '..', 'dist', 'cmd', 'blossom.js');
-require(path);
+
+require('child_process').spawnSync(
+  'node',
+  ['--no-warnings', path, ...process.argv.slice(2)],
+  {
+    stdio: 'inherit',
+  },
+);
