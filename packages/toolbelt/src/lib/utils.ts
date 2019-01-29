@@ -112,6 +112,14 @@ export function makeTitleOriginDescriptor(
       return `Union: ${originDescriptor.name}`;
     case OriginKind.Operation:
       return `Operation: ${originDescriptor.operationType}`;
+    case OriginKind.ObjectExtension:
+      return `Type Extension: ${originDescriptor.objectName} > Field: ${
+        originDescriptor.fieldName
+      }`;
+    case OriginKind.InputExtension:
+      return `Input Extension: ${originDescriptor.objectName} > Field: ${
+        originDescriptor.fieldName
+      }`;
   }
 }
 

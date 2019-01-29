@@ -21,6 +21,7 @@ import {
   TypeDescriptor,
   UnionTypeDescriptor,
   KnownScalarTypes,
+  ObjectExtensionDescriptor,
 } from './parsing';
 import { blossomInstancePath, typesFilePath, resolversFilePath } from './paths';
 import {
@@ -53,6 +54,21 @@ export const CORE_DELIVER_NAME = 'deliver';
 export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
 export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
 export const OBJECT_SIGNATURE_NAME = 'ObjectResolverSignature';
+
+const OPERATION_MAP: { [key in SupportedOperation]: string } = {
+  // Using [SupportOperation.Query] throws runtime error.
+  query: blossomGraphqlQueryTypeName(),
+  mutation: blossomGraphqlMutationTypeName(),
+};
+
+// TODO: Move me.
+export function blossomGraphqlQueryTypeName(): string {
+  return 'Query';
+}
+
+export function blossomGraphqlMutationTypeName(): string {
+  return 'Mutation';
+}
 
 export enum DependencyFlag {
   HasOptionalReference = 'HasOptionalReference',
@@ -155,6 +171,8 @@ export enum OriginKind {
   ObjectArgument = 'ObjectArgument',
   InputArgument = 'InputArgument',
   Operation = 'Operation',
+  ObjectExtension = 'ObjectExtension',
+  InputExtension = 'InputExtension',
 }
 
 export enum ElementKind {
@@ -184,10 +202,16 @@ export type OriginDescription =
   | ArgumentOriginDescription
   | OperationOriginDescription;
 
+export type FieldOriginKind =
+  | OriginKind.Object
+  | OriginKind.Input
+  | OriginKind.ObjectExtension
+  | OriginKind.InputExtension;
+
 export type FieldOriginDescription = {
   fieldName: string;
   objectName: string;
-  originKind: OriginKind.Object | OriginKind.Input;
+  originKind: FieldOriginKind;
 };
 
 export type ArgumentOriginDescription = {
@@ -271,7 +295,8 @@ export function updateReferenceGraphArgument(
   } else {
     if (argumentDescriptor.type.kind === 'ReferencedType') {
       const originKind =
-        fieldOriginDescription.originKind === OriginKind.Object
+        fieldOriginDescription.originKind === OriginKind.Object ||
+        fieldOriginDescription.originKind === OriginKind.ObjectExtension
           ? OriginKind.ObjectArgument
           : OriginKind.InputArgument;
 
@@ -291,12 +316,28 @@ export function updateReferenceGraphArgument(
 export function updateReferenceGraphField(
   linkingContext: LinkingContext,
   descriptor: FieldDescriptor,
-  parent: ObjectTypeDescriptor,
+  parent: ObjectTypeDescriptor | ObjectExtensionDescriptor,
 ) {
-  const originKind: OriginKind.Object | OriginKind.Input =
-    parent.objectType === ObjectTypeKind.Object
-      ? OriginKind.Object
-      : OriginKind.Input;
+  let originKind: FieldOriginKind;
+  switch (parent.objectType) {
+    case ObjectTypeKind.Object:
+      originKind =
+        parent.kind === 'ObjectExtensionsDescriptor'
+          ? OriginKind.ObjectExtension
+          : OriginKind.Object;
+      break;
+    case ObjectTypeKind.Input:
+      originKind =
+        parent.kind === 'ObjectExtensionsDescriptor'
+          ? OriginKind.InputExtension
+          : OriginKind.Input;
+      break;
+    default:
+      originKind = OriginKind.Object;
+  }
+
+  // TODO: Under certain circumstances, extensions will require the base type
+  // as a reference as well. Be ready to bring support to these.
 
   const fieldOriginDescription: FieldOriginDescription = {
     originKind,
@@ -332,7 +373,11 @@ export function updateReferenceGraphField(
 
 export function updateReferenceMap(
   linkingContext: LinkingContext,
-  descriptor: ObjectTypeDescriptor | UnionTypeDescriptor | OperationDescriptor,
+  descriptor:
+    | ObjectTypeDescriptor
+    | ObjectExtensionDescriptor
+    | UnionTypeDescriptor
+    | OperationDescriptor,
 ): void {
   if (descriptor.kind === 'UnionTypeDescriptor') {
     descriptor.members.forEach(field =>
@@ -341,7 +386,10 @@ export function updateReferenceMap(
         name: descriptor.name,
       }),
     );
-  } else if (descriptor.kind === 'ObjectTypeDescriptor') {
+  } else if (
+    descriptor.kind === 'ObjectTypeDescriptor' ||
+    descriptor.kind === 'ObjectExtensionsDescriptor'
+  ) {
     descriptor.fields.forEach(field => {
       updateReferenceGraphField(linkingContext, field, descriptor);
     });
@@ -541,17 +589,17 @@ export function isValidResolution(
 ): boolean {
   switch (reference.originKind) {
     case OriginKind.Object:
+    case OriginKind.ObjectExtension:
       return [ElementKind.Type, ElementKind.Enum, ElementKind.Union].includes(
         resolution.elementKind,
       );
     case OriginKind.ObjectArgument:
-      const typeRepresentsRootMutation = isRootType(
+      const typeRepresentsRoot = isRootType(
         reference.fieldOriginDescription.objectName,
         linkingContext,
-        SupportedOperation.Mutation,
       );
 
-      if (typeRepresentsRootMutation) {
+      if (typeRepresentsRoot) {
         return [
           ElementKind.Input,
           ElementKind.Enum,
@@ -562,6 +610,7 @@ export function isValidResolution(
           resolution.elementKind,
         );
       }
+    case OriginKind.InputExtension:
     case OriginKind.Input:
     case OriginKind.InputArgument:
       return [ElementKind.Input, ElementKind.Enum].includes(
@@ -693,24 +742,25 @@ export function extractDescriptor(
 }
 
 export function linkOperationTypes(
-  descriptor: OperationDescriptor,
+  descriptor: ObjectExtensionDescriptor,
   result: TypesFileContents | RootFileContents,
   linkingContext: LinkingContext,
 ) {
-  // 1. Get object type definition from resolved map. Ensure that exists.
-  const { name } = descriptor.objectType;
+  let operation: SupportedOperation | undefined = undefined;
+  Object.entries(OPERATION_MAP).some(
+    ([supportedOperation, typeName]: [string, string]) => {
+      const isSupportedOperation = descriptor.name === typeName;
+      if (isSupportedOperation)
+        operation = supportedOperation as SupportedOperation;
 
-  const objectDescriptor = extractDescriptor(
-    name,
-    ElementKind.Type,
-    linkingContext,
+      return isSupportedOperation;
+    },
   );
-  if (!objectDescriptor) {
-    throw new Error(`Object descriptor not found for name ${name}.`);
-  }
 
-  // 2. Create descriptor for each one of the fields.
-  objectDescriptor.fields.forEach(field => {
+  if (!operation) return;
+
+  // 1. Create descriptor for each one of the fields.
+  descriptor.fields.forEach(field => {
     const fieldDescriptor: FieldDescriptor = {
       ...field,
       thunkType: ThunkType.AsyncFunction,
@@ -718,9 +768,13 @@ export function linkOperationTypes(
     addFieldCommonDependencyFlags(fieldDescriptor, result);
 
     const operationFieldDescriptor: OperationFieldDescriptor = {
-      ...descriptor,
       kind: 'OperationFieldDescriptor',
       fieldDescriptor,
+      operation: operation as SupportedOperation,
+      objectType: {
+        kind: 'ReferencedType',
+        name: descriptor.name,
+      },
     };
 
     result.operationDeclarations.push(operationFieldDescriptor);
@@ -740,19 +794,19 @@ export function linkOperationTypes(
     }
   });
 
-  if (descriptor.operation === SupportedOperation.Query) {
+  if (operation === SupportedOperation.Query) {
     result.dependencyFlags.set(DependencyFlag.HasRootQuery, true);
-  } else if (descriptor.operation === SupportedOperation.Mutation) {
+  } else if (operation === SupportedOperation.Mutation) {
     result.dependencyFlags.set(DependencyFlag.HasRootMutation, true);
   }
 
-  // 3. Add dependency flags for properly resolving imports when we are
+  // 2. Add dependency flags for properly resolving imports when we are
   //    generating a types file.
   if (linkingContext.linkingType !== LinkingType.TypesFile) return;
 
-  if (descriptor.operation === SupportedOperation.Query) {
+  if (operation === SupportedOperation.Query) {
     result.dependencyFlags.set(DependencyFlag.HasQuerySignatures, true);
-  } else if (descriptor.operation === SupportedOperation.Mutation) {
+  } else if (operation === SupportedOperation.Mutation) {
     result.dependencyFlags.set(DependencyFlag.HasMutationSignatures, true);
   }
 }
@@ -770,19 +824,17 @@ export function isRootType(
   linkingContext: LinkingContext,
   expectedOperation?: SupportedOperation,
 ): boolean {
-  for (const operationDescriptor of linkingContext.parsedFile.parsedDocument.operations.values()) {
-    const isExpectedOperation = expectedOperation
-      ? expectedOperation === operationDescriptor.operation
-      : true;
+  if (expectedOperation && fieldName !== OPERATION_MAP[expectedOperation])
+    return false;
 
-    if (
-      isExpectedOperation &&
-      operationDescriptor.objectType.name === fieldName
-    )
-      return true;
+  return Object.values(OPERATION_MAP).some(hasRootType);
+
+  function hasRootType(typeName: string) {
+    return (
+      fieldName === typeName &&
+      !!linkingContext.parsedFile.parsedDocument.objectExtensions.get(typeName)
+    );
   }
-
-  return false;
 }
 
 export function linkObjectTypes(
@@ -1134,9 +1186,16 @@ export function linkTypesFile(
   );
 
   const operationErrors = forEachWithErrors(
-    [...parsedFile.parsedDocument.operations.values()],
-    descriptor => {
+    Object.values(OPERATION_MAP),
+    typeName => {
+      const descriptor = linkingContext.parsedFile.parsedDocument.objectExtensions.get(
+        typeName,
+      );
+      if (!descriptor) return;
+
       updateReferenceMap(linkingContext, descriptor);
+
+      linkOperationTypes(descriptor, result, linkingContext);
     },
   );
 
@@ -1145,14 +1204,6 @@ export function linkTypesFile(
 
   const linkingErrors = enforceReferencesPresence(linkingContext);
 
-  // Resolve operation fields
-  const operationLinkingErrors = forEachWithErrors(
-    [...parsedFile.parsedDocument.operations.values()],
-    descriptor => {
-      linkOperationTypes(descriptor, result, linkingContext);
-    },
-  );
-
   // Show errors
   const accumulatedErrors = [
     ...objectErrors,
@@ -1160,7 +1211,6 @@ export function linkTypesFile(
     ...unionErrors,
     ...linkingErrors,
     ...operationErrors,
-    ...operationLinkingErrors,
   ];
 
   if (accumulatedErrors.length > 0) {
@@ -1203,14 +1253,21 @@ export function linkRootFile(
   // guarantee the resolution of outputs and arguments.
   const accumulatedErrors: [number, Error][] = [];
 
-  accumulatedErrors.push(
-    ...forEachWithErrors(
-      [...parsedFile.parsedDocument.operations.values()],
-      descriptor => {
-        updateReferenceMap(linkingContext, descriptor);
-      },
-    ),
+  const operationErrors = forEachWithErrors(
+    Object.values(OPERATION_MAP),
+    typeName => {
+      const descriptor = linkingContext.parsedFile.parsedDocument.objectExtensions.get(
+        typeName,
+      );
+      if (!descriptor) return;
+
+      updateReferenceMap(linkingContext, descriptor);
+
+      linkOperationTypes(descriptor, result, linkingContext);
+    },
   );
+
+  accumulatedErrors.push(...operationErrors);
 
   resolveReferences(linkingContext);
   accumulatedErrors.push(...enforceReferencesPresence(linkingContext));
@@ -1234,15 +1291,6 @@ export function linkRootFile(
   // descriptors.
   resolveReferences(linkingContext);
   accumulatedErrors.push(...enforceReferencesPresence(linkingContext));
-
-  accumulatedErrors.push(
-    ...forEachWithErrors(
-      [...parsedFile.parsedDocument.operations.values()],
-      descriptor => {
-        linkOperationTypes(descriptor, result, linkingContext);
-      },
-    ),
-  );
 
   if (accumulatedErrors.length > 0) {
     throw new LinkingError(accumulatedErrors);

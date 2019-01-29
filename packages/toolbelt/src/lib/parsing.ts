@@ -883,7 +883,8 @@ export function parseDocumentObjectType(
 
   const commonResults: ObjectDescriptorBase = {
     objectType:
-      nodeDescriptor.kind === 'ObjectTypeDefinition'
+      nodeDescriptor.kind === 'ObjectTypeDefinition' ||
+      nodeDescriptor.kind === 'ObjectTypeExtension'
         ? ObjectTypeKind.Object
         : ObjectTypeKind.Input,
     name: nodeDescriptor.name.value,
