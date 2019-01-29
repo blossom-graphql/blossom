@@ -100,9 +100,6 @@ type Post {
 # Extensions from other files will not be considered by the codegen tool, since
 # these will be generated in their own files.
 
-"""
-Definitions for post queries.
-"""
 extend type Query {
   """
   Returns a post with an specific ID. Returns `null` if the Post doesn't exist.
@@ -114,9 +111,6 @@ extend type Query {
   posts(last: Int = 10): [Post!]!
 }
 
-"""
-Definitions for post mutations.
-"""
 extend type Mutation {
   """
   Creates a new Post entity given the payload. If the post is created succesfully,
