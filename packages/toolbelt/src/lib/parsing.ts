@@ -20,6 +20,8 @@ import {
   NamedTypeNode,
   parse,
   UnionTypeDefinitionNode,
+  ObjectTypeExtensionNode,
+  InputObjectTypeExtensionNode,
 } from 'graphql';
 
 import { ImportParsingError, UnsupportedOperationError } from './errors';
@@ -75,6 +77,14 @@ export type IntermediateDictionary = {
    */
   unions: DocumentNameMap<UnionTypeDefinitionNode>;
   /**
+   * Map of parsed object extensions.
+   */
+  objectExtensions: DocumentNameMap<ObjectTypeExtensionNode>;
+  /**
+   * Map of parsed input extensions.
+   */
+  inputExtensions: DocumentNameMap<InputObjectTypeExtensionNode>;
+  /**
    * The node that is defining the schema on this file.
    */
   schema?: SchemaDefinitionNode;
@@ -90,6 +100,8 @@ export type DocumentParsingOuput = {
   enums: Map<string, EnumTypeDescriptor>;
   unions: Map<string, UnionTypeDescriptor>;
   operations: Map<SupportedOperation, OperationDescriptor>;
+  objectExtensions: Map<string, ObjectExtensionDescriptor>;
+  inputExtensions: Map<string, ObjectExtensionDescriptor>;
 };
 
 /**
@@ -220,18 +232,25 @@ export type TypeDescriptor =
   | KnownScalarTypeDescriptor
   | ReferencedTypeDescriptor;
 
+export type ObjectDescriptorBase = {
+  objectType: ObjectTypeKind;
+  name: string;
+  fields: FieldDescriptor[];
+  referencedTypes: ReferencedTypeList;
+};
+
 /**
  * Full description of an object type. Any `type` and `input` declaration in
  * GraphQL objects is collapsed into this data structure which in turned is
  * then consumed for codegen purposes.
  */
-export type ObjectTypeDescriptor = {
+export type ObjectTypeDescriptor = ObjectDescriptorBase & {
   kind: 'ObjectTypeDescriptor';
-  objectType: ObjectTypeKind;
-  name: string;
   comments?: string;
-  fields: FieldDescriptor[];
-  referencedTypes: ReferencedTypeList;
+};
+
+export type ObjectExtensionDescriptor = ObjectDescriptorBase & {
+  kind: 'ObjectExtensionsDescriptor';
 };
 
 /**
@@ -449,6 +468,8 @@ export function parseDocumentNode(
     inputs: {},
     enums: {},
     unions: {},
+    objectExtensions: {},
+    inputExtensions: {},
     schema: undefined,
   };
 
@@ -478,7 +499,17 @@ export function parseDocumentNode(
       case 'UnionTypeDefinition':
         intermediateDict.unions[definition.name.value] = { node: definition };
         break;
-      // TODO: Extra types go here.
+      case 'ObjectTypeExtension':
+        intermediateDict.objectExtensions[definition.name.value] = {
+          node: definition,
+        };
+        break;
+      case 'InputObjectTypeExtension':
+        intermediateDict.inputExtensions[definition.name.value] = {
+          node: definition,
+        };
+        break;
+      // TODO: Extra types go here in the future.
       default:
         // Do nothing
         // TODO: Logger.
@@ -523,71 +554,50 @@ export function parseDocumentNode(
     });
   }
 
-  /**
-   * Reducer meant to be used for mapping DocumentNodeDescriptors and, when
-   * the return is not null, incorporating the descriptor to the cumulative
-   * array.
-   *
-   * @param accumulator Accumulated array of ObjectTypeDescriptions.
-   *
-   * @param object Descriptor of the Object / Input.
-   */
-  function objectNodeReducer(
-    accumulator: Map<string, ObjectTypeDescriptor>,
-    object:
-      | DocumentNodeDescriptor<ObjectTypeDefinitionNode>
-      | DocumentNodeDescriptor<InputObjectTypeDefinitionNode>,
-  ) {
-    const parsedResult = parseDocumentObjectType(object.node);
-
-    if (parsedResult !== null) {
-      accumulator.set(parsedResult.name, parsedResult);
-    }
-
-    return accumulator;
-  }
-
-  function enumTypeReducer(
-    accumulator: Map<string, EnumTypeDescriptor>,
-    object: DocumentNodeDescriptor<EnumTypeDefinitionNode>,
-  ) {
-    const parsedResult = parseDocumentEnumType(object.node);
-    accumulator.set(parsedResult.name, parsedResult);
-
-    return accumulator;
-  }
-
-  function unionTypeReducer(
-    accumulator: Map<string, UnionTypeDescriptor>,
-    object: DocumentNodeDescriptor<UnionTypeDefinitionNode>,
-  ) {
-    const parsedResult = parseDocumentUnionType(object.node);
-    accumulator.set(parsedResult.name, parsedResult);
-
-    return accumulator;
-  }
-
   // Return the parsed AST for the objects.
   // TODO: Do something with aliases.
   return {
-    objects: Object.values(intermediateDict.objects).reduce(
-      objectNodeReducer,
-      new Map(),
+    objects: reduceToMap(
+      Object.values(intermediateDict.objects),
+      parseDocumentObjectType,
     ),
-    inputs: Object.values(intermediateDict.inputs).reduce(
-      objectNodeReducer,
-      new Map(),
+    inputs: reduceToMap(
+      Object.values(intermediateDict.inputs),
+      parseDocumentObjectType,
     ),
-    enums: Object.values(intermediateDict.enums).reduce(
-      enumTypeReducer,
-      new Map(),
+    enums: reduceToMap(
+      Object.values(intermediateDict.enums),
+      parseDocumentEnumType,
     ),
-    unions: Object.values(intermediateDict.unions).reduce(
-      unionTypeReducer,
-      new Map(),
+    unions: reduceToMap(
+      Object.values(intermediateDict.unions),
+      parseDocumentUnionType,
     ),
     operations,
+    objectExtensions: reduceToMap<
+      ObjectTypeExtensionNode,
+      ObjectExtensionDescriptor
+    >(
+      Object.values(intermediateDict.objectExtensions),
+      parseDocumentObjectType,
+    ),
+    inputExtensions: reduceToMap<
+      InputObjectTypeExtensionNode,
+      ObjectExtensionDescriptor
+    >(Object.values(intermediateDict.inputExtensions), parseDocumentObjectType),
   };
+}
+
+export function reduceToMap<U, V extends { name: string }>(
+  values: { node: U }[],
+  parser: (descriptor: U) => V | null,
+): Map<string, V> {
+  return values.reduce((accumulator: Map<string, V>, current: { node: U }) => {
+    const parsedResult = parser(current.node);
+    if (parsedResult !== null) accumulator.set(parsedResult.name, parsedResult);
+
+    return accumulator;
+  }, new Map<string, V>());
 }
 
 /**
@@ -809,11 +819,21 @@ export function parseFieldDefinitionNode(
  * and return the ObjectTypeDescription, which is our intermediate data
  * structure for codegen purposes.
  *
- * @param type Definition structure of the object / input object type.
+ * @param nodeDescriptor Definition structure of the object / input object type.
  */
 export function parseDocumentObjectType(
-  type: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
-): ObjectTypeDescriptor | null {
+  nodeDescriptor: ObjectTypeExtensionNode | InputObjectTypeExtensionNode,
+): ObjectExtensionDescriptor;
+export function parseDocumentObjectType(
+  nodeDescriptor: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
+): ObjectTypeDescriptor;
+export function parseDocumentObjectType(
+  nodeDescriptor:
+    | ObjectTypeDefinitionNode
+    | InputObjectTypeDefinitionNode
+    | ObjectTypeExtensionNode
+    | InputObjectTypeExtensionNode,
+): ObjectTypeDescriptor | ObjectExtensionDescriptor {
   const referencedTypes: ReferencedTypeList = new Set();
 
   /**
@@ -830,7 +850,10 @@ export function parseDocumentObjectType(
   function parserIteratee(
     field: FieldDefinitionNode | InputValueDefinitionNode,
   ): FieldDescriptor {
-    if (type.kind === 'ObjectTypeDefinition') {
+    if (
+      nodeDescriptor.kind === 'ObjectTypeDefinition' ||
+      nodeDescriptor.kind === 'ObjectTypeExtension'
+    ) {
       return parseFieldDefinitionNode(
         field,
         ObjectTypeKind.Object,
@@ -850,26 +873,40 @@ export function parseDocumentObjectType(
   // empty or not.
   let fields: FieldDescriptor[] = [];
 
-  if (type.fields) {
-    for (const field of type.fields) {
+  if (nodeDescriptor.fields) {
+    for (const field of nodeDescriptor.fields) {
       const fieldDescriptor = parserIteratee(field);
 
       fieldDescriptor !== undefined && fields.push(fieldDescriptor);
     }
   }
 
-  // Mount the parsed object.
-  return {
-    kind: 'ObjectTypeDescriptor',
+  const commonResults: ObjectDescriptorBase = {
     objectType:
-      type.kind === 'ObjectTypeDefinition'
+      nodeDescriptor.kind === 'ObjectTypeDefinition'
         ? ObjectTypeKind.Object
         : ObjectTypeKind.Input,
-    name: type.name.value,
-    comments: type.description && type.description.value,
+    name: nodeDescriptor.name.value,
     fields,
     referencedTypes,
   };
+
+  // Mount the parsed object.
+  if (
+    nodeDescriptor.kind === 'ObjectTypeDefinition' ||
+    nodeDescriptor.kind === 'InputObjectTypeDefinition'
+  ) {
+    return {
+      ...commonResults,
+      kind: 'ObjectTypeDescriptor',
+      comments: nodeDescriptor.description && nodeDescriptor.description.value,
+    };
+  } else {
+    return {
+      ...commonResults,
+      kind: 'ObjectExtensionsDescriptor',
+    };
+  }
 }
 
 export function parseDocumentEnumType(
