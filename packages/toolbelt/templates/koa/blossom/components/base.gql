@@ -5,11 +5,11 @@
 # files. The most common example is extending the root query and root mutation
 # types, which will happen here.
 
-type Query @schemaQuery;
+type Query
 
-type Mutation @schemaMutation;
+type Mutation
 
 schema {
-  query: Query;
-  mutation: Mutation;
+  query: Query
+  mutation: Mutation
 }
