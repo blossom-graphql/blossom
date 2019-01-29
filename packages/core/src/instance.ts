@@ -10,25 +10,15 @@ import {
   buildASTSchema,
   DefinitionNode,
   DocumentNode,
-  FieldDefinitionNode,
   GraphQLSchema,
   GraphQLError,
-  ObjectTypeDefinitionNode,
-  OperationTypeDefinitionNode,
   OperationTypeNode,
-  SchemaDefinitionNode,
 } from 'graphql';
 
 import { BaseResolverSignature } from './common';
 import { BlossomError, BlossomEmptyHandlerError } from './errors';
 import { resolve, resolveArray } from './resolver';
 import COMMON_DEFINITIONS from './common-definitions';
-
-const CONSOLIDATED_QUERY_NAMES: { [key in OperationTypeNode]: string } = {
-  query: 'BlossomQuery',
-  mutation: 'BlossomMutation',
-  subscription: 'BlossomSubscription',
-};
 
 export type ResolverSignature = BaseResolverSignature<any, any, any>;
 
@@ -92,9 +82,7 @@ export interface IBlossomInstance {
 
 export class BlossomInstance implements IBlossomInstance {
   rawDocuments: DocumentNode[] = [];
-  filteredDocuments: DocumentNode[] = [];
-  operationDefinitions: SchemaDefinitionNode[] = [];
-  objectTypeMap: Map<string, ObjectTypeDefinitionNode> = new Map();
+  operationDefinitions: DefinitionNode[] = [];
 
   rootOperationsMap: Map<
     string,
@@ -111,128 +99,17 @@ export class BlossomInstance implements IBlossomInstance {
 
   addDocument(document: DocumentNode) {
     this.rawDocuments.push(document);
-
-    const nonOperationDefinitions: DefinitionNode[] = [];
-    const operationDefinitions: SchemaDefinitionNode[] = [];
-
-    document.definitions.forEach(definition => {
-      if (definition.kind === 'ObjectTypeDefinition') {
-        if (this.objectTypeMap.has(definition.name.value)) {
-          throw new Error(
-            `Object with name ${
-              definition.name.value
-            } is already registered. This makes impossible to consolidate root queries and will throw a GraphQLError.`,
-          );
-        }
-
-        this.objectTypeMap.set(definition.name.value, definition);
-      }
-
-      if (definition.kind === 'SchemaDefinition') {
-        operationDefinitions.push(definition);
-      } else {
-        nonOperationDefinitions.push(definition);
-      }
-    });
-
-    this.operationDefinitions.push(...operationDefinitions);
-    this.filteredDocuments.push({
-      ...document,
-      definitions: nonOperationDefinitions,
-    });
+    this.operationDefinitions.push(...document.definitions);
   }
 
   get finalDocument(): DocumentNode {
-    const definitions: DefinitionNode[] = [];
-
-    // Push common definitions
-    definitions.push(...(COMMON_DEFINITIONS as DefinitionNode[]));
-
-    // Push all definitions from filtered documents
-    this.filteredDocuments.forEach(document => {
-      definitions.push(...document.definitions);
-    });
-
-    const fields: { [key in OperationTypeNode]: FieldDefinitionNode[] } = {
-      query: [],
-      mutation: [],
-      subscription: [],
-    };
-
-    const operationTypes: OperationTypeDefinitionNode[] = [];
-
-    this.operationDefinitions.forEach(definition => {
-      definition.operationTypes.forEach(operationType => {
-        const typeName = operationType.type.name.value;
-        const objectTypeDefinition = this.objectTypeMap.get(typeName);
-
-        if (!objectTypeDefinition) {
-          throw new ReferenceError(
-            `Reference to name ${typeName} not found for operation type ${
-              operationType.operation
-            }. Is it present in any of the imported files?`,
-          );
-        }
-        if (
-          !objectTypeDefinition.fields ||
-          objectTypeDefinition.fields.length === 0
-        ) {
-          return;
-        }
-
-        fields[operationType.operation].push(...objectTypeDefinition.fields);
-      });
-    });
-
-    Object.entries(fields).forEach(([operation, fields]) => {
-      if (fields.length === 0) return;
-
-      const objectName =
-        CONSOLIDATED_QUERY_NAMES[operation as OperationTypeNode];
-
-      // Push to the list of operation types
-      operationTypes.push({
-        kind: 'OperationTypeDefinition',
-        operation: operation as OperationTypeNode,
-        type: {
-          kind: 'NamedType',
-          name: {
-            kind: 'Name',
-            value: objectName,
-          },
-        },
-      });
-
-      // Create the object definition and push it to the list of definitions
-      const finalDefinition: ObjectTypeDefinitionNode = {
-        kind: 'ObjectTypeDefinition',
-        name: {
-          kind: 'Name',
-          value: objectName,
-        },
-        description: {
-          kind: 'StringValue',
-          value: `Consolidated list of Blossom ${operation}s.`, // <- Nasty
-        },
-        fields,
-      };
-      definitions.push(finalDefinition);
-    });
-
-    if (operationTypes.length === 0) {
-      throw new Error(
-        "No root values registered in this schema. Won't be able to resolve anything.",
-      );
-    }
-
-    // Create the final, consolidated, schema definition
-    const finalSchemaDefinition: SchemaDefinitionNode = {
-      kind: 'SchemaDefinition',
-      operationTypes,
-    };
-    definitions.push(finalSchemaDefinition);
+    const definitions: DefinitionNode[] = [
+      ...(COMMON_DEFINITIONS as DefinitionNode[]),
+      ...this.operationDefinitions,
+    ];
 
     return {
+      ...this.rawDocuments[0],
       kind: 'Document',
       definitions,
     };
@@ -258,9 +135,7 @@ export class BlossomInstance implements IBlossomInstance {
   }
 
   get rootValue(): RootValueOutput {
-    const finalObject: {
-      [key: string]: ResolverSignature;
-    } = {};
+    const finalObject: RootValueOutput = {};
 
     for (const [name, { callback }] of this.rootOperationsMap) {
       finalObject[name] = callback;

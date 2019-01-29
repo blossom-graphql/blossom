@@ -10,7 +10,7 @@ import { graphql, ExecutionResult } from 'graphql';
 
 import { IBlossomInstance } from './instance';
 import { formatGraphQLErrors } from './errors';
-import { generateLoaderInstance } from './new-loader';
+import { generateLoaderInstance } from './loader';
 import { BlossomContext } from './context';
 
 /**

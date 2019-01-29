@@ -5,82 +5,61 @@
  * LICENSE file in the root directory of this source tree.
  *
  */
-
 import Dataloader from 'dataloader';
 
-/**
- * Interface for the LoaderInstance class. Required for mocking.
- */
-interface ILoaderInstance {
-  get: <K, V>(batchFunction: Dataloader.BatchLoadFn<K, V>) => Dataloader<K, V>;
-}
+import { BatchFunction } from './common';
+import { BlossomContext } from './context';
 
-/**
- * Singleton that contains all the loader instances for an specific blossom
- * requests.
- */
-export class LoaderInstance implements ILoaderInstance {
-  /**
-   * Map that contains the already existing instances for the request.
-   */
-  instances: Map<
-    Dataloader.BatchLoadFn<any, any>,
+export type BlossomLoaderSignature<C> = {
+  <K, V>(batchFn: BatchFunction<K, V, C>): Dataloader<K, V>;
+  instance: LoaderInstance<C>;
+};
+
+export class LoaderInstance<C> {
+  private context: C | undefined = undefined;
+
+  loaderMap: Map<
+    BatchFunction<any, any, any>,
     Dataloader<any, any>
   > = new Map();
 
-  /**
-   * Given a batch functions, retrieves the instance of the dataloader
-   * associated to it in this specific request.
-   *
-   * If there's none, it's created.
-   *
-   * @param batchFunction Name of the batch function that creates a loader.
-   */
-  get<K, V>(batchFunction: Dataloader.BatchLoadFn<K, V>): Dataloader<K, V> {
-    // Retrieve from the map and guard from not-null value.
-    const dataLoaderInstance = this.instances.get(batchFunction);
-    if (dataLoaderInstance) {
-      return dataLoaderInstance;
+  constructor() {}
+
+  setContext(context: C) {
+    this.context = context;
+  }
+
+  getLoader<K, V>(batchFn: BatchFunction<K, V, C>): Dataloader<K, V> {
+    if (!this.context) throw new Error(`Instance context is not set yet.`);
+
+    const existingBatchFn = this.loaderMap.get(batchFn);
+    if (existingBatchFn) {
+      return existingBatchFn;
     }
 
-    // It doesn't exist. Create it and return it.
-    const newDataLoaderInstance = new Dataloader(batchFunction);
-    this.instances.set(batchFunction, newDataLoaderInstance);
-    return newDataLoaderInstance;
+    // Just a reference because otherwise the guard above doesn't work
+    // ! Notice that setContext enforces the context presence.
+    // ! Cannot be unset once is set.
+    const context = this.context;
+    const compositeBatchFn = (keys: K[]) => batchFn(keys, context);
+    const newLoader = new Dataloader(compositeBatchFn);
+
+    this.loaderMap.set(batchFn, newLoader);
+    return newLoader;
   }
 }
 
-/**
- * Function that receives a batching function as an argument and returns an
- * associated Dataloader instance.
- */
-type LoaderRetrieveFunction = <K, V>(
-  batchFunction: Dataloader.BatchLoadFn<K, V>,
-) => Dataloader<K, V>;
+export function generateLoaderInstance<C>(): BlossomLoaderSignature<
+  BlossomContext<C>
+> {
+  const instance = new LoaderInstance<BlossomContext<C>>();
 
-/**
- * Proxy object that gives access to the loader instance and it's get method.
- */
-type LoaderInstanceProxy = {
-  instance: ILoaderInstance;
-  getLoader: LoaderRetrieveFunction;
-};
-
-/**
- * Creates a loader instance, **to be used on a single Blossom request**.
- */
-export function createLoaderInstance(): LoaderInstanceProxy {
-  const instance = new LoaderInstance();
-
-  /**
-   * Retrieves the loader from the instance given its associated batch function.
-   */
-  return {
-    instance,
-    getLoader: function getLoader<K, V>(
-      batchFunction: Dataloader.BatchLoadFn<K, V>,
-    ): Dataloader<K, V> {
-      return instance.get(batchFunction);
-    },
+  const exportedFunction = <K, V>(
+    batchFn: BatchFunction<K, V, BlossomContext<C>>,
+  ) => {
+    return instance.getLoader(batchFn);
   };
+  exportedFunction.instance = instance;
+
+  return exportedFunction;
 }

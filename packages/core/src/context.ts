@@ -6,7 +6,7 @@
  *
  */
 
-import { BlossomLoaderSignature } from './new-loader';
+import { BlossomLoaderSignature } from './loader';
 
 /**
  * A context for an specific Blossom request.
