@@ -19,6 +19,7 @@ import { BaseResolverSignature } from './common';
 import { BlossomError, BlossomEmptyHandlerError } from './errors';
 import { resolve, resolveArray } from './resolver';
 import COMMON_DEFINITIONS from './common-definitions';
+import { ExtensionMap } from './extensions';
 
 export type ResolverSignature = BaseResolverSignature<any, any, any>;
 
@@ -82,7 +83,8 @@ export interface IBlossomInstance {
 
 export class BlossomInstance implements IBlossomInstance {
   rawDocuments: DocumentNode[] = [];
-  operationDefinitions: DefinitionNode[] = [];
+  definitions: DefinitionNode[] = [];
+  extensionMap: ExtensionMap = new ExtensionMap();
 
   rootOperationsMap: Map<
     string,
@@ -99,14 +101,34 @@ export class BlossomInstance implements IBlossomInstance {
 
   addDocument(document: DocumentNode) {
     this.rawDocuments.push(document);
-    this.operationDefinitions.push(...document.definitions);
+
+    document.definitions.forEach(definition => {
+      this.definitions.push(definition);
+
+      if (definition.kind === 'ObjectTypeDefinition')
+        this.extensionMap.addDefinition(definition);
+
+      if (definition.kind === 'ObjectTypeExtension')
+        this.extensionMap.addExtension(definition);
+    });
   }
 
   get finalDocument(): DocumentNode {
     const definitions: DefinitionNode[] = [
       ...(COMMON_DEFINITIONS as DefinitionNode[]),
-      ...this.operationDefinitions,
     ];
+
+    this.definitions.forEach(definition => {
+      // We'll leave extensions there in case they need to be supported by
+      // GraphQL in the future.
+      if (definition.kind === 'ObjectTypeDefinition') {
+        definitions.push(
+          this.extensionMap.getFinalDefinition(definition.name.value),
+        );
+      } else {
+        definitions.push(definition);
+      }
+    });
 
     return {
       ...this.rawDocuments[0],
