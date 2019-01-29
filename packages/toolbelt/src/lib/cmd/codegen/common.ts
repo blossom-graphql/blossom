@@ -6,9 +6,9 @@
  *
  */
 
-import fs from 'fs';
 import path from 'path';
 
+import fsExtra from 'fs-extra';
 import ts from 'typescript';
 import cosmiconfig from 'cosmiconfig';
 import prettier from 'prettier';
@@ -174,7 +174,7 @@ export function makeGraphCodegenPipeline(opts: {
 
     if (!options.stdout) {
       const writePromises = Object.entries(filesOutput).map(
-        ([path, contents]) => fs.promises.writeFile(path, contents),
+        ([path, contents]) => fsExtra.writeFile(path, contents),
       );
 
       await writePromises;

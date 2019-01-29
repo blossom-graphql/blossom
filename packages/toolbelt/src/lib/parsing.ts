@@ -6,8 +6,9 @@
  *
  */
 
-import fs from 'fs';
 import path from 'path';
+
+import fsExtra from 'fs-extra';
 import {
   ObjectTypeDefinitionNode,
   InputObjectTypeDefinitionNode,
@@ -422,7 +423,7 @@ export async function getParsingMap(
   let fileContents: Buffer;
 
   try {
-    fileContents = await fs.promises.readFile(filePath);
+    fileContents = await fsExtra.readFile(filePath);
   } catch (error) {
     throw new ImportParsingError(filePath, error);
   }

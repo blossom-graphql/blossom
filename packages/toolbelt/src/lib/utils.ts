@@ -6,10 +6,11 @@
  *
  */
 
-import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 import { inspect } from 'util';
+
+import fsExtra from 'fs-extra';
 
 import { OriginDescription, OriginKind } from './linking';
 
@@ -126,19 +127,19 @@ export function makeTitleOriginDescriptor(
 export async function listDirFilesRecursive(
   pathName: string,
 ): Promise<string[] | undefined> {
-  const pathStat = await fs.promises.stat(pathName);
+  const pathStat = await fsExtra.stat(pathName);
 
   if (!pathStat.isDirectory()) {
     return undefined;
   }
 
-  const fileList = await fs.promises.readdir(pathName);
+  const fileList = await fsExtra.readdir(pathName);
 
   const lists = await Promise.all(
     fileList.map(async file => {
       const fullpath = path.join(pathName, file);
 
-      const filePathStat = await fs.promises.stat(fullpath);
+      const filePathStat = await fsExtra.stat(fullpath);
       if (filePathStat.isDirectory()) {
         return (await listDirFilesRecursive(fullpath)) as string[];
       } else {
