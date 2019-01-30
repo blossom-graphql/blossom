@@ -7,14 +7,17 @@
  */
 
 import { spawn } from 'child_process';
+import path from 'path';
 
+import fsExtra from 'fs-extra';
 import chalk from 'chalk';
 import webpack, { Configuration, Stats } from 'webpack';
+import tmp from 'tmp-promise';
 
 import VERSION from '../version';
 import baseConfig from '../config/webpack.base';
-import { appPath } from '../lib/paths';
 import { SpawnProcess } from '../lib/processes';
+import { appPath } from '../lib/paths';
 
 /**
  * Clears the console by sending octal \033 + ascii c. This clears the console
@@ -29,9 +32,13 @@ function clearConsole(): void {
 /**
  * Starts a new development process.
  */
-function startProcess(): void {
+function startProcess(buildPath: string): void {
   runningProcesses.push(
-    new SpawnProcess(spawn('node', [appPath('./dist/server.js')])),
+    new SpawnProcess(
+      spawn('node', [buildPath], {
+        stdio: 'inherit',
+      }),
+    ),
   );
 }
 
@@ -51,64 +58,66 @@ function clearProcesses(): void {
 let firstCompilation = true;
 let runningProcesses: SpawnProcess[] = [];
 
-/**
- * Handler to be passed when a watch event has finally run.
- *
- * @param _ Any webpack critical error. If this is present, we should quit.
- *
- * @param stats Webpack compilation stats.
- */
-function handleWebpackWatch(_: Error, stats: Stats) {
-  if (firstCompilation) firstCompilation = false;
+function makeWatcher(buildPath: string) {
+  /**
+   * Handler to be passed when a watch event has finally run.
+   *
+   * @param _ Any webpack critical error. If this is present, we should quit.
+   *
+   * @param stats Webpack compilation stats.
+   */
+  return function handleWebpackWatch(_: Error, stats: Stats) {
+    if (firstCompilation) firstCompilation = false;
 
-  clearConsole();
+    clearConsole();
 
-  const hasErrors = stats.hasErrors();
-  const hasWarnings = stats.hasWarnings();
-  let compileSuccessful = !hasErrors && !hasWarnings;
+    const hasErrors = stats.hasErrors();
+    const hasWarnings = stats.hasWarnings();
+    let compileSuccessful = !hasErrors && !hasWarnings;
 
-  if (hasErrors) {
-    console.log(chalk.bold.red('Errors found while compiling'), '\n');
+    if (hasErrors) {
+      console.log(chalk.bold.red('Errors found while compiling'), '\n');
 
-    const info = stats.toJson();
+      const info = stats.toJson();
 
-    info.errors.forEach((error: string) => console.log(error));
-  }
-
-  if (hasWarnings) {
-    const filteredWarnings = stats.compilation.warnings.filter(
-      warning =>
-        warning.name !== 'ModuleDependencyWarning' ||
-        !warning.message.includes('Critical dependency'),
-    );
-    const hasFilteredWarnings = filteredWarnings.length > 0;
-
-    if (hasFilteredWarnings) {
-      console.log(chalk.bold.yellow('Warnings found while compiling!'), '\n');
-
-      filteredWarnings.forEach(warning => console.log(warning));
-    } else {
-      compileSuccessful = !hasErrors && !hasFilteredWarnings;
+      info.errors.forEach((error: string) => console.log(error));
     }
-  }
 
-  // We don't spawn child process when there's errors
-  if (hasErrors) return;
-  // ... but we do on warnings
+    if (hasWarnings) {
+      const filteredWarnings = stats.compilation.warnings.filter(
+        warning =>
+          warning.name !== 'ModuleDependencyWarning' ||
+          !warning.message.includes('Critical dependency'),
+      );
+      const hasFilteredWarnings = filteredWarnings.length > 0;
 
-  if (compileSuccessful) {
-    console.log(
-      chalk.bold.green('Compiled succesfully!'),
-      chalk.bold('Starting compiled bundle...'),
-      '\n',
-    );
-  } else {
-    console.log(chalk.bold('Starting compiled bundle...'), '\n');
-  }
+      if (hasFilteredWarnings) {
+        console.log(chalk.bold.yellow('Warnings found while compiling!'), '\n');
 
-  // Clear any other running process and start this new one
-  clearProcesses();
-  startProcess();
+        filteredWarnings.forEach(warning => console.log(warning));
+      } else {
+        compileSuccessful = !hasErrors && !hasFilteredWarnings;
+      }
+    }
+
+    // We don't spawn child process when there's errors
+    if (hasErrors) return;
+    // ... but we do on warnings
+
+    if (compileSuccessful) {
+      console.log(
+        chalk.bold.green('Compiled succesfully!'),
+        chalk.bold('Starting compiled bundle...'),
+        '\n',
+      );
+    } else {
+      console.log(chalk.bold('Starting compiled bundle...'), '\n');
+    }
+
+    // Clear any other running process and start this new one
+    clearProcesses();
+    startProcess(buildPath);
+  };
 }
 
 /**
@@ -118,9 +127,22 @@ function handleWebpackWatch(_: Error, stats: Stats) {
  * ! functions and this should just become the entrypoint based on the template
  * ! file.
  */
-export function devServer() {
+export async function devServer() {
   // Start on a clean slate
   clearConsole();
+
+  // Retrieve a tmp dir
+  const tmpDirPath = (await tmp.dir()).path;
+  console.log(tmpDirPath);
+  tmp.setGracefulCleanup();
+  fsExtra.symlink(
+    appPath('./node_modules'),
+    path.join(tmpDirPath, 'node_modules'),
+  );
+  fsExtra.symlink(
+    appPath('./package.json'),
+    path.join(tmpDirPath, 'package.json'),
+  );
 
   console.log(
     '🌺',
@@ -134,6 +156,10 @@ export function devServer() {
   const compiler = webpack({
     ...baseConfig,
     mode: 'development',
+    output: {
+      filename: '[name].js',
+      path: tmpDirPath,
+    },
   } as Configuration);
 
   // Warn the user that a re-compilation is happening...
@@ -150,7 +176,7 @@ export function devServer() {
       aggregateTimeout: 300,
       poll: undefined,
     },
-    handleWebpackWatch,
+    makeWatcher(path.join(tmpDirPath, 'server.js')),
   );
 }
 

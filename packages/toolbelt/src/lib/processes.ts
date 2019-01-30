@@ -24,11 +24,6 @@ export class SpawnProcess {
   }
 
   private createBindings() {
-    // Pipe inputs
-    this.process.stdout.pipe(process.stdout);
-    this.process.stderr.pipe(process.stderr);
-    process.stdin.pipe(this.process.stdin);
-
     // Listen to process exit
     this.process.on('exit', this.handleSignal);
   }

@@ -19,10 +19,10 @@ const baseConfig = {
   entry: {
     server: appPath('./cmd/server.ts'),
   },
-  output: {
-    filename: '[name].js',
-    path: appPath('./dist'),
-  },
+  // output: {
+  //   filename: '[name].js',
+  //   path: appPath('./dist'),
+  // },
   resolve: {
     extensions: ['.mjs', '.ts', '.js', '.graphql', '.gql'],
     plugins: [
