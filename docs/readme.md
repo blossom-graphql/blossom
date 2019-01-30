@@ -27,3 +27,23 @@ These **are not** Blossom goals:
 - Encourage the use of monolithic APIs. While Blossom lets you create an entire project from scratch, it's expected you distribute your data sources to different APIs as your application grows up and make Blossom be a proxy to them.
 
 - Be strict about this goals. These can change over time!
+
+# Documentation Overview
+
+The documentation of this project aims to be structured on a deductive way: from understanding the big picture and how things are stitched together to specifics about the API reference:
+
+- **Getting Started** guides you on installing Blossom on your computer and understanding the basic concepts about the architecture and the platform.
+
+- **Tutorials** shows you multiple tutorials for building applications with Blossom, from the basics to more complicated applications.
+
+- **μGuides** (*micro*-guides) aims to be a syllabus of multiple short guides that solve specifics and common tasks that you might need to do with Blossom.
+
+- **Deep Dive** contains a selection of topics aimed to help the developer to understand more advanced concepts about the framework.
+
+- **API Reference** contains all the information about common Blossom APIs. This section does not aim to be self-explanatory, but to be used as a handbook of the specifics of the frameowkr.
+
+# Contribute
+
+Blossom is an open source project and contributing is encouraged to everyone, which includes reporting your issues, proposing features, commenting on RFCs, giving your input and writing pull requests.
+
+You can check out the [GitHub monorepo](https://github.com/spsoto/blossom) to start contributing!

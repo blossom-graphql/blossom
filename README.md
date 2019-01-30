@@ -2,6 +2,10 @@
 
 A TypeScript backgend GraphQL framework for developing multi-service data layers with ease 🌺.
 
+## Documentation
+
+All documentation can be found on its [gitbooks page](https://blossom.gitbook.io/blossom/) and its source [here](./docs).
+
 ## Development Environment
 
 The development environment is setup using Docker in order to have an standard and as predictable as possible runtime across multiple developers.
