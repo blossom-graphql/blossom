@@ -47,11 +47,11 @@ Once the project is bootstrapped, you can start the development server with an e
 npx blossom server
 ```
 
-Your project should now be running on [http://localhost:3000](http://localhost:3000). Congratulations 🎉! These are the two available URLs:
+Your project should now be running on [`http://localhost:3000`](http://localhost:3000). Congratulations 🎉! These are the two available URLs:
 
-- [http://localhost:3000/graphql](http://localhost:3000/graphql): your GraphQL playground. **Only available when `NODE_ENV` is not set to `production`**.
+- [`http://localhost:3000/graphql`](http://localhost:3000/graphql): your GraphQL playground. **Only available when `NODE_ENV` is not set to `production`**.
 
-- (`POST`) [http://localhost:3000/graphql](http://localhost:3000/graphql): resolves actual GraphQL requests.
+- (`POST`) [`http://localhost:3000/graphql`](http://localhost:3000/graphql): resolves actual GraphQL requests.
 
 Before starting introducing changes to this project, we encourage you to go to the next sections in order to understand the platform and the core concepts of Blossom.
 
