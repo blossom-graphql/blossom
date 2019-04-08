@@ -30,10 +30,6 @@ export class SpawnProcess {
 
   private clearBindings() {
     this.process.removeAllListeners();
-
-    process.stdin.unpipe(this.process.stdin);
-    this.process.stderr.unpipe(process.stderr);
-    this.process.stdout.unpipe(process.stdout);
   }
 
   private handleSignal = (code: number, signal?: string) => {

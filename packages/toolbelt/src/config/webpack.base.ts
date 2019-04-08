@@ -8,21 +8,24 @@
 
 import path from 'path';
 
-import { BannerPlugin } from 'webpack';
+import { BannerPlugin, Configuration } from 'webpack';
+import nodeExternals from 'webpack-node-externals';
 import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
 
 import { appPath } from '../lib/paths';
 
-const baseConfig = {
+const baseConfig: Configuration = {
   target: 'node' as 'node',
+  // We are NOT bundling dependencies in the main bundle. This creates a whole
+  // new set of issues because dependencies like koa or sequelize perform require
+  // statements at runtime. Until a decent workaround can be found for this, the
+  // sanest approach is to perform bundling on the original codebase only and
+  // not in their modules.
+  externals: [nodeExternals()],
   devtool: 'source-map' as 'source-map',
   entry: {
     server: appPath('./cmd/server.ts'),
   },
-  // output: {
-  //   filename: '[name].js',
-  //   path: appPath('./dist'),
-  // },
   resolve: {
     extensions: ['.mjs', '.ts', '.js', '.graphql', '.gql'],
     plugins: [

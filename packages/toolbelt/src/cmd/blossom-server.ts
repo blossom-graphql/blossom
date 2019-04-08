@@ -84,11 +84,8 @@ function makeWatcher(buildPath: string) {
     }
 
     if (hasWarnings) {
-      const filteredWarnings = stats.compilation.warnings.filter(
-        warning =>
-          warning.name !== 'ModuleDependencyWarning' ||
-          !warning.message.includes('Critical dependency'),
-      );
+      // No filters at the moment.
+      const filteredWarnings = stats.compilation.warnings.filter(_ => true);
       const hasFilteredWarnings = filteredWarnings.length > 0;
 
       if (hasFilteredWarnings) {
@@ -105,6 +102,7 @@ function makeWatcher(buildPath: string) {
     // ... but we do on warnings
 
     if (compileSuccessful) {
+      firstCompilation && console.log('');
       console.log(
         chalk.bold.green('Compiled succesfully!'),
         chalk.bold('Starting compiled bundle...'),
@@ -133,7 +131,7 @@ export async function devServer() {
 
   // Retrieve a tmp dir
   const tmpDirPath = (await tmp.dir()).path;
-  console.log(tmpDirPath);
+
   tmp.setGracefulCleanup();
   fsExtra.symlink(
     appPath('./node_modules'),

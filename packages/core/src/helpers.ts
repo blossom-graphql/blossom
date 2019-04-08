@@ -109,8 +109,8 @@ type PluckingFunction<U, R> = (key: R) => U;
  * obtain a unique identifier that matches those on `keys`.
  */
 export function deliver<U, R>(
-  keys: U[],
-  results: R[],
+  keys: ReadonlyArray<U>,
+  results: ReadonlyArray<R>,
   plucker: PluckingFunction<U, R>,
 ): (R | null)[] {
   const resultMap = new Map<U, R>();
@@ -177,8 +177,8 @@ export function deliver<U, R>(
  * obtain a unique identifier that matches those on `keys`.
  */
 export function deliverGroup<U, R>(
-  keys: U[],
-  results: R[],
+  keys: ReadonlyArray<U>,
+  results: ReadonlyArray<R>,
   plucker: PluckingFunction<U, R>,
 ): (R[])[] {
   const resultMap = new Map<U, R[]>();
