@@ -15,7 +15,7 @@ export default {
     koa: '^2.6.2',
     'koa-bodyparser': '^4.2.1',
     'koa-router': '^7.4.0',
-    'koa2-cors': '^2.0.6',
+    '@koa/cors': '^3.0.0',
     'graphql-playground-middleware-koa': '^1.6.8',
     'source-map-support': '^0.5.9',
   },
@@ -28,7 +28,7 @@ export default {
     '@types/koa': '^2.0.47',
     '@types/koa-bodyparser': '^4.2.1',
     '@types/koa-router': '^7.0.38',
-    '@types/koa2-cors': '^2.0.1',
+    '@types/koa__cors': '^2.2.3',
     '@types/webpack-env': '^1.13.6',
   },
 };
