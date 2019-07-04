@@ -1,0 +1,5 @@
+#!/bin/sh
+
+source bin/config
+
+docker-compose -p $PROJECT_NAME run --rm ${1:-node} bash

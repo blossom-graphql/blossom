@@ -1,0 +1,5 @@
+#!/bin/sh
+
+PROJECT_NAME=blossom
+
+trap "docker-compose -p $PROJECT_NAME down" SIGINT EXIT
