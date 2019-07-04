@@ -9,30 +9,7 @@
 import { GraphQLResolveInfo } from 'graphql';
 
 import { Maybe, Resolver } from './common';
-
-export type ConnectionPageInfo<C> = {
-  count: (args: {}, ctx: C, ast: GraphQLResolveInfo) => Promise<number>;
-  hasPreviousPage: (
-    args: {},
-    ctx: C,
-    ast: GraphQLResolveInfo,
-  ) => Promise<boolean>;
-  hasNextPage: (args: {}, ctx: C, ast: GraphQLResolveInfo) => Promise<boolean>;
-};
-
-export type ConnectionData<I, C> = {
-  edges: (
-    args: {},
-    ctx: C,
-    ast: GraphQLResolveInfo,
-  ) => Promise<
-    ReadonlyArray<{
-      node: I;
-      cursor: (args: {}, ctx: C, ast: GraphQLResolveInfo) => string;
-    }>
-  >;
-  pageInfo: ConnectionPageInfo<C>;
-};
+import { ConnectionData, ConnectionPageInfo } from './connections';
 
 export type Connection<O, C> = {
   __typename: string;
