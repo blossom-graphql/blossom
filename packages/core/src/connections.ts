@@ -8,7 +8,7 @@ import Dataloader from 'dataloader';
 
 class ConnectionArgsError extends Error {
   constructor(error: string) {
-    super(`Invalid connection arguments: ${error}`)
+    super(`Invalid connection arguments: ${error}`);
   }
 }
 
@@ -52,6 +52,9 @@ export type ConnectionArgs<D> = {
    * it's going to be used to encode/decode the cursors as well.
    */
   primary: keyof D;
+  /**
+   * Order at which the information **in the page** must be shown.
+   */
   order: LoadOrder;
 };
 
@@ -195,7 +198,7 @@ export enum LoadOrder {
 }
 
 /**
- * Common input for any of the thunked operations: either `load()` or `count()`. 
+ * Common input for any of the thunked operations: either `load()` or `count()`.
  */
 type AdapterInput<F> = {
   /**
@@ -313,7 +316,7 @@ export type ConnectionDataLoader<F, D, C> = (
 /**
  * Given an `adapter`, returns a function that can be used to fetch connection
  * data for a GraphQL root query request.
- * 
+ *
  * @param adapter Adapter function to use on this operation. Usually comes from
  * one of the adapters packages and is a function that returns the adapter itself.
  */
@@ -352,21 +355,29 @@ export function connectionDataLoader<F, D, C>(
       return ids.map(_id => results);
     });
 
-    const hasVertex = async (anchorType: AdapterAnchorType): Promise<boolean> => {
+    const hasVertex = async (
+      anchorType: AdapterAnchorType,
+    ): Promise<boolean> => {
       const results = await resultsLoader.load(0);
       if (results.length == 0) return false;
 
-      const cursor = results[results.length - 1].cursor();
+      let cursor: string;
+      if (
+        anchorType === AdapterAnchorType.GT ||
+        anchorType === AdapterAnchorType.GTE
+      ) {
+        cursor = results[results.length - 1].cursor();
+      } else {
+        cursor = results[0].cursor();
+      }
+
       const nextResults = await adapter.load(
         {
           filter,
           fields: [connectionArgs.primary], // we do we need more than the primary?
           anchors: [
             {
-              type: adaptAnchorType(
-                anchorType,
-                connectionArgs.order,
-              ),
+              type: adaptAnchorType(anchorType, connectionArgs.order),
               cursor,
             },
           ],
@@ -376,8 +387,9 @@ export function connectionDataLoader<F, D, C>(
         },
         ctx,
       );
+      console.log(anchorType, nextResults);
       return nextResults.length > 0;
-    }
+    };
 
     return {
       async edges(_args: {}, _ctx: C, _ast: GraphQLResolveInfo) {
@@ -398,11 +410,11 @@ export function connectionDataLoader<F, D, C>(
           return adapter.count({ filter }, ctx);
         },
         hasNextPage(): Promise<boolean> {
-          return hasVertex(AdapterAnchorType.GT)
+          return hasVertex(AdapterAnchorType.GT);
         },
         hasPreviousPage(): Promise<boolean> {
-          return hasVertex(AdapterAnchorType.LT)
-        }
+          return hasVertex(AdapterAnchorType.LT);
+        },
       },
     };
   };
@@ -413,7 +425,7 @@ export function connectionDataLoader<F, D, C>(
  * `limit` (max numbers to fetch), the list of `anchors` to involve in the
  * operation, and the sorting `order` that the **data store** must use to
  * fetch the information (as opposed to the order in the page).
- * 
+ *
  * @param adapter Adapter structure.
  * @param connectionArgs Common arguments of the GraphQL request.
  * @param ctx Parameters of the incoming GraphQL request.
@@ -422,7 +434,7 @@ function computeOrientation<F, D, C>(
   adapter: ConnectionAdapter<F, D, C>,
   connectionArgs: ConnectionArgs<D>,
   ctx: C,
-): { limit: number, anchors: readonly AdapterAnchor[], order: LoadOrder } {
+): { limit: number; anchors: readonly AdapterAnchor[]; order: LoadOrder } {
   // The gql request is asking for both first and last at the same time.
   // This is not supported.
   if (!!connectionArgs.first && !!connectionArgs.last) {
@@ -485,7 +497,7 @@ function invertOrder(order: LoadOrder): LoadOrder {
 /**
  * Given the current page order and the type of anchor, returns the adapted
  * anchor type to how it should be fetched from the data store.
- * 
+ *
  * @param anchorType Type of anchor that needs to be adapted.
  * @param order Current expected ordering for **the page.**
  */
