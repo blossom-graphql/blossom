@@ -11,14 +11,14 @@
     "test": "npx jest --config ./scripts/jest/config.base.js"
   },
   "devDependencies": {
-    "@types/jest": "^23.3.9",
+    "@types/jest": "^24.0.15",
     "@types/node": "^10.12.10",
-    "jest": "^23.6.0",
+    "jest": "^24.8.0",
     "lerna": "^3.4.3",
     "prettier": "^1.15.2",
-    "ts-jest": "^23.10.5",
+    "ts-jest": "^24.0.2",
     "ts-node": "^7.0.1",
     "tslint": "^5.11.0",
-    "typescript": "^3.1.6"
+    "typescript": "^3.5.2"
   }
 }
