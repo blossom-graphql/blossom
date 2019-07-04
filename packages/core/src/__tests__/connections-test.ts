@@ -11,6 +11,8 @@ import {
   ConnectionAdapter,
   AdapterAnchorType,
   LoadOrder,
+  ConnectionArgsError,
+  ConnectionArgs,
 } from '../connections';
 import { GraphQLResolveInfo } from 'graphql';
 
@@ -81,7 +83,7 @@ const RESOLVE_INFO = {} as GraphQLResolveInfo;
  */
 const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
   limit() {
-    return 10;
+    return 9;
   },
   default() {
     return 5;
@@ -103,16 +105,18 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
     const filter = (i: number): boolean =>
       filters.reduce((acc, f) => acc && f(i), true as boolean);
 
-    let slice: ExampleData[] = SAMPLE_DATA.filter(datum =>
-      filter(datum.id),
-    ).slice(0, count);
+    const base = SAMPLE_DATA.slice();
+    if (args.order === LoadOrder.DESC) {
+      base.reverse();
+    }
+
+    let slice: ExampleData[] = base
+      .filter(datum => filter(datum.id))
+      .slice(0, count); // ! THIS SHOULD GO **AFTER** THE FILTERS.
     if (args.filter.fruits && args.filter.fruits.length > 0) {
-      slice = SAMPLE_DATA.filter(
+      slice = slice.filter(
         datum => args.filter.fruits && args.filter.fruits.includes(datum.fruit),
       );
-    }
-    if (args.order === LoadOrder.DESC) {
-      slice.reverse();
     }
 
     return slice.map(datum => ({
@@ -137,7 +141,7 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
 describe('AdapterMock', () => {
   describe('limit', () => {
     test('returns the correct value', () => {
-      expect(AdapterMock.limit({})).toBe(10);
+      expect(AdapterMock.limit({})).toBe(9);
     });
   });
 
@@ -212,8 +216,8 @@ describe('AdapterMock', () => {
           .slice()
           .reverse()
           .forEach((datum, i) => {
-            expect(datum.node).toEqual(SAMPLE_DATA[i]);
-            expect(datum.cursor()).toEqual(String(SAMPLE_DATA[i].id));
+            expect(datum.node).toEqual(SAMPLE_DATA[7 + i]); // id 8 is index 7
+            expect(datum.cursor()).toEqual(String(SAMPLE_DATA[7 + i].id));
           });
       });
     });
@@ -279,38 +283,469 @@ describe('AdapterMock', () => {
 describe(connectionDataLoader, () => {
   const loader = connectionDataLoader(AdapterMock);
 
+  describe('both first and last are present', () => {
+    test('it raises ConnectionArgsError', () => {
+      expect(() => {
+        loader(
+          {},
+          { primary: 'id', order: LoadOrder.ASC, first: 10, last: 10 },
+          RESOLVE_INFO,
+        );
+      }).toThrowError(ConnectionArgsError);
+    });
+  });
+
+  type ExtectedValues = {
+    edges: readonly { node: ExampleData; cursor: string }[];
+    count: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+  async function expectValues(
+    filter: ExampleFilter,
+    args: ConnectionArgs<ExampleData>,
+    expected: ExtectedValues,
+  ) {
+    const result = loader(filter, args, RESOLVE_INFO);
+    const edges = await result.edges({}, {}, RESOLVE_INFO);
+    expect.assertions(4 + 2 * expected.edges.length);
+
+    expect(edges.length).toBe(expected.edges.length);
+
+    edges.forEach((edge, i) => {
+      expect(edge.node).toEqual(expected.edges[i].node);
+      expect(edge.cursor({}, {}, RESOLVE_INFO)).toEqual(
+        expected.edges[i].cursor,
+      );
+    });
+
+    expect(await result.pageInfo.count({}, {}, RESOLVE_INFO)).toBe(
+      expected.count,
+    );
+    expect(await result.pageInfo.hasNextPage({}, {}, RESOLVE_INFO)).toBe(
+      expected.hasNextPage,
+    );
+    expect(await result.pageInfo.hasPreviousPage({}, {}, RESOLVE_INFO)).toBe(
+      expected.hasPreviousPage,
+    );
+  }
+
   describe('with happy path parameters', () => {
     test('it returns correct values', async () => {
-      expect.assertions(14);
-
-      const result = loader(
+      await expectValues(
         {},
         {
           primary: 'id',
           order: LoadOrder.ASC,
         },
-        RESOLVE_INFO,
+        {
+          edges: SAMPLE_DATA.slice(0, 5).map(data => ({
+            node: data,
+            cursor: data.id.toString(),
+          })),
+          count: SAMPLE_DATA.length,
+          hasNextPage: true,
+          hasPreviousPage: false,
+        },
       );
-      const edges = await result.edges({}, {}, RESOLVE_INFO);
+    });
+  });
 
-      expect(edges.length).toBe(AdapterMock.default({}));
-
-      edges.forEach((edge, i) => {
-        expect(edge.node).toEqual(SAMPLE_DATA[i]);
-        expect(edge.cursor({}, {}, RESOLVE_INFO)).toEqual(
-          SAMPLE_DATA[i].id.toString(),
-        );
+  describe('ascending order', () => {
+    describe('first and after present', () => {
+      describe('below pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              first: 8,
+              after: '2',
+            },
+            {
+              edges: SAMPLE_DATA.slice(2, 10).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
       });
 
-      expect(await result.pageInfo.count({}, {}, RESOLVE_INFO)).toBe(
-        SAMPLE_DATA.length,
-      );
-      expect(await result.pageInfo.hasNextPage({}, {}, RESOLVE_INFO)).toBe(
-        true,
-      );
-      expect(await result.pageInfo.hasPreviousPage({}, {}, RESOLVE_INFO)).toBe(
-        false,
-      );
+      describe('above pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              first: 10,
+              after: '2',
+            },
+            {
+              edges: SAMPLE_DATA.slice(2, 11).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (upper bound)', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              after: '10',
+            },
+            {
+              edges: SAMPLE_DATA.slice(10, 12).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: false,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (lower bound)', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              after: '-3',
+            },
+            {
+              edges: SAMPLE_DATA.slice(0, 5).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: false,
+            },
+          );
+        });
+      });
+    });
+
+    describe('last and before present', () => {
+      describe('below pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              last: 8,
+              before: '11',
+            },
+            {
+              edges: SAMPLE_DATA.slice(2, 10).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('above pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              last: 10, // it's going to be 9 anyway
+              before: '11',
+            },
+            {
+              edges: SAMPLE_DATA.slice(1, 10).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (lower bound)', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              last: 5,
+              before: '3',
+            },
+            {
+              edges: SAMPLE_DATA.slice(0, 2).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: false,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (upper bound)', () => {
+        test('it returns correct values', async () => {
+          // picks 5 anyway: 8, 9, 10, 11, 12
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.ASC,
+              last: 5,
+              before: '15',
+            },
+            {
+              edges: SAMPLE_DATA.slice(7, 12).map(data => ({
+                node: data,
+                cursor: data.id.toString(),
+              })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: false,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+    });
+  });
+
+  describe('descending order', () => {
+    // From the perspective of the page:
+    // Ids:       12 - 11 - 10 - ...
+    // Position:   1    2 -  3 - ... (as such, after and before mean different things)
+
+    describe('first and after present', () => {
+      describe('below pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              first: 8,
+              after: '11',
+            },
+            {
+              edges: SAMPLE_DATA.slice(2, 10)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('above pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              first: 10,
+              after: '11',
+            },
+            {
+              edges: SAMPLE_DATA.slice(1, 10)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (upper bound)', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              after: '3',
+            },
+            {
+              edges: SAMPLE_DATA.slice(0, 2)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: false,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (lower bound)', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              after: '16',
+            },
+            {
+              edges: SAMPLE_DATA.slice(7, 12)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: false,
+            },
+          );
+        });
+      });
+    });
+
+    describe('last and before present', () => {
+      describe('below pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              last: 8,
+              before: '2',
+            },
+            {
+              edges: SAMPLE_DATA.slice(2, 10)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('above pagination limit', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              last: 10, // it's going to be 9 anyway
+              before: '2',
+            },
+            {
+              edges: SAMPLE_DATA.slice(2, 11)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (lower bound)', () => {
+        test('it returns correct values', async () => {
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              last: 5,
+              before: '9',
+            },
+            {
+              edges: SAMPLE_DATA.slice(9, 12)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: true,
+              hasPreviousPage: false,
+            },
+          );
+        });
+      });
+
+      describe('without enough elements (upper bound)', () => {
+        test('it returns correct values', async () => {
+          // picks 5 anyway: 8, 9, 10, 11, 12
+          await expectValues(
+            {},
+            {
+              primary: 'id',
+              order: LoadOrder.DESC,
+              last: 5,
+              before: '-3',
+            },
+            {
+              edges: SAMPLE_DATA.slice(0, 5)
+                .reverse()
+                .map(data => ({
+                  node: data,
+                  cursor: data.id.toString(),
+                })),
+              count: SAMPLE_DATA.length,
+              hasNextPage: false,
+              hasPreviousPage: true,
+            },
+          );
+        });
+      });
     });
   });
 });

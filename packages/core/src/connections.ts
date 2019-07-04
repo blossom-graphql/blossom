@@ -6,7 +6,7 @@ import Dataloader from 'dataloader';
 // - `D` represents the type of the base data.
 // - `C` represents the type of the context.
 
-class ConnectionArgsError extends Error {
+export class ConnectionArgsError extends Error {
   constructor(error: string) {
     super(`Invalid connection arguments: ${error}`);
   }
@@ -352,7 +352,15 @@ export function connectionDataLoader<F, D, C>(
         ctx,
       );
 
-      return ids.map(_id => results);
+      // If the orders are different, this means we need to reverse the order
+      // at which the results are coming from the database.
+      if (order === connectionArgs.order) {
+        return ids.map(_id => results);
+      } else {
+        // Reverse by itself is immutable, so unfortunately we need to copy
+        // it first.
+        return ids.map(_id => results.slice().reverse());
+      }
     });
 
     const hasVertex = async (
@@ -387,23 +395,12 @@ export function connectionDataLoader<F, D, C>(
         },
         ctx,
       );
-      console.log(anchorType, nextResults);
       return nextResults.length > 0;
     };
 
     return {
-      async edges(_args: {}, _ctx: C, _ast: GraphQLResolveInfo) {
-        const results = await resultsLoader.load(0);
-
-        // If the orders are different, this means we need to reverse the order
-        // at which the results are coming from the database.
-        if (order === connectionArgs.order) {
-          return results;
-        } else {
-          // Reverse by itself is immutable, so unfortunately we need to copy
-          // it first.
-          return results.slice().reverse();
-        }
+      edges(_args: {}, _ctx: C, _ast: GraphQLResolveInfo) {
+        return resultsLoader.load(0);
       },
       pageInfo: {
         count() {
@@ -462,14 +459,14 @@ function computeOrientation<F, D, C>(
 
   if (!!connectionArgs.after) {
     anchors.push({
-      type: adaptAnchorType(AdapterAnchorType.GT, order),
+      type: adaptAnchorType(AdapterAnchorType.GT, connectionArgs.order),
       cursor: connectionArgs.after,
     });
   }
 
   if (!!connectionArgs.before) {
     anchors.push({
-      type: adaptAnchorType(AdapterAnchorType.LT, order),
+      type: adaptAnchorType(AdapterAnchorType.LT, connectionArgs.order),
       cursor: connectionArgs.before,
     });
   }
