@@ -148,7 +148,7 @@ export function deliver<U, R>(
  * > deliverGroup(keys, results, ({ id }) => id)
  * ```
  *
- * This results in this example are:
+ * The results in this example are:
  *
  * ```
  * [
@@ -162,7 +162,7 @@ export function deliver<U, R>(
  *   [ // <--- keys[1]: 2 (no results, thus empty array)
  *   ],
  *   [ // <--- keys[2]: 3
- *     { id: 3, fruit: 'ornage' },
+ *     { id: 3, fruit: 'orange' },
  *     { id: 3, fruit: 'grape' },
  *   ],
  * ]

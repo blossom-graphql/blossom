@@ -23,56 +23,69 @@ type ExampleFilter = {
 type ExampleData = {
   id: number;
   fruit: string;
+  rating: number;
 };
 
 const SAMPLE_DATA: readonly ExampleData[] = [
   {
     id: 1,
     fruit: 'orange',
+    rating: 3,
   },
   {
     id: 2,
     fruit: 'mango',
+    rating: 2,
   },
   {
     id: 3,
     fruit: 'pineapple',
+    rating: 4,
   },
   {
     id: 4,
     fruit: 'peach',
+    rating: 5,
   },
   {
     id: 5,
     fruit: 'pear',
+    rating: 1,
   },
   {
     id: 6,
     fruit: 'apple',
+    rating: 2,
   },
   {
     id: 7,
     fruit: 'strawberry',
+    rating: 5,
   },
   {
     id: 8,
     fruit: 'raspberry',
+    rating: 4,
   },
   {
     id: 9,
     fruit: 'papaya',
+    rating: 3,
   },
   {
     id: 10,
     fruit: 'cherimoya',
+    rating: 2,
   },
   {
     id: 11,
     fruit: 'macadamia',
+    rating: 5,
   },
   {
     id: 12,
     fruit: 'cherry',
+    rating: 5,
   },
 ];
 
@@ -110,17 +123,15 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
       base.reverse();
     }
 
-    let slice: ExampleData[] = base
-      .filter(datum => filter(datum.id))
-      .slice(0, count); // ! THIS SHOULD GO **AFTER** THE FILTERS.
+    let slice: ExampleData[] = base.filter(datum => filter(datum.id));
     if (args.filter.fruits && args.filter.fruits.length > 0) {
       slice = slice.filter(
         datum => args.filter.fruits && args.filter.fruits.includes(datum.fruit),
       );
     }
 
-    return slice.map(datum => ({
-      node: datum,
+    return slice.slice(0, count).map(datum => ({
+      node: fieldMask(datum, args.fields),
       cursor: () => datum.id.toString(),
     }));
   },
@@ -134,6 +145,23 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
     return SAMPLE_DATA.length;
   },
 };
+
+function fieldMask(
+  data: ExampleData,
+  fields?: (keyof ExampleData)[],
+): ExampleData {
+  if (!fields || fields.length === 0) {
+    return data;
+  }
+
+  const map = new Set(fields);
+
+  return {
+    id: map.has('id') ? data.id : 0,
+    fruit: map.has('fruit') ? data.fruit : '',
+    rating: map.has('rating') ? data.rating : 0,
+  };
+}
 
 // Yes, we test the mock first, to ensure that it's behaving as expected. This way,
 // we can ensure that wrong test results are actually caused by broken code and not
@@ -182,7 +210,7 @@ describe('AdapterMock', () => {
           {
             filter: {},
             primary: 'id',
-            fields: ['id', 'fruit'],
+            fields: ['id', 'fruit', 'rating'],
             max: 5,
             order: LoadOrder.ASC,
             anchors: [],
@@ -197,6 +225,28 @@ describe('AdapterMock', () => {
       });
     });
 
+    describe('when only a subset of fields is selected', () => {
+      test('returns the correct values', async () => {
+        expect.assertions(10);
+        const data = await AdapterMock.load(
+          {
+            filter: {},
+            primary: 'id',
+            fields: ['id', 'fruit'],
+            max: 5,
+            order: LoadOrder.ASC,
+            anchors: [],
+          },
+          {},
+        );
+
+        data.forEach((datum, i) => {
+          expect(datum.node.rating).toEqual(0);
+          expect(datum.cursor()).toEqual(String(SAMPLE_DATA[i].id));
+        });
+      });
+    });
+
     describe('when the sorting order is different', () => {
       test('it returns the correct number of elements', async () => {
         expect.assertions(10);
@@ -204,7 +254,7 @@ describe('AdapterMock', () => {
           {
             filter: {},
             primary: 'id',
-            fields: ['id', 'fruit'],
+            fields: ['id', 'fruit', 'rating'],
             max: 5,
             order: LoadOrder.DESC,
             anchors: [],
@@ -229,7 +279,7 @@ describe('AdapterMock', () => {
           {
             filter: {},
             primary: 'id',
-            fields: ['id', 'fruit'],
+            fields: ['id', 'fruit', 'rating'],
             max: 8,
             order: LoadOrder.ASC,
             anchors: [
@@ -257,7 +307,7 @@ describe('AdapterMock', () => {
           {
             filter: {},
             primary: 'id',
-            fields: ['id', 'fruit'],
+            fields: ['id', 'fruit', 'rating'],
             max: 3,
             order: LoadOrder.ASC,
             anchors: [
@@ -341,6 +391,51 @@ describe(connectionDataLoader, () => {
         {
           edges: SAMPLE_DATA.slice(0, 5).map(data => ({
             node: data,
+            cursor: data.id.toString(),
+          })),
+          count: SAMPLE_DATA.length,
+          hasNextPage: true,
+          hasPreviousPage: false,
+        },
+      );
+    });
+  });
+
+  describe('when a filter is added', () => {
+    test('it returns correct values', async () => {
+      await expectValues(
+        {
+          fruits: ['orange'],
+        },
+        {
+          primary: 'id',
+          order: LoadOrder.ASC,
+        },
+        {
+          edges: SAMPLE_DATA.slice(0, 1).map(data => ({
+            node: data,
+            cursor: data.id.toString(),
+          })),
+          count: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      );
+    });
+  });
+
+  describe('when only a subset of the fields is requested', () => {
+    test('it returns correct values', async () => {
+      await expectValues(
+        {},
+        {
+          primary: 'id',
+          order: LoadOrder.ASC,
+          fields: ['id', 'rating'],
+        },
+        {
+          edges: SAMPLE_DATA.slice(0, 5).map(data => ({
+            node: fieldMask(data, ['id', 'rating']),
             cursor: data.id.toString(),
           })),
           count: SAMPLE_DATA.length,

@@ -279,6 +279,11 @@ export type AdapterLoadInput<F, D> = AdapterInput<F> & {
    * List of attributes that **at least** must be provided by the corresponding
    * function. Ideally, the `load()` function should return and query exactly
    * the fields asked.
+   *
+   * It's important to note that `primary` is **NOT** guaranteed to be on this
+   * list on any scenario. If this list does not include `primary`, you must
+   * include it in the adapter implementation if required for any kind of
+   * operation.
    */
   fields: (keyof D)[];
 
