@@ -23,3 +23,16 @@ export {
 export { BlossomContext } from './context';
 
 export { deliver, deliverGroup } from './helpers';
+
+export {
+  connectionDataLoader,
+  AdapterBaseInput,
+  AdapterCountInput,
+  AdapterLoadInput,
+  AdapterAnchorType,
+  ConnectionAdapter,
+  ConnectionData,
+  ConnectionArgs,
+  ConnectionArgsError,
+  LoadOrder,
+} from './connections';

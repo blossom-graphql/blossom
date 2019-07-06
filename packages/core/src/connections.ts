@@ -165,7 +165,7 @@ export type ConnectionAdapter<F, D, C> = {
    * the values of `hasNextPage` and `hasPreviousPage` in `ConnectionData`,
    * which in turn invoke `load` with specific parameters.
    */
-  count: (args: AdapterCountInput<F>, context: C) => Promise<number>;
+  count: (args: AdapterCountInput<F, D>, context: C) => Promise<number>;
 };
 
 /**
@@ -200,19 +200,27 @@ export enum LoadOrder {
 /**
  * Common input for any of the thunked operations: either `load()` or `count()`.
  */
-type AdapterInput<F> = {
+export type AdapterBaseInput<F, D> = {
   /**
    * An object that describes the possible values that the filter for this
    * adapter might accept.
    */
   filter: F;
+
+  /**
+   * Name of the primary field. It's the field that is going to be used to
+   * generate the cursor as well. Do **NOT** confuse this with the primary field
+   * of a database. For a pagination based on the `createdAt` field, this would
+   * be the primary in the adapter and **NOT** the `id` field.
+   */
+  primary: keyof D;
 };
 
 /**
  * Arguments passed to the `count()` function in order to fetch the estimated
  * list of total entries.
  */
-export type AdapterCountInput<F> = AdapterInput<F>;
+export type AdapterCountInput<F, D> = AdapterBaseInput<F, D>;
 
 /**
  * One of the possible anchor types used to perform a query within the adapter.
@@ -254,15 +262,7 @@ export type AdapterAnchor = {
 /**
  * Arguments passed to the `load()` function in order to fetch the entries.
  */
-export type AdapterLoadInput<F, D> = AdapterInput<F> & {
-  /**
-   * Name of the primary field. It's the field that is going to be used to
-   * generate the cursor as well. Do **NOT** confuse this with the primary field
-   * of a database. For a pagination based on the `createdAt` field, this would
-   * be the primary in the adapter and **NOT** the `id` field.
-   */
-  primary: keyof D;
-
+export type AdapterLoadInput<F, D> = AdapterBaseInput<F, D> & {
   /**
    * Max number of items asked in the request. The `load()` function must return
    * **at most** `max` fields but does not need to guarantee returning such
@@ -409,7 +409,10 @@ export function connectionDataLoader<F, D, C>(
       },
       pageInfo: {
         count() {
-          return adapter.count({ filter }, ctx);
+          return adapter.count(
+            { primary: connectionArgs.primary, filter },
+            ctx,
+          );
         },
         hasNextPage(): Promise<boolean> {
           return hasVertex(AdapterAnchorType.GT);

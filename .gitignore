@@ -71,3 +71,6 @@ packages/test-*
 
 # Testing folders inside packages
 test/
+
+# TS Build Info is ignored by default
+*.tsbuildinfo

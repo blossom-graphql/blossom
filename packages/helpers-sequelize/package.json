@@ -1,0 +1,18 @@
+{
+  "name": "@blossom-gql/helpers-sequelize",
+  "version": "0.0.0",
+  "description": "Helpers and adapters for supporting Sequelize in the Blossom Core.",
+  "main": "dist/index.js",
+  "repository": "https://github.com/blossom-graphql/blossom",
+  "author": "Sebastian Soto",
+  "license": "MIT",
+  "private": false,
+  "devDependencies": {
+    "@blossom-gql/core": "^0.0.0",
+    "@types/lodash.set": "^4.3.6",
+    "sequelize": "^5.9.2"
+  },
+  "dependencies": {
+    "lodash.set": "^4.3.2"
+  }
+}

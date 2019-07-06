@@ -183,7 +183,7 @@ describe('AdapterMock', () => {
     describe('when no filters are applied', () => {
       test('returns the correct value', async () => {
         expect.assertions(1);
-        expect(await AdapterMock.count({ filter: {} }, {})).toBe(
+        expect(await AdapterMock.count({ primary: 'id', filter: {} }, {})).toBe(
           SAMPLE_DATA.length,
         );
       });
@@ -194,7 +194,7 @@ describe('AdapterMock', () => {
         expect.assertions(1);
         expect(
           await AdapterMock.count(
-            { filter: { fruits: ['pineapple', 'cherimoya'] } },
+            { primary: 'id', filter: { fruits: ['pineapple', 'cherimoya'] } },
             {},
           ),
         ).toBe(2);
