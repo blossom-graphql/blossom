@@ -20,6 +20,8 @@ export default {
     'source-map-support': '^0.5.9',
   },
   devDependencies: {
+    '@blossom-gql/toolbelt':
+      '/Users/sebastiansoto/repositories/blossom/packages/toolbelt',
     jest: '^23.3.10',
     prettier: '^1.16.0',
     '@types/node': `^10.12.18`,
