@@ -5,3 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  *
  */
+
+export {
+  sequelizeConnectionAdapter,
+  SequelizeConnectionArgsMapper,
+  AdapterOptions,
+} from './connection';

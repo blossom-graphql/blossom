@@ -1,4 +1,4 @@
-version: '2.4'
+version: '3.7'
 
 services:
   node:
@@ -6,10 +6,23 @@ services:
     init: true
     environment:
       - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:blossom@postgres:5432/blossom
     working_dir: /var/app
     volumes:
       - .:/var/app
       - blossom-dev-yarn-cache:/root/.yarn-cache
+    depends_on:
+      - postgres
+
+  # Yes, we are not adding volumes to persist state since we want to start with
+  # a clean slate on this one after subsequent restarts.
+  postgres:
+    image: postgres:11.4
+    environment:
+      - POSTGRES_PASSWORD=blossom
+      - POSTGRES_DB=blossom
+    ports:
+      - 5435:5432
 
 volumes:
   blossom-dev-yarn-cache:

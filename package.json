@@ -8,7 +8,7 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "test": "npx jest --config ./scripts/jest/config.base.js"
+    "test": "npx jest --config ./scripts/jest/config.base.js --coverage"
   },
   "devDependencies": {
     "@types/jest": "^24.0.15",
