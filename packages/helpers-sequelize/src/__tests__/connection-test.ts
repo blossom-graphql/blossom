@@ -45,4 +45,101 @@ describe(sequelizeConnectionAdapter, () => {
       ),
     ).toBe(1);
   });
+
+  describe('limit', () => {
+    describe('when a number is set', () => {
+      xtest('it uses the number', () => {
+        // write me
+      });
+    });
+    describe('when a function is set', () => {
+      xtest('it returns the function value', () => {
+        // write me
+      });
+    });
+  });
+
+  describe('default', () => {
+    describe('when a number is set', () => {
+      xtest('it uses the number', () => {
+        // write me
+      });
+    });
+
+    describe('when a function is set', () => {
+      xtest('it returns the function value', () => {
+        // write me
+      });
+    });
+  });
+
+  describe('load', () => {
+    describe("when there is a returned 'where' value", () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when there is a returned include value', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when no fields are set', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when the primary field is not added', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when a top anchor is present', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when a bottom anchor is present', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when both anchors are present', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when order is set to ASC', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+
+    describe('when order is set to DESC', () => {
+      xtest('it returns the correct values', () => {
+        // write me
+      });
+    });
+  });
+
+  describe('count', () => {
+    describe("when there is a returned 'where' value", () => {
+      xtest('it returns the correct value', () => {
+        // write me
+      });
+    });
+
+    describe('when there is a returned include value', () => {
+      xtest('it returns the correct value', () => {
+        // write me
+      });
+    });
+  });
 });
