@@ -78,6 +78,7 @@ export async function setup() {
   await sequelize.query(query.toString());
 
   // Add users to the database
+  await User.truncate({ cascade: true });
   const data = JSON.parse(
     (await fs.readFile(path.join(__dirname, 'users.json'))).toString(),
   );

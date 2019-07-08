@@ -12,7 +12,6 @@ import {
   AdapterAnchorType,
   LoadOrder,
 } from '@blossom-gql/core';
-import set from 'lodash.set';
 import { Model, Op, WhereOptions, Includeable } from 'sequelize';
 
 /**
@@ -83,6 +82,11 @@ export type AdapterOptions<C> = {
   default: number | ((ctx: C) => number);
 };
 
+export const defaultAdapterOpts = {
+  cursor: defaultCursorGenerator,
+  default: 20,
+  limit: 100,
+};
 /**
  * Generates a `ConnectionAdapter` that allows querying connections from
  * `sequelize`. This in turn can be passed to the `connectionDataLoader`
@@ -103,11 +107,7 @@ export function sequelizeConnectionAdapter<
 >(
   m: M,
   argsMapper: SequelizeConnectionArgsMapper<F, U, C>,
-  opts: AdapterOptions<C> = {
-    cursor: defaultCursorGenerator,
-    default: 20,
-    limit: 100,
-  },
+  opts: AdapterOptions<C> = defaultAdapterOpts,
 ): ConnectionAdapter<F, U, C> {
   return {
     limit(ctx: C) {
@@ -136,13 +136,15 @@ export function sequelizeConnectionAdapter<
       const where = { ...mappedArgs.where };
       args.anchors.forEach(anchor => {
         const op = AnchorToOp.get(anchor.type);
+        /* istanbul ignore next */
         if (!op) {
           // no known anchor, skip. maybe raise an exception?
+          // not covered because we know for a fact that this should not happen
           return;
         }
 
         // Add the anchor to the where statement: [primary].[operator] = cursor value
-        set(where, [args.primary, op], anchor.cursor);
+        setAnchor(where, args.primary as string, op, anchor.cursor);
       });
 
       const results: readonly U[] = await m.findAll({
@@ -174,4 +176,19 @@ export function sequelizeConnectionAdapter<
       });
     },
   };
+}
+
+/**
+ * Sets the anchor on the sequelize `where` object.
+ *
+ * @param where `WhereOptions` object for the query.
+ * @param key Name of the key to set.
+ * @param op Sequelize comparison operator.
+ * @param value Value to set for the cursor.
+ */
+function setAnchor(where: any, key: string, op: symbol, value: string) {
+  if (!where.hasOwnProperty(key)) {
+    where[key] = {};
+  }
+  where[key][op] = value;
 }
