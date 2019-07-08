@@ -12,8 +12,5 @@
     "@types/lodash.set": "^4.3.6",
     "pg": "^7.11.0",
     "sequelize": "^5.9.2"
-  },
-  "dependencies": {
-    "lodash.set": "^4.3.2"
   }
 }
