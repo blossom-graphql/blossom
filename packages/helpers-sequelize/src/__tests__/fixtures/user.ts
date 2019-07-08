@@ -4,6 +4,7 @@ import path from 'path';
 import { fn, Model, DataTypes } from 'sequelize';
 
 import sequelize from './sequelize';
+import { cleanup as cleanupMovies, setup as setupMovies } from './movie';
 
 class User extends Model {
   id!: number;
@@ -83,10 +84,14 @@ export async function setup() {
     (await fs.readFile(path.join(__dirname, 'users.json'))).toString(),
   );
   await User.bulkCreate(data);
+
+  // Add movies to the database
+  await setupMovies();
 }
 
 export async function cleanup() {
-  await User.drop();
+  await User.drop({ cascade: true });
+  await cleanupMovies();
   await sequelize.close();
 }
 

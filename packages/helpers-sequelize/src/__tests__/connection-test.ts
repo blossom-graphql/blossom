@@ -12,6 +12,7 @@ import {
   LoadOrder,
   AdapterAnchorType,
 } from '@blossom-gql/core';
+import sequelize from './fixtures/sequelize';
 
 beforeAll(async () => {
   await setup();
@@ -19,6 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await cleanup();
+  // await sequelize.close();
 });
 
 describe(sequelizeConnectionAdapter, () => {
