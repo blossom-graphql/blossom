@@ -5,6 +5,8 @@ if (!process.env.DATABASE_URL) {
     'You must setup the $DATABASE_URL environment variable before proceeding.',
   );
 }
-const sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  logging: process.env.DATABASE_LOGGING === 'true',
+});
 
 export default sequelize;

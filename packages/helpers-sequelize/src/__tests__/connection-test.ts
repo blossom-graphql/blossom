@@ -13,14 +13,18 @@ import {
   AdapterAnchorType,
 } from '@blossom-gql/core';
 import sequelize from './fixtures/sequelize';
+import Movie from './fixtures/movie';
 
 beforeAll(async () => {
   await setup();
 });
 
 afterAll(async () => {
-  await cleanup();
-  // await sequelize.close();
+  if (process.env.SKIP_CLEANUP) {
+    await sequelize.close();
+  } else {
+    await cleanup();
+  }
 });
 
 describe(sequelizeConnectionAdapter, () => {
@@ -30,6 +34,7 @@ describe(sequelizeConnectionAdapter, () => {
     firstName?: string;
     lastName?: string;
     createdAt?: Date;
+    rating?: number;
   };
   const mapper: SequelizeConnectionArgsMapper<
     UsersFilter,
@@ -44,8 +49,19 @@ describe(sequelizeConnectionAdapter, () => {
       ? { createdAt: { [Op.gte]: args.filter.createdAt } }
       : undefined;
 
+    const rating = args.filter.rating
+      ? [
+          {
+            model: Movie,
+            as: 'movies',
+            where: { rating: { [Op.gt]: args.filter.rating } },
+          },
+        ]
+      : [];
+
     return {
       where: { ...firstName, ...createdAt },
+      include: [...rating],
     };
   };
 
@@ -184,8 +200,51 @@ describe(sequelizeConnectionAdapter, () => {
     });
 
     describe('when there is a returned include value', () => {
-      xtest('it returns the correct values', () => {
-        // write me
+      const expectedGuids = [
+        '264585aa-5678-4fb2-893e-0107d1b408e6',
+        '52b0c03c-942a-4269-9e25-c9e3513f7c94',
+        '748ebcf8-df22-471e-a02b-87f959c1f5a5',
+        '72826f66-2f10-4372-81a3-bccaedf6b73e',
+        '60cc603e-a538-4abf-8586-f4d43e0a64d0',
+        'a143cb6a-7271-4f12-993b-52243ca30870',
+        '549a55b8-5556-4375-93c8-9923d3afd09a',
+        '2432441b-e623-4288-8f98-b65197db626f',
+        'e814b76b-65ae-47ef-8425-94c8556a3218',
+        'cf2a6b6f-e73f-4f24-bf2c-ec8b229ad734',
+      ];
+      // Extracted from this query:
+      `
+      SELECT DISTINCT
+        users.id,
+        users.uuid
+      FROM
+        users
+        INNER JOIN movies ON users.id = movies.user_id
+      WHERE
+        movies.rating > 4
+      ORDER BY users.id ASC
+      LIMIT 10;
+      `;
+
+      test('it returns the correct values', async () => {
+        expect.assertions(1 + expectedGuids.length);
+
+        const results = await adapter().load(
+          {
+            filter: { rating: 4 },
+            primary: 'id',
+            max: expectedGuids.length,
+            anchors: [],
+            order: LoadOrder.ASC,
+            fields: [],
+          },
+          {},
+        );
+
+        expect(results.length).toBe(expectedGuids.length);
+        results.forEach((result, i) => {
+          expect(result.node.uuid).toBe(expectedGuids[i]);
+        });
       });
     });
 
@@ -419,8 +478,29 @@ describe(sequelizeConnectionAdapter, () => {
     });
 
     describe('when there is a returned include value', () => {
-      xtest('it returns the correct value', () => {
-        // write me
+      test('it returns the correct value', async () => {
+        // This is the query that returns the actual value. Data is immutable
+        // since it's on a fixture.
+        `
+        SELECT
+          count(DISTINCT ("User"."id")) AS "count"
+        FROM
+          "users" AS "User"
+          INNER JOIN "movies" AS "movies" ON "User"."id" = "movies"."user_id"
+            AND "movies"."rating" > 4;
+        `; // yields 364
+
+        expect.assertions(1);
+
+        expect(
+          await adapter().count(
+            {
+              filter: { rating: 4 },
+              primary: 'id',
+            },
+            {},
+          ),
+        ).toBe(846);
       });
     });
   });

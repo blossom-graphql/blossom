@@ -4,7 +4,7 @@ import path from 'path';
 import { fn, Model, DataTypes } from 'sequelize';
 
 import sequelize from './sequelize';
-import { cleanup as cleanupMovies, setup as setupMovies } from './movie';
+import Movie, { cleanup as cleanupMovies, setup as setupMovies } from './movie';
 
 class User extends Model {
   id!: number;
@@ -72,6 +72,7 @@ User.init(
   },
   { sequelize, timestamps: true, tableName: 'users' },
 );
+User.hasMany(Movie, { as: 'movies', foreignKey: 'userId' });
 
 export async function setup() {
   // Create users table
