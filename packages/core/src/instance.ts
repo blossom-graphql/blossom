@@ -96,6 +96,8 @@ export class BlossomInstance implements IBlossomInstance {
 
   /**
    * Mapping for introducing error handlers in the instance.
+   *
+   * TODO: Add a common set of errors that can be automatically thrown.
    */
   errorHandlers: BlossomErrorHandlerDict = new Map();
 
