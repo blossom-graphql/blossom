@@ -23,6 +23,7 @@ import {
   UnionTypeDefinitionNode,
   ObjectTypeExtensionNode,
   InputObjectTypeExtensionNode,
+  DirectiveNode,
 } from 'graphql';
 
 import { ImportParsingError, UnsupportedOperationError } from './errors';
@@ -38,6 +39,19 @@ export enum SupportedOperation {
   Query = 'query',
   Mutation = 'mutation',
 }
+
+/**
+ * Any of the descriptors contained in a document.
+ */
+export type Descriptor =
+  | ObjectTypeDescriptor
+  | ObjectExtensionDescriptor
+  | FieldDescriptor
+  | OperationDescriptor
+  | OperationFieldDescriptor
+  | EnumTypeDescriptor
+  | EnumValueDescriptor
+  | UnionTypeDescriptor;
 
 /**
  * Descriptor of a document node.
@@ -177,6 +191,7 @@ export type OperationFieldDescriptor = OperationBaseDescriptor & {
 };
 
 export type EnumValueDescriptor = {
+  kind: 'EnumValueDescriptor';
   originalName: string;
   comments?: string;
 };
@@ -304,6 +319,95 @@ export type ParsedFileDescriptor = ParsedSchemaReferences & {
 export type ParsedFileGraph = Map<string, ParsedFileDescriptor>;
 
 export type ReferencedTypeList = Set<string>;
+
+export type SupportedDefinitionNode =
+  | ObjectTypeDefinitionNode
+  | InputObjectTypeDefinitionNode
+  | EnumTypeDefinitionNode
+  | ObjectTypeExtensionNode
+  | InputObjectTypeExtensionNode
+  | FieldDefinitionNode
+  | InputValueDefinitionNode
+  | UnionTypeDefinitionNode;
+
+/**
+ * A directive handler receives a descriptor object and is able to mutate it
+ * accordingly. By design, directives are only allowed to affect the scope of
+ * the descriptor.
+ */
+export type DirectiveHandler = (
+  directive: DirectiveNode,
+  node: SupportedDefinitionNode,
+  descriptor: Descriptor,
+) => void;
+
+export type DirectiveHandlingMap = Map<string, DirectiveHandler>;
+
+const DirectiveHandlers: DirectiveHandlingMap = new Map([
+  ['blossomImpl', blossomImplementationDirectiveHandler],
+]);
+
+function blossomImplementationDirectiveHandler(
+  directive: DirectiveNode,
+  node: SupportedDefinitionNode,
+  descriptor: Descriptor,
+) {
+  if (
+    descriptor.kind !== 'SingleFieldDescriptor' &&
+    descriptor.kind !== 'ArrayFieldDescriptor'
+  ) {
+    return;
+  }
+  if (node.kind !== 'FieldDefinition') {
+    return;
+  }
+
+  const argument =
+    directive.arguments &&
+    directive.arguments.find(
+      argument => argument.name.value === BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
+    );
+  if (!argument) {
+    return;
+  }
+
+  if (
+    argument.value.kind !== 'EnumValue' &&
+    argument.value.kind !== 'StringValue'
+  ) {
+    return;
+  }
+
+  switch (argument.value.value) {
+    case ThunkImplementationType.Function:
+      descriptor.thunkType = ThunkType.Function;
+      return;
+    case ThunkImplementationType.AsyncFunction:
+      descriptor.thunkType = ThunkType.AsyncFunction;
+      return;
+    default:
+    case ThunkImplementationType.None:
+      return;
+  }
+}
+
+function handleDirectives(
+  definitionNode: SupportedDefinitionNode,
+  descriptor: Descriptor,
+) {
+  if (!definitionNode.directives || definitionNode.directives.length === 0) {
+    return;
+  }
+
+  definitionNode.directives.forEach(directive => {
+    const handler = DirectiveHandlers.get(directive.name.value);
+    if (!handler) {
+      return;
+    }
+
+    handler(directive, definitionNode, descriptor);
+  });
+}
 
 export async function parseFileGraph(
   filePath: string,
@@ -602,64 +706,6 @@ export function reduceToMap<U, V extends { name: string }>(
 }
 
 /**
- * Given a list of directives, coming from a parsed field, indicates the
- * thunkType of the field.
- *
- * TODO: This is not a clean approach. A dictionary of directives should be
- * created and then attach handlers to them in a global file.
- *
- * @param directives List of directives.
- */
-export function thunkTypeFromDirectives(field: FieldDefinitionNode) {
-  const { arguments: args, directives } = field;
-  // If this field has arguments, then it must default to a function
-  // type. In any other cases it is safe to pass it. Thus, the default thunk
-  // value comes from the fact whether the field has arguments.
-  const hasArguments = args && args.length > 0;
-  const defaultThunkValue = hasArguments ? ThunkType.Function : ThunkType.None;
-
-  if (!directives || directives.length === 0) return defaultThunkValue;
-
-  // Find whether the blossomImpl directive is present in the list of
-  // directives.
-  const blossomImplDirective = directives.find(
-    ({ name: { value } }) => value === BLOSSOM_IMPLEMENTATION_DIRECTIVE,
-  );
-  if (!blossomImplDirective) {
-    return defaultThunkValue;
-  }
-
-  // From the directive, find the argument with name `type`.
-  const typeArgument =
-    blossomImplDirective.arguments &&
-    blossomImplDirective.arguments.find(
-      argument => argument.name.value === BLOSSOM_IMPLEMENTATION_ARGUMENT_NAME,
-    );
-  if (!typeArgument) {
-    return defaultThunkValue;
-  }
-
-  if (
-    typeArgument.value.kind === 'EnumValue' ||
-    typeArgument.value.kind === 'StringValue'
-  ) {
-    switch (typeArgument.value.value) {
-      case ThunkImplementationType.Function:
-        return ThunkType.Function;
-      case ThunkImplementationType.AsyncFunction:
-        return ThunkType.AsyncFunction;
-      default:
-      // Unable to parse. Send default value.
-      // TODO: Log a warning.
-      case ThunkImplementationType.None:
-        return defaultThunkValue;
-    }
-  } else {
-    return defaultThunkValue;
-  }
-}
-
-/**
  * Receives a NamedType (GraphQL) structure and maps it to a KnownTypeDescriptor
  * or a ReferencedTypeDescriptor depending on whether the is a known type or
  * is available on a definition.
@@ -794,10 +840,7 @@ export function parseFieldDefinitionNode(
       // Only parse thunk type for definitions that are objects and have
       // directives. We don't parse them for inputs. Moreover, we even should
       // throw an error in the future.
-      thunkType:
-        definition.kind === 'FieldDefinition'
-          ? thunkTypeFromDirectives(definition)
-          : ThunkType.None,
+      thunkType: ThunkType.None,
       arguments: args,
     };
 
@@ -877,8 +920,12 @@ export function parseDocumentObjectType(
   if (nodeDescriptor.fields) {
     for (const field of nodeDescriptor.fields) {
       const fieldDescriptor = parserIteratee(field);
+      if (!fieldDescriptor) {
+        continue;
+      }
 
-      fieldDescriptor !== undefined && fields.push(fieldDescriptor);
+      handleDirectives(field, fieldDescriptor);
+      fields.push(fieldDescriptor);
     }
   }
 
@@ -893,40 +940,49 @@ export function parseDocumentObjectType(
     referencedTypes,
   };
 
+  let descriptor: ObjectTypeDescriptor | ObjectExtensionDescriptor;
+
   // Mount the parsed object.
   if (
     nodeDescriptor.kind === 'ObjectTypeDefinition' ||
     nodeDescriptor.kind === 'InputObjectTypeDefinition'
   ) {
-    return {
+    descriptor = {
       ...commonResults,
       kind: 'ObjectTypeDescriptor',
       comments: nodeDescriptor.description && nodeDescriptor.description.value,
     };
   } else {
-    return {
+    descriptor = {
       ...commonResults,
       kind: 'ObjectExtensionsDescriptor',
     };
   }
+
+  handleDirectives(nodeDescriptor, descriptor);
+  return descriptor;
 }
 
 export function parseDocumentEnumType(
   enumDesc: EnumTypeDefinitionNode,
 ): EnumTypeDescriptor {
-  const fields = enumDesc.values
+  const fields: EnumValueDescriptor[] = enumDesc.values
     ? enumDesc.values.map(value => ({
+        kind: 'EnumValueDescriptor',
         originalName: value.name.value,
         comments: value.description && value.description.value,
       }))
     : [];
 
-  return {
+  let descriptor: EnumTypeDescriptor = {
     kind: 'EnumTypeDescriptor',
     name: enumDesc.name.value,
     comments: enumDesc.description && enumDesc.description.value,
     fields,
   };
+  handleDirectives(enumDesc, descriptor);
+
+  return descriptor;
 }
 
 export function parseDocumentUnionType(
@@ -936,11 +992,14 @@ export function parseDocumentUnionType(
     ? unionDesc.types.map(type => type.name.value)
     : [];
 
-  return {
+  let descriptor: UnionTypeDescriptor = {
     kind: 'UnionTypeDescriptor',
     name: unionDesc.name.value,
     comments: unionDesc.description && unionDesc.description.value,
     members,
     referencedTypes: new Set(members),
   };
+  handleDirectives(unionDesc, descriptor);
+
+  return descriptor;
 }

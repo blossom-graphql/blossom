@@ -57,7 +57,9 @@ export function formatError<U extends Error>(
   const handler = dict.get(error.constructor);
 
   // If there's no associated handler we don't add extensions and we simply
-  // exclude them.
+  // exclude them. This means this error is going as-is to the user.
+  // TODO: If we support environment variables, then we should hide these
+  // kind of errors and just shown an internal error.
   if (!handler) {
     return { render: true, extensions: undefined };
   }
