@@ -1,9 +1,16 @@
 import { resolveArray, BlossomRootQuery } from 'blossom/instance';
-import { Example, ExampleQuery } from 'blossom/components/example/example.types';
+import {
+  Example,
+  ExampleQuery,
+} from 'blossom/components/example/example.types';
 import { exampleResolver } from 'blossom/components/example/example.resolvers';
 import { exampleByName, ExampleData } from './example.sources';
 
-export const exampleRootQuery: ExampleQuery = async function exampleRootQuery(args, ctx, ast) {
+export const exampleRootQuery: ExampleQuery = async function exampleRootQuery(
+  args,
+  ctx,
+  ast,
+) {
   const data = await ctx.loader(exampleByName).loadMany([...args.names]);
 
   return resolveArray<ExampleData, Example, typeof ctx>({
@@ -14,5 +21,5 @@ export const exampleRootQuery: ExampleQuery = async function exampleRootQuery(ar
   });
 };
 
-// Registers the functon above as a root value in the Blossom instance.
+// Registers the function above as a root value in the Blossom instance.
 BlossomRootQuery({ implements: 'example', using: exampleRootQuery });

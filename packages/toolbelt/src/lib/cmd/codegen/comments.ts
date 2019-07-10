@@ -23,7 +23,7 @@ this to properly resolve.
 `;
 
 export const ROOT_REGISTRATION_COMMENT = comment`
-Registers the functon above as a root value in the Blossom instance.
+Registers the function above as a root value in the Blossom instance.
 `;
 
 export const SOURCE_COMMENT = comment`
