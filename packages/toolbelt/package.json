@@ -17,25 +17,25 @@
   "dependencies": {
     "@types/cosmiconfig": "^5.0.3",
     "@types/fs-extra": "^5.0.4",
-    "@types/graphql": "^14.0.3",
+    "@types/graphql": "^14.2.2",
     "@types/jest": "^23.3.10",
     "@types/lodash": "^4.14.119",
     "@types/node": "^10.12.15",
     "@types/pluralize": "^0.0.29",
-    "@types/prettier": "^1.15.2",
+    "@types/prettier": "^1.15.4",
     "chalk": "^2.4.1",
-    "commander": "^2.19.0",
+    "commander": "^2.20.0",
     "cosmiconfig": "^5.2.1",
     "fs-extra": "^7.0.1",
-    "graphql": "^14.0.2",
-    "lodash": "^4.17.11",
+    "graphql": "^14.4.2",
+    "lodash": "^4.17.14",
     "pluralize": "^7.0.0",
     "tmp": "^0.0.33",
     "tmp-promise": "^1.0.5",
-    "ts-loader": "^5.3.1",
+    "ts-loader": "^6.0.4",
     "tsconfig-paths-webpack-plugin": "^3.2.0",
-    "typescript": "^3.2.2",
-    "webpack": "^4.27.1",
+    "typescript": "^3.5.2",
+    "webpack": "^4.35.3",
     "webpack-node-externals": "^1.7.2",
     "word-wrap": "^1.2.3"
   },
@@ -44,6 +44,6 @@
     "@types/webpack": "^4.4.21",
     "@types/webpack-node-externals": "^1.6.3",
     "ts-node": "^7.0.1",
-    "typescript": "^3.2.2"
+    "typescript": "^3.5.2"
   }
 }
