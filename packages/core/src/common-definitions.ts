@@ -20,7 +20,13 @@ enum BlossomThunkType {
 
 directive @blossomImpl(type: BlossomThunkType!) on FIELD_DEFINITION
 
-directive @blossomConnection on OBJECT
+directive @hasConnection on OBJECT
+
+type PageInfo {
+  count: Int!
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+}
 `);
 
 export default parsed.definitions;

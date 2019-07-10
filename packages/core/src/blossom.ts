@@ -8,10 +8,10 @@
 
 import { graphql, ExecutionResult } from 'graphql';
 
-import { IBlossomInstance } from './instance';
+import { IBlossomInstance } from './common';
+import { BlossomContext } from './context';
 import { formatGraphQLErrors } from './errors';
 import { generateLoaderInstance } from './loader';
-import { BlossomContext } from './context';
 
 /**
  * The body of a (already pre-processed) Blossom request.

@@ -11,47 +11,21 @@ import {
   DefinitionNode,
   DocumentNode,
   GraphQLSchema,
-  GraphQLError,
   OperationTypeNode,
+  DirectiveNode,
 } from 'graphql';
 
-import { BaseResolverSignature } from './common';
-import { BlossomError, BlossomEmptyHandlerError } from './errors';
-import { resolve, resolveArray } from './resolver';
+import {
+  BlossomError,
+  BlossomEmptyHandlerError,
+  ErrorHandlingFunction,
+  BlossomErrorHandlerDict,
+} from './errors';
 import COMMON_DEFINITIONS from './common-definitions';
+import { IBlossomInstance, ResolverSignature, RootValueOutput } from './common';
+import { hasConnectionDirectiveHandler } from './directives';
 import { ExtensionMap } from './extensions';
-
-export type ResolverSignature = BaseResolverSignature<any, any, any>;
-
-export type RootValueOutput = {
-  [key: string]: ResolverSignature;
-};
-
-/**
- * This type just keeps track of the extension format from the original API.
- */
-type ExtensionFormat = typeof GraphQLError.prototype.extensions;
-
-/**
- * Output of the error handling function.
- */
-type ErrorHandlerOutput = {
-  render: boolean;
-  extensions?: ExtensionFormat;
-};
-
-/**
- * A function that receives an error (which will be available on the originalError
- * entry from GraphQLError type) and converts it to the GraphQL extension format.
- */
-export type ErrorHandlingFunction = <E extends Error>(
-  error: E,
-) => ErrorHandlerOutput;
-
-/**
- * Dict that associates error class to error handler.
- */
-export type BlossomErrorHandlerDict = Map<Function, ErrorHandlingFunction>;
+import { createConnectionResolver, resolve, resolveArray } from './resolver';
 
 /**
  * Options for the Blossom Error accumulator function.
@@ -64,27 +38,13 @@ type BlossomErrorInput = {
   handler?: ErrorHandlingFunction;
 };
 
-export interface IBlossomInstance {
-  errorHandlers: BlossomErrorHandlerDict;
-  addDocument: (document: DocumentNode) => void;
-  finalDocument: DocumentNode;
-  rootSchema: GraphQLSchema;
-  addRootOperation: (
-    operation: OperationTypeNode,
-    name: string,
-    callback: ResolverSignature,
-  ) => void;
-  rootValue: RootValueOutput;
-  addErrorHandler: (
-    errorClass: BlossomError,
-    handlingFunction?: ErrorHandlingFunction,
-  ) => void;
-}
-
 export class BlossomInstance implements IBlossomInstance {
   rawDocuments: DocumentNode[] = [];
   definitions: DefinitionNode[] = [];
   extensionMap: ExtensionMap = new ExtensionMap();
+  runtimeDirectiveHandler = new Map([
+    ['hasConnection', hasConnectionDirectiveHandler],
+  ]);
 
   rootOperationsMap: Map<
     string,
@@ -101,17 +61,22 @@ export class BlossomInstance implements IBlossomInstance {
    */
   errorHandlers: BlossomErrorHandlerDict = new Map();
 
+  addDefinition(definition: DefinitionNode) {
+    this.definitions.push(definition);
+
+    if (definition.kind === 'ObjectTypeDefinition')
+      this.extensionMap.addDefinition(definition);
+
+    if (definition.kind === 'ObjectTypeExtension')
+      this.extensionMap.addExtension(definition);
+  }
+
   addDocument(document: DocumentNode) {
     this.rawDocuments.push(document);
 
     document.definitions.forEach(definition => {
-      this.definitions.push(definition);
-
-      if (definition.kind === 'ObjectTypeDefinition')
-        this.extensionMap.addDefinition(definition);
-
-      if (definition.kind === 'ObjectTypeExtension')
-        this.extensionMap.addExtension(definition);
+      this.addDefinition(definition);
+      handleDirectives(this, definition);
     });
   }
 
@@ -233,5 +198,24 @@ export function createBlossomDecorators(instance: IBlossomInstance) {
     // monitoring, logging come to mind.
     resolve,
     resolveArray,
+    createConnectionResolver,
   };
+}
+
+function handleDirectives(
+  object: IBlossomInstance,
+  node: DefinitionNode & { directives?: readonly DirectiveNode[] },
+) {
+  if (!node.directives || node.directives.length === 0) {
+    return;
+  }
+
+  node.directives.forEach(directive => {
+    const handler = object.runtimeDirectiveHandler.get(directive.name.value);
+    if (!handler) {
+      return;
+    }
+
+    handler(object, node, directive);
+  });
 }
