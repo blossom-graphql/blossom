@@ -22,6 +22,7 @@ import {
   UnionTypeDescriptor,
   KnownScalarTypes,
   ObjectExtensionDescriptor,
+  ObjectTypeAnnotation,
 } from './parsing';
 import { blossomInstancePath, typesFilePath, resolversFilePath } from './paths';
 import {
@@ -56,6 +57,7 @@ export const CORE_DELIVER_NAME = 'deliver';
 export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
 export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
 export const OBJECT_SIGNATURE_NAME = 'ObjectResolverSignature';
+export const CONNECTION_NAME = 'Connection';
 
 const OPERATION_MAP: { [key in SupportedOperation]: string } = {
   // Using [SupportOperation.Query] throws runtime error.
@@ -81,6 +83,7 @@ export enum DependencyFlag {
   HasReferencedArrayTypeOperation = 'HasReferencedArrayTypeOperation',
   HasRootQuery = 'HasRootQuery',
   HasRootMutation = 'HasRootMutation',
+  HasConnection = 'HasConnection',
 }
 
 type ImportMembersMap = Map<'default' | string, string | undefined>;
@@ -730,9 +733,7 @@ export function extractDescriptor(
   if (resolution.elementKind !== elementKind) {
     // Must be Object type.
     throw new Error(
-      `${fieldName} of kind ${
-        resolution.elementKind
-      } doesn't match Element Kind ${elementKind}.`,
+      `${fieldName} of kind ${resolution.elementKind} doesn't match Element Kind ${elementKind}.`,
     ); // TODO: Internal.
   }
 
@@ -871,8 +872,12 @@ export function linkObjectTypes(
 ) {
   // TODO: When extensions are available, this must also consider extensions
   // as a by updating fields and whatever's new.
-  if (typeDescriptor.fields.length === 0) {
+  if (!typeDescriptor.virtual && typeDescriptor.fields.length === 0) {
     throw new NoFieldsTypeError(typeDescriptor);
+  }
+
+  if (typeDescriptor.annotations.has(ObjectTypeAnnotation.HasConnection)) {
+    result.dependencyFlags.set(DependencyFlag.HasConnection, true);
   }
 
   // Update some of the stats that will be used to compute imports.
@@ -1004,6 +1009,16 @@ export function addTypesFileImports(
 
   // 2. Add dependencies coming from other files.
   addTypeReferencesImports(result, linkingContext);
+
+  // 3. Add connections, if required
+  if (result.dependencyFlags.has(DependencyFlag.HasConnection)) {
+    addImport(
+      result.vendorImports,
+      'VendorImport',
+      CORE_PACKAGE_NAME,
+      CONNECTION_NAME,
+    );
+  }
 }
 
 export function addRootFileImports(

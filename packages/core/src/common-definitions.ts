@@ -19,6 +19,8 @@ enum BlossomThunkType {
 }
 
 directive @blossomImpl(type: BlossomThunkType!) on FIELD_DEFINITION
+
+directive @blossomConnection on OBJECT
 `);
 
 export default parsed.definitions;

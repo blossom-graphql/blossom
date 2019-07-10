@@ -253,7 +253,15 @@ export type ObjectDescriptorBase = {
   name: string;
   fields: FieldDescriptor[];
   referencedTypes: ReferencedTypeList;
+  virtual: boolean;
 };
+
+/**
+ * A tag or directive that gives additional information about the object descriptor.
+ */
+export enum ObjectTypeAnnotation {
+  HasConnection = 'HasConnection',
+}
 
 /**
  * Full description of an object type. Any `type` and `input` declaration in
@@ -263,6 +271,7 @@ export type ObjectDescriptorBase = {
 export type ObjectTypeDescriptor = ObjectDescriptorBase & {
   kind: 'ObjectTypeDescriptor';
   comments?: string;
+  annotations: Set<ObjectTypeAnnotation>;
 };
 
 export type ObjectExtensionDescriptor = ObjectDescriptorBase & {
@@ -343,9 +352,25 @@ export type DirectiveHandler = (
 
 export type DirectiveHandlingMap = Map<string, DirectiveHandler>;
 
-const DirectiveHandlers: DirectiveHandlingMap = new Map([
+const DIRECTIVE_HANDLERS: DirectiveHandlingMap = new Map([
   ['blossomImpl', blossomImplementationDirectiveHandler],
+  ['hasConnection', hasConnectionDirectiveHandler],
 ]);
+
+function hasConnectionDirectiveHandler(
+  _: DirectiveNode,
+  node: SupportedDefinitionNode,
+  descriptor: Descriptor,
+) {
+  if (descriptor.kind !== 'ObjectTypeDescriptor') {
+    return;
+  }
+  if (node.kind !== 'ObjectTypeDefinition') {
+    return;
+  }
+
+  descriptor.annotations.add(ObjectTypeAnnotation.HasConnection);
+}
 
 function blossomImplementationDirectiveHandler(
   directive: DirectiveNode,
@@ -400,7 +425,7 @@ function handleDirectives(
   }
 
   definitionNode.directives.forEach(directive => {
-    const handler = DirectiveHandlers.get(directive.name.value);
+    const handler = DIRECTIVE_HANDLERS.get(directive.name.value);
     if (!handler) {
       return;
     }
@@ -695,11 +720,15 @@ export function parseDocumentNode(
 
 export function reduceToMap<U, V extends { name: string }>(
   values: { node: U }[],
-  parser: (descriptor: U) => V | null,
+  parser: (descriptor: U) => readonly V[] | null,
 ): Map<string, V> {
   return values.reduce((accumulator: Map<string, V>, current: { node: U }) => {
     const parsedResult = parser(current.node);
-    if (parsedResult !== null) accumulator.set(parsedResult.name, parsedResult);
+    if (parsedResult !== null) {
+      parsedResult.forEach(result => {
+        accumulator.set(result.name, result);
+      });
+    }
 
     return accumulator;
   }, new Map<string, V>());
@@ -867,17 +896,17 @@ export function parseFieldDefinitionNode(
  */
 export function parseDocumentObjectType(
   nodeDescriptor: ObjectTypeExtensionNode | InputObjectTypeExtensionNode,
-): ObjectExtensionDescriptor;
+): readonly ObjectExtensionDescriptor[];
 export function parseDocumentObjectType(
   nodeDescriptor: ObjectTypeDefinitionNode | InputObjectTypeDefinitionNode,
-): ObjectTypeDescriptor;
+): readonly ObjectTypeDescriptor[];
 export function parseDocumentObjectType(
   nodeDescriptor:
     | ObjectTypeDefinitionNode
     | InputObjectTypeDefinitionNode
     | ObjectTypeExtensionNode
     | InputObjectTypeExtensionNode,
-): ObjectTypeDescriptor | ObjectExtensionDescriptor {
+): readonly ObjectTypeDescriptor[] | readonly ObjectExtensionDescriptor[] {
   const referencedTypes: ReferencedTypeList = new Set();
 
   /**
@@ -938,6 +967,7 @@ export function parseDocumentObjectType(
     name: nodeDescriptor.name.value,
     fields,
     referencedTypes,
+    virtual: false,
   };
 
   let descriptor: ObjectTypeDescriptor | ObjectExtensionDescriptor;
@@ -951,6 +981,7 @@ export function parseDocumentObjectType(
       ...commonResults,
       kind: 'ObjectTypeDescriptor',
       comments: nodeDescriptor.description && nodeDescriptor.description.value,
+      annotations: new Set(),
     };
   } else {
     descriptor = {
@@ -960,12 +991,39 @@ export function parseDocumentObjectType(
   }
 
   handleDirectives(nodeDescriptor, descriptor);
-  return descriptor;
+
+  // guard for typing
+  if (descriptor.kind === 'ObjectTypeDescriptor') {
+    // If the descriptor has a connection annotation, add a derived virtual
+    // type from it that represents the connection, within the same file.
+    //
+    // This way, the connection will be resolved in the types file when required.
+    // `blossom cg types` will automatically generate the connection as well.
+    //
+    // TODO: Find a generalized way of emitting additional, virtual types.
+    if (descriptor.annotations.has(ObjectTypeAnnotation.HasConnection)) {
+      const connectionType: ObjectTypeDescriptor = {
+        kind: 'ObjectTypeDescriptor',
+        objectType: ObjectTypeKind.Object,
+        name: descriptor.name + 'Connection',
+        fields: [] as FieldDescriptor[],
+        referencedTypes: new Set([descriptor.name]),
+        annotations: new Set(),
+        virtual: true,
+      };
+
+      return [descriptor, connectionType];
+    }
+
+    return [descriptor];
+  } else {
+    return [descriptor];
+  }
 }
 
 export function parseDocumentEnumType(
   enumDesc: EnumTypeDefinitionNode,
-): EnumTypeDescriptor {
+): readonly EnumTypeDescriptor[] {
   const fields: EnumValueDescriptor[] = enumDesc.values
     ? enumDesc.values.map(value => ({
         kind: 'EnumValueDescriptor',
@@ -982,12 +1040,12 @@ export function parseDocumentEnumType(
   };
   handleDirectives(enumDesc, descriptor);
 
-  return descriptor;
+  return [descriptor];
 }
 
 export function parseDocumentUnionType(
   unionDesc: UnionTypeDefinitionNode,
-): UnionTypeDescriptor {
+): readonly UnionTypeDescriptor[] {
   const members = unionDesc.types
     ? unionDesc.types.map(type => type.name.value)
     : [];
@@ -1001,5 +1059,5 @@ export function parseDocumentUnionType(
   };
   handleDirectives(unionDesc, descriptor);
 
-  return descriptor;
+  return [descriptor];
 }

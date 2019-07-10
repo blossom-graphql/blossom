@@ -92,3 +92,8 @@ TODO:
 export const RESOLVER_OTHER_PROPS_COMMENT = comment`
 TODO: Remove this and map attributes to the properties of the output type.
 `;
+
+export const CONNECTION_TYPE_COMMENT = (name: string) => comment`
+This is the connection type that must be returned on a field or operation that
+resolves to a ${name}Connection.
+`;

@@ -23,6 +23,7 @@ import {
   KnownScalarTypeDescriptor,
   SupportedOperation,
   OperationFieldDescriptor,
+  ObjectTypeAnnotation,
 } from './parsing';
 import {
   TypesFileContents,
@@ -41,6 +42,7 @@ import {
   CORE_RESOLVER_NAME,
   INSTANCE_CONTEXT_NAME,
   INSTANCE_RESOLVE_ARRAY_NAME,
+  CONNECTION_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -57,6 +59,7 @@ import {
   RESOLVER_TYPENAME_COMMENT,
   ROOT_BLOCK_COMMENT,
   ROOT_REGISTRATION_COMMENT,
+  CONNECTION_TYPE_COMMENT,
 } from './cmd/codegen/comments';
 
 export const CODE_GROUP_SPACING = '\n\n';
@@ -405,8 +408,12 @@ export function generateEnumDeclaration(enumDescriptor: EnumTypeDescriptor) {
  */
 export function generateObjectTypeAlias(
   descriptor: ObjectTypeDescriptor,
-): ts.TypeAliasDeclaration {
-  const members: ReadonlyArray<ts.TypeElement> = descriptor.fields.map(
+): ts.TypeAliasDeclaration[] {
+  if (descriptor.virtual) {
+    return [];
+  }
+
+  const members: readonly ts.TypeElement[] = descriptor.fields.map(
     generateTypeElement,
   );
 
@@ -429,12 +436,38 @@ export function generateObjectTypeAlias(
     undefined,
     ts.createTypeLiteralNode([typenameElement, ...members]),
   );
-
   if (descriptor.comments) {
     prependJSDocComments(declaration, descriptor.comments);
   }
 
-  return declaration;
+  const declarations: ts.TypeAliasDeclaration[] = [declaration];
+  if (!descriptor.annotations.has(ObjectTypeAnnotation.HasConnection)) {
+    return declarations;
+  }
+
+  const connectionDeclaration = ts.createTypeAliasDeclaration(
+    undefined,
+    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+    ts.createIdentifier(descriptor.name + 'Connection'),
+    undefined,
+    ts.createTypeReferenceNode(ts.createIdentifier(CONNECTION_NAME), [
+      ts.createTypeReferenceNode(
+        ts.createIdentifier(descriptor.name),
+        undefined,
+      ),
+      ts.createTypeReferenceNode(
+        ts.createIdentifier(INSTANCE_CONTEXT_NAME),
+        undefined,
+      ),
+    ]),
+  );
+  prependJSDocComments(
+    connectionDeclaration,
+    CONNECTION_TYPE_COMMENT(descriptor.name),
+  );
+  declarations.push(connectionDeclaration);
+
+  return declarations;
 }
 
 export function generateUnionTypeAlias(
@@ -556,7 +589,7 @@ export function generateTypesFileNodes(
     generateEnumDeclaration,
   );
 
-  const objectTypeDeclarations = contents.typeDeclarations.map(
+  const objectTypeDeclarations = contents.typeDeclarations.flatMap(
     generateObjectTypeAlias,
   );
 

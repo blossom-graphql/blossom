@@ -36,3 +36,5 @@ export {
   ConnectionArgsError,
   LoadOrder,
 } from './connections';
+
+export { Connection } from './resolver';
