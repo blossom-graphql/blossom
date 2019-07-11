@@ -100,10 +100,7 @@ describe(createConnectionResolver, () => {
   };
 
   test('must include correct typename after calling resolver', () => {
-    const builtConnectionResolver = createConnectionResolver(
-      TYPENAME,
-      testResolver,
-    );
+    const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
 
     // Resolve the connection
     const resolvedConnection = builtConnectionResolver(connectionAttributes);
@@ -112,10 +109,7 @@ describe(createConnectionResolver, () => {
   });
 
   test('must directly wire pageInfo from the attributes property', () => {
-    const builtConnectionResolver = createConnectionResolver(
-      TYPENAME,
-      testResolver,
-    );
+    const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
 
     // Resolve the connection
     const resolvedConnection = builtConnectionResolver(connectionAttributes);
@@ -127,10 +121,7 @@ describe(createConnectionResolver, () => {
     'must not call edges() on the attributes object if the result ' +
       'edges() property has not been called',
     () => {
-      const builtConnectionResolver = createConnectionResolver(
-        TYPENAME,
-        testResolver,
-      );
+      const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
 
       // Resolve the connection
       builtConnectionResolver(connectionAttributes);
@@ -146,37 +137,24 @@ describe(createConnectionResolver, () => {
     async () => {
       expect.assertions(1);
 
-      const builtConnectionResolver = createConnectionResolver(
-        TYPENAME,
-        testResolver,
-      );
+      const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
       const resolverContext = { foo: 'bar' };
 
       // Resolve the connection
-      const resolvedConnection = builtConnectionResolver(
-        connectionAttributes,
-        resolverContext,
-      );
+      const resolvedConnection = builtConnectionResolver(connectionAttributes, resolverContext);
       await resolvedConnection.edges();
 
       // Nothing should have happened
-      expect(connectionAttributes.edges).toHaveBeenCalledWith(
-        null,
-        resolverContext,
-      );
+      expect(connectionAttributes.edges).toHaveBeenCalledWith(null, resolverContext);
     },
   );
 
   test(
-    'must not call resolver function if edges().node() function ' +
-      'has not been invoked',
+    'must not call resolver function if edges().node() function ' + 'has not been invoked',
     async () => {
       expect.assertions(1);
 
-      const builtConnectionResolver = createConnectionResolver(
-        TYPENAME,
-        testResolver,
-      );
+      const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
 
       // Resolve the connection
       const resolvedConnection = builtConnectionResolver(connectionAttributes);
@@ -187,23 +165,16 @@ describe(createConnectionResolver, () => {
   );
 
   test(
-    'must call resolver function with correct arguments ' +
-      'if edges().node() function is invoked',
+    'must call resolver function with correct arguments ' + 'if edges().node() function is invoked',
     async () => {
-      const builtConnectionResolver = createConnectionResolver(
-        TYPENAME,
-        testResolver,
-      );
+      const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
       const connectionAttributesEdges = await connectionAttributes.edges();
       const resolverContext = { foo: 'bar' };
 
       expect.assertions(1 + connectionAttributesEdges.length);
 
       // Resolve the connection
-      const resolvedConnection = builtConnectionResolver(
-        connectionAttributes,
-        resolverContext,
-      );
+      const resolvedConnection = builtConnectionResolver(connectionAttributes, resolverContext);
       const resolvedEdges = await resolvedConnection.edges();
 
       // Call all the nodes (i.e. 1), but we're leaving the generic expression
@@ -216,52 +187,41 @@ describe(createConnectionResolver, () => {
       // The resolver must been called with the correct arguments for each of the nodes
       // We don't care about the order.
       connectionAttributesEdges.forEach((connectionAttribute: any) =>
-        expect(testResolver).toHaveBeenCalledWith(
-          connectionAttribute.node(),
-          resolverContext,
-        ),
+        expect(testResolver).toHaveBeenCalledWith(connectionAttribute.node(), resolverContext),
       );
     },
   );
 
-  test(
-    'must properly wire edges().cursor() from the ' + 'connections function',
-    async () => {
-      const builtConnectionResolver = createConnectionResolver(
-        TYPENAME,
-        testResolver,
+  test('must properly wire edges().cursor() from the ' + 'connections function', async () => {
+    const builtConnectionResolver = createConnectionResolver(TYPENAME, testResolver);
+    const connectionAttributesEdges = await connectionAttributes.edges();
+
+    expect.assertions(connectionAttributesEdges.length);
+
+    // Resolve the connection
+    const resolvedConnection = builtConnectionResolver(connectionAttributes);
+    const resolvedEdges = await resolvedConnection.edges();
+
+    // The resolver must been called with the correct arguments for each of the nodes
+    // We don't care about the order.
+    resolvedEdges.forEach(resolvedEdge => {
+      // Because of this, this test is going to be O(n^2). Obviously we can
+      // make it O(n) but using a dict. But n = 1 at this time.
+      //
+      // Does it really worth it overly-complicating this test in order to
+      // decrease this test running time for bigger n? Not a this moment.
+      const matchingConnectionEdge = connectionAttributesEdges.find(
+        ({ node }: { node: () => { message: string } }) =>
+          resolvedEdge.node().message === node().message,
       );
-      const connectionAttributesEdges = await connectionAttributes.edges();
 
-      expect.assertions(connectionAttributesEdges.length);
+      if (!matchingConnectionEdge) {
+        throw new Error(`Matching connection edge not found for resolved edge ${resolvedEdge}`);
+      }
 
-      // Resolve the connection
-      const resolvedConnection = builtConnectionResolver(connectionAttributes);
-      const resolvedEdges = await resolvedConnection.edges();
-
-      // The resolver must been called with the correct arguments for each of the nodes
-      // We don't care about the order.
-      resolvedEdges.forEach(resolvedEdge => {
-        // Because of this, this test is going to be O(n^2). Obviously we can
-        // make it O(n) but using a dict. But n = 1 at this time.
-        //
-        // Does it really worth it overly-complicating this test in order to
-        // decrease this test running time for bigger n? Not a this moment.
-        const matchingConnectionEdge = connectionAttributesEdges.find(
-          ({ node }: { node: () => { message: string } }) =>
-            resolvedEdge.node().message === node().message,
-        );
-
-        if (!matchingConnectionEdge) {
-          throw new Error(
-            `Matching connection edge not found for resolved edge ${resolvedEdge}`,
-          );
-        }
-
-        expect(resolvedEdge.cursor).toBe(matchingConnectionEdge.cursor);
-      });
-    },
-  );
+      expect(resolvedEdge.cursor).toBe(matchingConnectionEdge.cursor);
+    });
+  });
 });
 
 describe(resolve, () => {
@@ -295,8 +255,7 @@ describe(resolve, () => {
   });
 
   test(
-    'must call resolver as many times as elements are ' +
-      'passed on an array as attributes',
+    'must call resolver as many times as elements are ' + 'passed on an array as attributes',
     () => {
       const TEST_ARRAY = [{ message: 'foo' }, { message: 'bar' }];
 
@@ -330,8 +289,7 @@ describe(resolve, () => {
   });
 
   test(
-    'must call resolver once, with correct arguments, when ' +
-      'a single element is passed',
+    'must call resolver once, with correct arguments, when ' + 'a single element is passed',
     () => {
       const TEST_ATTRIBUTES = { message: 'foo' };
 
@@ -342,10 +300,7 @@ describe(resolve, () => {
       });
 
       expect(testResolver).toHaveBeenCalledTimes(1);
-      expect(testResolver).toHaveBeenCalledWith(
-        TEST_ATTRIBUTES,
-        resolverContext,
-      );
+      expect(testResolver).toHaveBeenCalledWith(TEST_ATTRIBUTES, resolverContext);
     },
   );
 
@@ -361,8 +316,6 @@ describe(resolve, () => {
       context: resolverContext,
     }) as TestResolverOutput;
 
-    expect(resolvedValue).toEqual(
-      testResolver(TEST_ATTRIBUTES, resolverContext),
-    );
+    expect(resolvedValue).toEqual(testResolver(TEST_ATTRIBUTES, resolverContext));
   });
 });

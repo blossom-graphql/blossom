@@ -244,9 +244,7 @@ export type ReferencedTypeDescriptor = {
   name: string;
 };
 
-export type TypeDescriptor =
-  | KnownScalarTypeDescriptor
-  | ReferencedTypeDescriptor;
+export type TypeDescriptor = KnownScalarTypeDescriptor | ReferencedTypeDescriptor;
 
 export type ObjectDescriptorBase = {
   objectType: ObjectTypeKind;
@@ -377,10 +375,7 @@ function blossomImplementationDirectiveHandler(
   node: SupportedDefinitionNode,
   descriptor: Descriptor,
 ) {
-  if (
-    descriptor.kind !== 'SingleFieldDescriptor' &&
-    descriptor.kind !== 'ArrayFieldDescriptor'
-  ) {
+  if (descriptor.kind !== 'SingleFieldDescriptor' && descriptor.kind !== 'ArrayFieldDescriptor') {
     return;
   }
   if (node.kind !== 'FieldDefinition') {
@@ -396,10 +391,7 @@ function blossomImplementationDirectiveHandler(
     return;
   }
 
-  if (
-    argument.value.kind !== 'EnumValue' &&
-    argument.value.kind !== 'StringValue'
-  ) {
+  if (argument.value.kind !== 'EnumValue' && argument.value.kind !== 'StringValue') {
     return;
   }
 
@@ -416,10 +408,7 @@ function blossomImplementationDirectiveHandler(
   }
 }
 
-function handleDirectives(
-  definitionNode: SupportedDefinitionNode,
-  descriptor: Descriptor,
-) {
+function handleDirectives(definitionNode: SupportedDefinitionNode, descriptor: Descriptor) {
   if (!definitionNode.directives || definitionNode.directives.length === 0) {
     return;
   }
@@ -434,9 +423,7 @@ function handleDirectives(
   });
 }
 
-export async function parseFileGraph(
-  filePath: string,
-): Promise<ParsedFileGraph> {
+export async function parseFileGraph(filePath: string): Promise<ParsedFileGraph> {
   // TODO: Display errors.
   const parsingMap = await getParsingMap(filePath);
   const result: ParsedFileGraph = new Map();
@@ -470,10 +457,7 @@ export function getImportStatementNames(_: string): '*' | Set<string> {
  *
  * @param basePath Base path to resolve the relative paths.
  */
-export function getSchemaImports(
-  schema: string,
-  basePath: string = APP_DIR,
-): ImportResolutionMap {
+export function getSchemaImports(schema: string, basePath: string = APP_DIR): ImportResolutionMap {
   const lines = schema.split('\n');
   const accumulatedImports: ImportResolutionMap = {
     full: new Set(),
@@ -516,10 +500,7 @@ export function getSchemaImports(
       if (!namedValue) {
         accumulatedImports.named.set(realPath, new Set([...parsedValue]));
       } else {
-        accumulatedImports.named.set(
-          realPath,
-          new Set([...namedValue, ...parsedValue]),
-        );
+        accumulatedImports.named.set(realPath, new Set([...namedValue, ...parsedValue]));
       }
     }
   });
@@ -538,17 +519,12 @@ export function getSchemaImports(
  * @param accumulated Accumulated map of the already parsed results. If null,
  * a new one will be created.
  */
-export async function getParsingMap(
-  filePath: string,
-  accumulated?: PathSchemaMap,
-) {
+export async function getParsingMap(filePath: string, accumulated?: PathSchemaMap) {
   // Base case: Return accumulator if path is in accumulator
   if (accumulated && accumulated.has(filePath)) return accumulated;
 
   // Read file + Create new accumulator with path
-  const accumulator: PathSchemaMap = accumulated
-    ? new Map(accumulated)
-    : new Map();
+  const accumulator: PathSchemaMap = accumulated ? new Map(accumulated) : new Map();
   let fileContents: Buffer;
 
   try {
@@ -590,9 +566,7 @@ export async function getParsingMap(
  *
  * @param document DocumentNode coming from the parsed GraphQL schema.
  */
-export function parseDocumentNode(
-  document: DocumentNode,
-): DocumentParsingOuput {
+export function parseDocumentNode(document: DocumentNode): DocumentParsingOuput {
   const intermediateDict: IntermediateDictionary = {
     objects: {},
     inputs: {},
@@ -687,34 +661,19 @@ export function parseDocumentNode(
   // Return the parsed AST for the objects.
   // TODO: Do something with aliases.
   return {
-    objects: reduceToMap(
-      Object.values(intermediateDict.objects),
-      parseDocumentObjectType,
-    ),
-    inputs: reduceToMap(
-      Object.values(intermediateDict.inputs),
-      parseDocumentObjectType,
-    ),
-    enums: reduceToMap(
-      Object.values(intermediateDict.enums),
-      parseDocumentEnumType,
-    ),
-    unions: reduceToMap(
-      Object.values(intermediateDict.unions),
-      parseDocumentUnionType,
-    ),
+    objects: reduceToMap(Object.values(intermediateDict.objects), parseDocumentObjectType),
+    inputs: reduceToMap(Object.values(intermediateDict.inputs), parseDocumentObjectType),
+    enums: reduceToMap(Object.values(intermediateDict.enums), parseDocumentEnumType),
+    unions: reduceToMap(Object.values(intermediateDict.unions), parseDocumentUnionType),
     operations,
-    objectExtensions: reduceToMap<
-      ObjectTypeExtensionNode,
-      ObjectExtensionDescriptor
-    >(
+    objectExtensions: reduceToMap<ObjectTypeExtensionNode, ObjectExtensionDescriptor>(
       Object.values(intermediateDict.objectExtensions),
       parseDocumentObjectType,
     ),
-    inputExtensions: reduceToMap<
-      InputObjectTypeExtensionNode,
-      ObjectExtensionDescriptor
-    >(Object.values(intermediateDict.inputExtensions), parseDocumentObjectType),
+    inputExtensions: reduceToMap<InputObjectTypeExtensionNode, ObjectExtensionDescriptor>(
+      Object.values(intermediateDict.inputExtensions),
+      parseDocumentObjectType,
+    ),
   };
 }
 
@@ -845,11 +804,7 @@ export function parseFieldDefinitionNode(
       definition.arguments.length > 0
     ) {
       args = definition.arguments.map(argument =>
-        parseFieldDefinitionNode(
-          argument,
-          ObjectTypeKind.Input,
-          referencedTypes,
-        ),
+        parseFieldDefinitionNode(argument, ObjectTypeKind.Input, referencedTypes),
       );
     } else {
       args = [];
@@ -920,24 +875,14 @@ export function parseDocumentObjectType(
    * @param field GraphQL descriptor for the field, which can be either an
    * object field or an input field.
    */
-  function parserIteratee(
-    field: FieldDefinitionNode | InputValueDefinitionNode,
-  ): FieldDescriptor {
+  function parserIteratee(field: FieldDefinitionNode | InputValueDefinitionNode): FieldDescriptor {
     if (
       nodeDescriptor.kind === 'ObjectTypeDefinition' ||
       nodeDescriptor.kind === 'ObjectTypeExtension'
     ) {
-      return parseFieldDefinitionNode(
-        field,
-        ObjectTypeKind.Object,
-        referencedTypes,
-      );
+      return parseFieldDefinitionNode(field, ObjectTypeKind.Object, referencedTypes);
     } else {
-      return parseFieldDefinitionNode(
-        field,
-        ObjectTypeKind.Input,
-        referencedTypes,
-      );
+      return parseFieldDefinitionNode(field, ObjectTypeKind.Input, referencedTypes);
     }
   }
 
@@ -1046,9 +991,7 @@ export function parseDocumentEnumType(
 export function parseDocumentUnionType(
   unionDesc: UnionTypeDefinitionNode,
 ): readonly UnionTypeDescriptor[] {
-  const members = unionDesc.types
-    ? unionDesc.types.map(type => type.name.value)
-    : [];
+  const members = unionDesc.types ? unionDesc.types.map(type => type.name.value) : [];
 
   let descriptor: UnionTypeDescriptor = {
     kind: 'UnionTypeDescriptor',

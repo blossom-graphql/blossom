@@ -9,10 +9,7 @@
 import { GraphQLSchema, buildSchema } from 'graphql';
 
 import { createBlossomDecorators, BlossomInstance } from '../instance';
-import {
-  BlossomEmptyHandlerError,
-  BlossomRootValueAlreadyInUse,
-} from '../errors';
+import { BlossomEmptyHandlerError, BlossomRootValueAlreadyInUse } from '../errors';
 import {
   Enum,
   renderEnumToSchema,
@@ -26,9 +23,7 @@ import { instanceMock } from './mocks/instance-mocks';
 jest.mock('../schema');
 
 const MOCKS = {
-  renderEnumToSchema: renderEnumToSchema as jest.Mock<
-    typeof renderEnumToSchema
-  >,
+  renderEnumToSchema: renderEnumToSchema as jest.Mock<typeof renderEnumToSchema>,
   renderRPCDescriptionToSchema: renderRPCDescriptionToSchema as jest.Mock<
     typeof renderRPCDescriptionToSchema
   >,
@@ -219,12 +214,8 @@ describe(BlossomInstance, () => {
       instance.registerRootQuery(ROOT_QUERY_2);
       instance.getRootSchema();
 
-      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(
-        ROOT_QUERY_1,
-      );
-      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(
-        ROOT_QUERY_2,
-      );
+      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(ROOT_QUERY_1);
+      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(ROOT_QUERY_2);
     });
 
     test('should call renderRPCDescriptionToSchema as many times as root mutations are registered', () => {
@@ -237,12 +228,8 @@ describe(BlossomInstance, () => {
       instance.registerRootMutation(ROOT_MUTATION_2);
       instance.getRootSchema();
 
-      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(
-        ROOT_MUTATION_1,
-      );
-      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(
-        ROOT_MUTATION_2,
-      );
+      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(ROOT_MUTATION_1);
+      expect(MOCKS.renderRPCDescriptionToSchema).toHaveBeenCalledWith(ROOT_MUTATION_2);
     });
 
     test('should call renderSchema with correct arguments', () => {
@@ -393,9 +380,7 @@ describe(BlossomInstance, () => {
 
       // Calling more than once must yield the exact same result (not only equality
       // but the same object in the heap).
-      expect(instance.getRootValue({ force: false })).toBe(
-        instance.getRootValue({ force: false }),
-      );
+      expect(instance.getRootValue({ force: false })).toBe(instance.getRootValue({ force: false }));
     });
 
     test('should force a new object when force option is true', () => {
@@ -439,18 +424,16 @@ describe(BlossomInstance, () => {
 
       instance.registerErrorHandler(TestError, handler1);
 
-      expect(() =>
-        instance.registerErrorHandler(TestError, handler2),
-      ).toThrowError(BlossomEmptyHandlerError);
+      expect(() => instance.registerErrorHandler(TestError, handler2)).toThrowError(
+        BlossomEmptyHandlerError,
+      );
     });
 
     test('should register handling function (and prioritize it) when available', () => {
       const instance = createInstance();
       instance.registerErrorHandler(TestErrorWithHandler, handler1);
 
-      const registeredHandler = instance.errorHandlers.get(
-        TestErrorWithHandler,
-      );
+      const registeredHandler = instance.errorHandlers.get(TestErrorWithHandler);
 
       expect(registeredHandler).toBe(handler1);
       expect(registeredHandler).not.toBe(TestErrorWithHandler.handler);
@@ -460,9 +443,7 @@ describe(BlossomInstance, () => {
       const instance = createInstance();
       instance.registerErrorHandler(TestErrorWithHandler);
 
-      const registeredHandler = instance.errorHandlers.get(
-        TestErrorWithHandler,
-      );
+      const registeredHandler = instance.errorHandlers.get(TestErrorWithHandler);
 
       expect(registeredHandler).toBe(TestErrorWithHandler.handler);
     });
@@ -470,9 +451,7 @@ describe(BlossomInstance, () => {
     test('should throw when neither handling function or static method is provided', () => {
       const instance = createInstance();
 
-      expect(() => instance.registerErrorHandler(TestError)).toThrow(
-        BlossomEmptyHandlerError,
-      );
+      expect(() => instance.registerErrorHandler(TestError)).toThrow(BlossomEmptyHandlerError);
     });
   });
 
@@ -518,9 +497,7 @@ describe(BlossomInstance, () => {
       const instance = createInstance();
 
       // Mock and call
-      instance.getRootValue = jest
-        .fn<typeof instance.getRootValue>()
-        .mockReturnValueOnce({});
+      instance.getRootValue = jest.fn<typeof instance.getRootValue>().mockReturnValueOnce({});
 
       // Retrieve the value (this is a getter)
       instance.rootValue;
@@ -624,10 +601,7 @@ describe(createBlossomDecorators, () => {
     // Make the registering
     BlossomError()(TestError);
 
-    expect(instanceMock.registerErrorHandler).toHaveBeenCalledWith(
-      TestError,
-      undefined,
-    );
+    expect(instanceMock.registerErrorHandler).toHaveBeenCalledWith(TestError, undefined);
   });
 
   test('must call registerErrorHandler with correct arguments when BlossomError is invoked with handler', () => {
@@ -641,9 +615,6 @@ describe(createBlossomDecorators, () => {
     // Make the registering
     BlossomError({ handler })(TestError);
 
-    expect(instanceMock.registerErrorHandler).toHaveBeenCalledWith(
-      TestError,
-      handler,
-    );
+    expect(instanceMock.registerErrorHandler).toHaveBeenCalledWith(TestError, handler);
   });
 });

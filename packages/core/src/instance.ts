@@ -42,9 +42,7 @@ export class BlossomInstance implements IBlossomInstance {
   rawDocuments: DocumentNode[] = [];
   definitions: DefinitionNode[] = [];
   extensionMap: ExtensionMap = new ExtensionMap();
-  runtimeDirectiveHandler = new Map([
-    ['hasConnection', hasConnectionDirectiveHandler],
-  ]);
+  runtimeDirectiveHandler = new Map([['hasConnection', hasConnectionDirectiveHandler]]);
 
   rootOperationsMap: Map<
     string,
@@ -64,11 +62,9 @@ export class BlossomInstance implements IBlossomInstance {
   addDefinition(definition: DefinitionNode) {
     this.definitions.push(definition);
 
-    if (definition.kind === 'ObjectTypeDefinition')
-      this.extensionMap.addDefinition(definition);
+    if (definition.kind === 'ObjectTypeDefinition') this.extensionMap.addDefinition(definition);
 
-    if (definition.kind === 'ObjectTypeExtension')
-      this.extensionMap.addExtension(definition);
+    if (definition.kind === 'ObjectTypeExtension') this.extensionMap.addExtension(definition);
   }
 
   addDocument(document: DocumentNode) {
@@ -81,17 +77,13 @@ export class BlossomInstance implements IBlossomInstance {
   }
 
   get finalDocument(): DocumentNode {
-    const definitions: DefinitionNode[] = [
-      ...(COMMON_DEFINITIONS as DefinitionNode[]),
-    ];
+    const definitions: DefinitionNode[] = [...(COMMON_DEFINITIONS as DefinitionNode[])];
 
     this.definitions.forEach(definition => {
       // We'll leave extensions there in case they need to be supported by
       // GraphQL in the future.
       if (definition.kind === 'ObjectTypeDefinition') {
-        definitions.push(
-          this.extensionMap.getFinalDefinition(definition.name.value),
-        );
+        definitions.push(this.extensionMap.getFinalDefinition(definition.name.value));
       } else if (isExtension(definition)) {
         // Skip. These should be handled above.
         return;
@@ -111,11 +103,7 @@ export class BlossomInstance implements IBlossomInstance {
     return buildASTSchema(this.finalDocument);
   }
 
-  addRootOperation(
-    operation: OperationTypeNode,
-    name: string,
-    callback: ResolverSignature,
-  ): void {
+  addRootOperation(operation: OperationTypeNode, name: string, callback: ResolverSignature): void {
     const existingOperation = this.rootOperationsMap.get(name);
     if (existingOperation) {
       throw new ReferenceError(
@@ -145,14 +133,9 @@ export class BlossomInstance implements IBlossomInstance {
    * provided, will try to retrieve handler from the static handler() method
    * of the constructor.
    */
-  addErrorHandler(
-    errorClass: BlossomError,
-    handlingFunction?: ErrorHandlingFunction,
-  ) {
+  addErrorHandler(errorClass: BlossomError, handlingFunction?: ErrorHandlingFunction) {
     if (this.errorHandlers.has(errorClass)) {
-      throw new BlossomEmptyHandlerError(
-        `${errorClass.name} error handler already registered`,
-      );
+      throw new BlossomEmptyHandlerError(`${errorClass.name} error handler already registered`);
     }
 
     if (handlingFunction) {
@@ -175,18 +158,10 @@ export type RootDescriptor = {
 export function createBlossomDecorators(instance: IBlossomInstance) {
   return {
     BlossomRootQuery(descriptor: RootDescriptor) {
-      instance.addRootOperation(
-        'query',
-        descriptor.implements,
-        descriptor.using,
-      );
+      instance.addRootOperation('query', descriptor.implements, descriptor.using);
     },
     BlossomRootMutation(descriptor: RootDescriptor) {
-      instance.addRootOperation(
-        'mutation',
-        descriptor.implements,
-        descriptor.using,
-      );
+      instance.addRootOperation('mutation', descriptor.implements, descriptor.using);
     },
     BlossomError(opts: BlossomErrorInput = {}) {
       return function(errorClass: BlossomError) {

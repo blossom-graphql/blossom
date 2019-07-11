@@ -25,10 +25,7 @@ const HEADER_TEXT = `/**
 */`;
 
 export const typesCodegenPair: GeneratorPair = [
-  codegenPipelineMaker(
-    nodeGroupGeneratorMaker(linkTypesFile, generateTypesFileNodes),
-    HEADER_TEXT,
-  ),
+  codegenPipelineMaker(nodeGroupGeneratorMaker(linkTypesFile, generateTypesFileNodes), HEADER_TEXT),
   typesFilePath,
 ];
 

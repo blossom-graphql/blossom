@@ -8,11 +8,7 @@
 
 import { GraphQLError } from 'graphql';
 
-import {
-  formatError,
-  ErrorHandlingFunction,
-  formatGraphQLErrors,
-} from '../errors';
+import { formatError, ErrorHandlingFunction, formatGraphQLErrors } from '../errors';
 
 class Error1 extends Error {
   // static handler: jest.fn()
@@ -29,9 +25,7 @@ const error1Handler = jest.fn((_: Error1) => {
 
 class UnhandledError extends Error {}
 
-const DICT = new Map<Function, ErrorHandlingFunction>([
-  [Error1, error1Handler],
-]);
+const DICT = new Map<Function, ErrorHandlingFunction>([[Error1, error1Handler]]);
 
 describe(formatError, () => {
   test('should return correct results when handler is not available', () => {
@@ -74,14 +68,7 @@ describe(formatGraphQLErrors, () => {
   });
 
   test('should exclude errors that have render set to false', () => {
-    const error = new GraphQLError(
-      'Test',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      new Error(),
-    );
+    const error = new GraphQLError('Test', undefined, undefined, undefined, undefined, new Error());
 
     errorFormatterMock.mockReturnValue({
       render: false,
@@ -95,14 +82,7 @@ describe(formatGraphQLErrors, () => {
   });
 
   test('should include extensions with render options as true, with correct extensions', () => {
-    const error = new GraphQLError(
-      'Test',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      new Error(),
-    );
+    const error = new GraphQLError('Test', undefined, undefined, undefined, undefined, new Error());
 
     errorFormatterMock.mockReturnValue({
       render: true,
@@ -117,14 +97,7 @@ describe(formatGraphQLErrors, () => {
   });
 
   test('should return correct values', () => {
-    const error = new GraphQLError(
-      'Test',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      new Error(),
-    );
+    const error = new GraphQLError('Test', undefined, undefined, undefined, undefined, new Error());
 
     errorFormatterMock
       .mockReturnValueOnce({
@@ -139,11 +112,7 @@ describe(formatGraphQLErrors, () => {
         extensions: { foo: 'baz' },
       });
 
-    const results = formatGraphQLErrors(
-      [error, error, error],
-      DICT,
-      errorFormatterMock,
-    );
+    const results = formatGraphQLErrors([error, error, error], DICT, errorFormatterMock);
 
     expect(errorFormatterMock).toHaveBeenCalledTimes(3);
     expect(results.length).toBe(2);

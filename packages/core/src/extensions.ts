@@ -26,15 +26,9 @@ export function mergeObjectTypeDefinition(
   definition: ObjectTypeDefinitionNode,
   extensions: ReadonlyArray<ObjectTypeExtensionNode>,
 ): ObjectTypeDefinitionNode {
-  const interfaces: NamedTypeNode[] = definition.interfaces
-    ? [...definition.interfaces]
-    : [];
-  const directives: DirectiveNode[] = definition.directives
-    ? [...definition.directives]
-    : [];
-  const fields: FieldDefinitionNode[] = definition.fields
-    ? [...definition.fields]
-    : [];
+  const interfaces: NamedTypeNode[] = definition.interfaces ? [...definition.interfaces] : [];
+  const directives: DirectiveNode[] = definition.directives ? [...definition.directives] : [];
+  const fields: FieldDefinitionNode[] = definition.fields ? [...definition.fields] : [];
 
   extensions.forEach(extension => {
     if (extension.name.value !== definition.name.value) return;
@@ -59,10 +53,7 @@ export class ExtensionMap {
 
   addDefinition(definition: ExtendableTypeDefinition) {
     const exists = this.types.has(definition.name.value);
-    if (exists)
-      throw new Error(
-        `Definition ${definition.name.value} already registered.`,
-      ); // TODO: Better error.
+    if (exists) throw new Error(`Definition ${definition.name.value} already registered.`); // TODO: Better error.
 
     this.types.set(definition.name.value, definition);
   }
@@ -73,9 +64,7 @@ export class ExtensionMap {
 
     if (type && KIND_MAPPING[type.kind] !== extension.kind) {
       throw new Error(
-        `Type is already defined as kind ${
-          type.kind
-        } but extension is of kind ${extension.kind}`,
+        `Type is already defined as kind ${type.kind} but extension is of kind ${extension.kind}`,
       );
     }
 
@@ -97,10 +86,7 @@ export class ExtensionMap {
 
     switch (type.kind) {
       case 'ObjectTypeDefinition':
-        return mergeObjectTypeDefinition(
-          type,
-          extensions as ObjectTypeExtensionNode[],
-        );
+        return mergeObjectTypeDefinition(type, extensions as ObjectTypeExtensionNode[]);
     }
   }
 }

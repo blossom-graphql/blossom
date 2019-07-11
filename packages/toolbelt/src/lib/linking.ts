@@ -36,11 +36,7 @@ import {
   NoMembersError,
 } from './errors';
 import { forEachWithErrors, /* fullInspect, */ ErrorsOutput } from './utils';
-import {
-  rootResolverSignatureName,
-  resolverName,
-  referencedTypeName,
-} from './naming';
+import { rootResolverSignatureName, resolverName, referencedTypeName } from './naming';
 
 export const GRAPHQL_PACKAGE_NAME = 'graphql';
 export const CORE_PACKAGE_NAME = '@blossom-gql/core';
@@ -305,15 +301,11 @@ export function updateReferenceGraphArgument(
           ? OriginKind.ObjectArgument
           : OriginKind.InputArgument;
 
-      addReferenceInGraph(
-        linkingContext.referenceMap,
-        argumentDescriptor.type.name,
-        {
-          originKind,
-          argumentName: argumentDescriptor.name,
-          fieldOriginDescription,
-        },
-      );
+      addReferenceInGraph(linkingContext.referenceMap, argumentDescriptor.type.name, {
+        originKind,
+        argumentName: argumentDescriptor.name,
+        fieldOriginDescription,
+      });
     }
   }
 }
@@ -333,9 +325,7 @@ export function updateReferenceGraphField(
       break;
     case ObjectTypeKind.Input:
       originKind =
-        parent.kind === 'ObjectExtensionsDescriptor'
-          ? OriginKind.InputExtension
-          : OriginKind.Input;
+        parent.kind === 'ObjectExtensionsDescriptor' ? OriginKind.InputExtension : OriginKind.Input;
       break;
     default:
       originKind = OriginKind.Object;
@@ -351,11 +341,7 @@ export function updateReferenceGraphField(
   };
 
   if (descriptor.kind === 'ArrayFieldDescriptor') {
-    updateReferenceGraphField(
-      linkingContext,
-      descriptor.elementDescriptor,
-      parent,
-    );
+    updateReferenceGraphField(linkingContext, descriptor.elementDescriptor, parent);
   } else {
     if (descriptor.type.kind === 'ReferencedType') {
       addReferenceInGraph(
@@ -368,11 +354,7 @@ export function updateReferenceGraphField(
 
   descriptor.arguments &&
     descriptor.arguments.forEach(argumentDescriptor => {
-      updateReferenceGraphArgument(
-        linkingContext,
-        argumentDescriptor,
-        fieldOriginDescription,
-      );
+      updateReferenceGraphArgument(linkingContext, argumentDescriptor, fieldOriginDescription);
     });
 }
 
@@ -399,14 +381,10 @@ export function updateReferenceMap(
       updateReferenceGraphField(linkingContext, field, descriptor);
     });
   } else if (descriptor.kind === 'OperationDescriptor') {
-    addReferenceInGraph(
-      linkingContext.referenceMap,
-      descriptor.objectType.name,
-      {
-        originKind: OriginKind.Operation,
-        operationType: descriptor.operation,
-      },
-    );
+    addReferenceInGraph(linkingContext.referenceMap, descriptor.objectType.name, {
+      originKind: OriginKind.Operation,
+      operationType: descriptor.operation,
+    });
   }
 }
 
@@ -438,53 +416,21 @@ export function resolveDocumentFullReferences(
   parsedDocument: DocumentParsingOuput,
   filePath: string,
 ): ErrorsOutput {
-  const enumErrors = forEachWithErrors(
-    [...parsedDocument.enums.values()],
-    enumDescriptor => {
-      ensureResolution(
-        referenceMap,
-        enumDescriptor,
-        filePath,
-        ElementKind.Enum,
-      );
-    },
-  );
+  const enumErrors = forEachWithErrors([...parsedDocument.enums.values()], enumDescriptor => {
+    ensureResolution(referenceMap, enumDescriptor, filePath, ElementKind.Enum);
+  });
 
-  const objectErrors = forEachWithErrors(
-    [...parsedDocument.objects.values()],
-    objectDescriptor => {
-      ensureResolution(
-        referenceMap,
-        objectDescriptor,
-        filePath,
-        ElementKind.Type,
-      );
-    },
-  );
+  const objectErrors = forEachWithErrors([...parsedDocument.objects.values()], objectDescriptor => {
+    ensureResolution(referenceMap, objectDescriptor, filePath, ElementKind.Type);
+  });
 
-  const inputErrors = forEachWithErrors(
-    [...parsedDocument.inputs.values()],
-    inputDescriptor => {
-      ensureResolution(
-        referenceMap,
-        inputDescriptor,
-        filePath,
-        ElementKind.Input,
-      );
-    },
-  );
+  const inputErrors = forEachWithErrors([...parsedDocument.inputs.values()], inputDescriptor => {
+    ensureResolution(referenceMap, inputDescriptor, filePath, ElementKind.Input);
+  });
 
-  const unionErrors = forEachWithErrors(
-    [...parsedDocument.unions.values()],
-    unionDescriptor => {
-      ensureResolution(
-        referenceMap,
-        unionDescriptor,
-        filePath,
-        ElementKind.Union,
-      );
-    },
-  );
+  const unionErrors = forEachWithErrors([...parsedDocument.unions.values()], unionDescriptor => {
+    ensureResolution(referenceMap, unionDescriptor, filePath, ElementKind.Union);
+  });
 
   return [...enumErrors, ...objectErrors, ...inputErrors, ...unionErrors];
 }
@@ -503,42 +449,25 @@ export function resolveDocumentNamedReferences(
 
   const objectDescriptor = document.objects.get(field);
   if (objectDescriptor) {
-    ensureResolution(
-      referenceMap,
-      objectDescriptor,
-      filePath,
-      ElementKind.Type,
-    );
+    ensureResolution(referenceMap, objectDescriptor, filePath, ElementKind.Type);
     return;
   }
 
   const inputDescriptor = document.inputs.get(field);
   if (inputDescriptor) {
-    ensureResolution(
-      referenceMap,
-      inputDescriptor,
-      filePath,
-      ElementKind.Input,
-    );
+    ensureResolution(referenceMap, inputDescriptor, filePath, ElementKind.Input);
   }
 
   const unionDescriptor = document.unions.get(field);
   if (unionDescriptor) {
-    ensureResolution(
-      referenceMap,
-      unionDescriptor,
-      filePath,
-      ElementKind.Union,
-    );
+    ensureResolution(referenceMap, unionDescriptor, filePath, ElementKind.Union);
   }
 
   // ! Wasn't found in any of the definitions. That's an error. Should be caught
   // ! by enforceReferencesPresence().
 }
 
-export function resolveReferences(
-  linkingContext: LinkingContext,
-): ErrorsOutput {
+export function resolveReferences(linkingContext: LinkingContext): ErrorsOutput {
   const { referenceMap } = linkingContext;
 
   // 1. Resolve references in current file
@@ -552,15 +481,9 @@ export function resolveReferences(
   const fullReferencesErrors = forEachWithErrors(
     [...linkingContext.parsedFile.references.full.keys()],
     filePath => {
-      const fileDescriptor = linkingContext.fileGraph.get(
-        filePath,
-      ) as ParsedFileDescriptor;
+      const fileDescriptor = linkingContext.fileGraph.get(filePath) as ParsedFileDescriptor;
 
-      resolveDocumentFullReferences(
-        referenceMap,
-        fileDescriptor.parsedDocument,
-        filePath,
-      );
+      resolveDocumentFullReferences(referenceMap, fileDescriptor.parsedDocument, filePath);
     },
   );
 
@@ -568,16 +491,9 @@ export function resolveReferences(
   const namedReferencesErrors = forEachWithErrors(
     [...linkingContext.parsedFile.references.named.entries()],
     ([filePath, references]) => {
-      const { parsedDocument } = linkingContext.fileGraph.get(
-        filePath,
-      ) as ParsedFileDescriptor;
+      const { parsedDocument } = linkingContext.fileGraph.get(filePath) as ParsedFileDescriptor;
       const errors = forEachWithErrors([...references.keys()], field =>
-        resolveDocumentNamedReferences(
-          referenceMap,
-          parsedDocument,
-          filePath,
-          field,
-        ),
+        resolveDocumentNamedReferences(referenceMap, parsedDocument, filePath, field),
       );
 
       if (errors.length > 0) throw new LinkingError(errors);
@@ -605,11 +521,9 @@ export function isValidResolution(
       );
 
       if (typeRepresentsRoot) {
-        return [
-          ElementKind.Input,
-          ElementKind.Enum,
-          ElementKind.Union,
-        ].includes(resolution.elementKind);
+        return [ElementKind.Input, ElementKind.Enum, ElementKind.Union].includes(
+          resolution.elementKind,
+        );
       } else {
         return [ElementKind.Type, ElementKind.Enum, ElementKind.Union].includes(
           resolution.elementKind,
@@ -618,9 +532,7 @@ export function isValidResolution(
     case OriginKind.InputExtension:
     case OriginKind.Input:
     case OriginKind.InputArgument:
-      return [ElementKind.Input, ElementKind.Enum].includes(
-        resolution.elementKind,
-      );
+      return [ElementKind.Input, ElementKind.Enum].includes(resolution.elementKind);
     case OriginKind.Union:
       return [ElementKind.Type].includes(resolution.elementKind);
     case OriginKind.Operation:
@@ -628,9 +540,7 @@ export function isValidResolution(
   }
 }
 
-export function enforceReferencesPresence(
-  linkingContext: LinkingContext,
-): ErrorsOutput {
+export function enforceReferencesPresence(linkingContext: LinkingContext): ErrorsOutput {
   // 1. All references must be defined.
   // 2. All references must have matching type.
   return forEachWithErrors(
@@ -648,24 +558,17 @@ export function enforceReferencesPresence(
       }
 
       // For each of the references, what's resolved must match
-      const errors = forEachWithErrors(
-        referenceDescription.references,
-        reference => {
-          if (
-            !isValidResolution(
-              referenceDescription.resolution as ResolutionDescription,
-              reference,
-              linkingContext,
-            )
-          ) {
-            throw new InvalidReferenceError(
-              fieldName,
-              linkingContext.filePath,
-              reference,
-            );
-          }
-        },
-      );
+      const errors = forEachWithErrors(referenceDescription.references, reference => {
+        if (
+          !isValidResolution(
+            referenceDescription.resolution as ResolutionDescription,
+            reference,
+            linkingContext,
+          )
+        ) {
+          throw new InvalidReferenceError(fieldName, linkingContext.filePath, reference);
+        }
+      });
 
       if (errors.length > 0) throw new LinkingError(errors);
     },
@@ -763,15 +666,12 @@ export function linkOperationTypes(
   linkingContext: LinkingContext,
 ) {
   let operation: SupportedOperation | undefined = undefined;
-  Object.entries(OPERATION_MAP).some(
-    ([supportedOperation, typeName]: [string, string]) => {
-      const isSupportedOperation = descriptor.name === typeName;
-      if (isSupportedOperation)
-        operation = supportedOperation as SupportedOperation;
+  Object.entries(OPERATION_MAP).some(([supportedOperation, typeName]: [string, string]) => {
+    const isSupportedOperation = descriptor.name === typeName;
+    if (isSupportedOperation) operation = supportedOperation as SupportedOperation;
 
-      return isSupportedOperation;
-    },
-  );
+    return isSupportedOperation;
+  });
 
   if (!operation) return;
 
@@ -797,15 +697,9 @@ export function linkOperationTypes(
 
     if (outputBaseType(fieldDescriptor).kind === 'ReferencedType') {
       if (fieldDescriptor.kind === 'ArrayFieldDescriptor') {
-        result.dependencyFlags.set(
-          DependencyFlag.HasReferencedArrayTypeOperation,
-          true,
-        );
+        result.dependencyFlags.set(DependencyFlag.HasReferencedArrayTypeOperation, true);
       } else {
-        result.dependencyFlags.set(
-          DependencyFlag.HasReferencedTypeOperation,
-          true,
-        );
+        result.dependencyFlags.set(DependencyFlag.HasReferencedTypeOperation, true);
       }
     }
   });
@@ -852,8 +746,7 @@ export function isRootType(
   linkingContext: LinkingContext,
   expectedOperation?: SupportedOperation,
 ): boolean {
-  if (expectedOperation && fieldName !== OPERATION_MAP[expectedOperation])
-    return false;
+  if (expectedOperation && fieldName !== OPERATION_MAP[expectedOperation]) return false;
 
   return Object.values(OPERATION_MAP).some(hasRootType);
 
@@ -913,51 +806,26 @@ export function addCommonVendorImports(
 ) {
   // - When there's a required field, Maybe must be included.
   if (result.dependencyFlags.has(DependencyFlag.HasOptionalReference)) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      CORE_PACKAGE_NAME,
-      MAYBE_NAME,
-    );
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, MAYBE_NAME);
   }
 
   // - When there's a thunked field, GraphQLResolveInfo and RequestContext must
   //   be included.
   if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
-    addImport(
-      result.fileImports,
-      'FileImport',
-      blossomInstancePath(),
-      INSTANCE_CONTEXT_NAME,
-    );
+    addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_CONTEXT_NAME);
   }
 
   // - Include signatures when they are present in the file
   if (result.dependencyFlags.get(DependencyFlag.HasQuerySignatures)) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      CORE_PACKAGE_NAME,
-      QUERY_SIGNATURE_NAME,
-    );
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, QUERY_SIGNATURE_NAME);
   }
 
   if (result.dependencyFlags.get(DependencyFlag.HasMutationSignatures)) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      CORE_PACKAGE_NAME,
-      MUTATION_SIGNATURE_NAME,
-    );
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, MUTATION_SIGNATURE_NAME);
   }
 
   if (result.dependencyFlags.get(DependencyFlag.HasThunkedField)) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      CORE_PACKAGE_NAME,
-      OBJECT_SIGNATURE_NAME,
-    );
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, OBJECT_SIGNATURE_NAME);
   }
 }
 
@@ -981,10 +849,7 @@ export function addTypeReferencesImports(
 
     // Don't add the import if we are generating a root file and the reference
     // is to one of the root types.
-    if (
-      linkingContext.linkingType === LinkingType.RootFile &&
-      isRootType(field, linkingContext)
-    )
+    if (linkingContext.linkingType === LinkingType.RootFile && isRootType(field, linkingContext))
       continue;
 
     addImport(
@@ -996,10 +861,7 @@ export function addTypeReferencesImports(
   }
 }
 
-export function addTypesFileImports(
-  result: TypesFileContents,
-  linkingContext: LinkingContext,
-) {
+export function addTypesFileImports(result: TypesFileContents, linkingContext: LinkingContext) {
   if (linkingContext.linkingType !== LinkingType.TypesFile) {
     throw new TypeError('Invalid linking type in linking context.');
   }
@@ -1012,19 +874,11 @@ export function addTypesFileImports(
 
   // 3. Add connections, if required
   if (result.dependencyFlags.has(DependencyFlag.HasConnection)) {
-    addImport(
-      result.vendorImports,
-      'VendorImport',
-      CORE_PACKAGE_NAME,
-      CONNECTION_NAME,
-    );
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CONNECTION_NAME);
   }
 }
 
-export function addRootFileImports(
-  result: RootFileContents,
-  linkingContext: LinkingContext,
-) {
+export function addRootFileImports(result: RootFileContents, linkingContext: LinkingContext) {
   // 1. Add common vendor imports.
   // ! No longer required. They are absorbed by the signatures.
   // ! To be removed.
@@ -1032,38 +886,16 @@ export function addRootFileImports(
 
   // 2. Add resolve import when necessary
   if (result.dependencyFlags.get(DependencyFlag.HasReferencedTypeOperation))
-    addImport(
-      result.fileImports,
-      'FileImport',
-      blossomInstancePath(),
-      INSTANCE_RESOLVE_NAME,
-    );
+    addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_RESOLVE_NAME);
 
-  if (
-    result.dependencyFlags.get(DependencyFlag.HasReferencedArrayTypeOperation)
-  )
-    addImport(
-      result.fileImports,
-      'FileImport',
-      blossomInstancePath(),
-      INSTANCE_RESOLVE_ARRAY_NAME,
-    );
+  if (result.dependencyFlags.get(DependencyFlag.HasReferencedArrayTypeOperation))
+    addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_RESOLVE_ARRAY_NAME);
 
   if (result.dependencyFlags.get(DependencyFlag.HasRootQuery))
-    addImport(
-      result.fileImports,
-      'FileImport',
-      blossomInstancePath(),
-      INSTANCE_ROOT_QUERY_NAME,
-    );
+    addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_ROOT_QUERY_NAME);
 
   if (result.dependencyFlags.get(DependencyFlag.HasRootMutation))
-    addImport(
-      result.fileImports,
-      'FileImport',
-      blossomInstancePath(),
-      INSTANCE_ROOT_MUTATION_NAME,
-    );
+    addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_ROOT_MUTATION_NAME);
 
   // 3. Add dependencies coming from other files.
   // ! No longer required since signatures include them.
@@ -1095,53 +927,23 @@ export function addSourcesFileImports(
   result: SourcesFileContents,
   _linkingContext: LinkingContext,
 ) {
-  addImport(
-    result.vendorImports,
-    'VendorImport',
-    CORE_PACKAGE_NAME,
-    CORE_BATCHFN_NAME,
-  );
+  addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_BATCHFN_NAME);
 
   // Loaders signatures should always import maybe and prime.
-  addImport(
-    result.vendorImports,
-    'VendorImport',
-    CORE_PACKAGE_NAME,
-    MAYBE_NAME,
-  );
+  addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, MAYBE_NAME);
 
-  addImport(
-    result.vendorImports,
-    'VendorImport',
-    CORE_PACKAGE_NAME,
-    CORE_DELIVER_NAME,
-  );
+  addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_DELIVER_NAME);
 
-  addImport(
-    result.fileImports,
-    'FileImport',
-    blossomInstancePath(),
-    INSTANCE_CONTEXT_NAME,
-  );
+  addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_CONTEXT_NAME);
 }
 
 export function addResolversFileImports(
   result: ResolversFileContents,
   linkingContext: LinkingContext,
 ) {
-  addImport(
-    result.vendorImports,
-    'VendorImport',
-    CORE_PACKAGE_NAME,
-    CORE_RESOLVER_NAME,
-  );
+  addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_RESOLVER_NAME);
 
-  addImport(
-    result.fileImports,
-    'FileImport',
-    blossomInstancePath(),
-    INSTANCE_CONTEXT_NAME,
-  );
+  addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_CONTEXT_NAME);
 
   // For each of the types import the definition from types file
   result.typeDeclarations.forEach(objectDescriptor => {
@@ -1154,10 +956,7 @@ export function addResolversFileImports(
   });
 }
 
-export function linkTypesFile(
-  filePath: string,
-  fileGraph: ParsedFileGraph,
-): TypesFileContents {
+export function linkTypesFile(filePath: string, fileGraph: ParsedFileGraph): TypesFileContents {
   const parsedFile = fileGraph.get(filePath);
   if (!parsedFile) {
     throw new FileNotFoundInGraph(filePath);
@@ -1226,19 +1025,14 @@ export function linkTypesFile(
     },
   );
 
-  const operationErrors = forEachWithErrors(
-    Object.values(OPERATION_MAP),
-    typeName => {
-      const descriptor = linkingContext.parsedFile.parsedDocument.objectExtensions.get(
-        typeName,
-      );
-      if (!descriptor) return;
+  const operationErrors = forEachWithErrors(Object.values(OPERATION_MAP), typeName => {
+    const descriptor = linkingContext.parsedFile.parsedDocument.objectExtensions.get(typeName);
+    if (!descriptor) return;
 
-      updateReferenceMap(linkingContext, descriptor);
+    updateReferenceMap(linkingContext, descriptor);
 
-      linkOperationTypes(descriptor, result, linkingContext);
-    },
-  );
+    linkOperationTypes(descriptor, result, linkingContext);
+  });
 
   // Find a resolution for each one of the added references.
   resolveReferences(linkingContext);
@@ -1263,10 +1057,7 @@ export function linkTypesFile(
   return result;
 }
 
-export function linkRootFile(
-  filePath: string,
-  fileGraph: ParsedFileGraph,
-): RootFileContents {
+export function linkRootFile(filePath: string, fileGraph: ParsedFileGraph): RootFileContents {
   const parsedFile = fileGraph.get(filePath);
   if (!parsedFile) {
     throw new FileNotFoundInGraph(filePath);
@@ -1294,19 +1085,14 @@ export function linkRootFile(
   // guarantee the resolution of outputs and arguments.
   const accumulatedErrors: [number, Error][] = [];
 
-  const operationErrors = forEachWithErrors(
-    Object.values(OPERATION_MAP),
-    typeName => {
-      const descriptor = linkingContext.parsedFile.parsedDocument.objectExtensions.get(
-        typeName,
-      );
-      if (!descriptor) return;
+  const operationErrors = forEachWithErrors(Object.values(OPERATION_MAP), typeName => {
+    const descriptor = linkingContext.parsedFile.parsedDocument.objectExtensions.get(typeName);
+    if (!descriptor) return;
 
-      updateReferenceMap(linkingContext, descriptor);
+    updateReferenceMap(linkingContext, descriptor);
 
-      linkOperationTypes(descriptor, result, linkingContext);
-    },
-  );
+    linkOperationTypes(descriptor, result, linkingContext);
+  });
 
   accumulatedErrors.push(...operationErrors);
 
@@ -1322,10 +1108,7 @@ export function linkRootFile(
   return result;
 }
 
-export function linkSourcesFile(
-  filePath: string,
-  fileGraph: ParsedFileGraph,
-): SourcesFileContents {
+export function linkSourcesFile(filePath: string, fileGraph: ParsedFileGraph): SourcesFileContents {
   const parsedFile = fileGraph.get(filePath);
   if (!parsedFile) {
     throw new FileNotFoundInGraph(filePath);

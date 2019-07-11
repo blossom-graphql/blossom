@@ -128,10 +128,7 @@ export function generateResolverFunctionArguments(
       undefined,
       ts.createIdentifier('ctx'),
       undefined,
-      ts.createTypeReferenceNode(
-        ts.createIdentifier('RequestContext'),
-        undefined,
-      ),
+      ts.createTypeReferenceNode(ts.createIdentifier('RequestContext'), undefined),
     ),
   ];
 
@@ -144,10 +141,7 @@ export function generateResolverFunctionArguments(
         undefined,
         ts.createIdentifier('ast'),
         undefined,
-        ts.createTypeReferenceNode(
-          ts.createIdentifier('GraphQLResolveInfo'),
-          undefined,
-        ),
+        ts.createTypeReferenceNode(ts.createIdentifier('GraphQLResolveInfo'), undefined),
       ),
     );
 
@@ -175,10 +169,7 @@ export function generateFunctionTypeNode(
   // isAsync: boolean = false,
 ): ts.TypeReferenceNode {
   if (descriptor.kind === 'OperationFieldDescriptor')
-    return generateFunctionTypeNode(
-      descriptor.fieldDescriptor,
-      descriptor.operation,
-    );
+    return generateFunctionTypeNode(descriptor.fieldDescriptor, descriptor.operation);
 
   let signatureName: string;
   switch (operation) {
@@ -196,17 +187,12 @@ export function generateFunctionTypeNode(
   const terminalType = generateTerminalTypeNode(descriptor);
   const isAsync = descriptor.thunkType === ThunkType.AsyncFunction;
 
-  const members = descriptor.arguments
-    ? descriptor.arguments.map(generateTypeElement)
-    : [];
+  const members = descriptor.arguments ? descriptor.arguments.map(generateTypeElement) : [];
 
   return ts.createTypeReferenceNode(ts.createIdentifier(signatureName), [
     ts.createTypeLiteralNode(members),
     getOutputType(terminalType, isAsync),
-    ts.createTypeReferenceNode(
-      ts.createIdentifier(INSTANCE_CONTEXT_NAME),
-      undefined,
-    ),
+    ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
   ]);
 }
 
@@ -252,16 +238,11 @@ export function prependJSDocComments(declaration: ts.Node, text: string) {
  * @param typeNode TypeScript API TypeNode element.
  * @param required Is it required?
  */
-export function wrapInOptionalType(
-  typeNode: ts.TypeNode,
-  required: boolean,
-): ts.TypeNode {
+export function wrapInOptionalType(typeNode: ts.TypeNode, required: boolean): ts.TypeNode {
   if (required) {
     return typeNode;
   } else {
-    return ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [
-      typeNode,
-    ]);
+    return ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [typeNode]);
   }
 }
 
@@ -292,10 +273,7 @@ export function generateTerminalTypeNode(
   if (field.type.kind === 'KnownScalarType') {
     const typeValue = field.type.type;
 
-    if (
-      typeValue === KnownScalarTypes.String ||
-      typeValue === KnownScalarTypes.ID
-    ) {
+    if (typeValue === KnownScalarTypes.String || typeValue === KnownScalarTypes.ID) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.StringKeyword);
     } else if (typeValue === KnownScalarTypes.Boolean) {
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.BooleanKeyword);
@@ -305,10 +283,7 @@ export function generateTerminalTypeNode(
       terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
     }
   } else if (field.type.kind === 'ReferencedType') {
-    terminalType = ts.createTypeReferenceNode(
-      ts.createIdentifier(field.type.name),
-      undefined,
-    );
+    terminalType = ts.createTypeReferenceNode(ts.createIdentifier(field.type.name), undefined);
   } else {
     terminalType = ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
     // TODO: Log warning.
@@ -351,9 +326,7 @@ export function generateTypeElement(field: FieldDescriptor): ts.TypeElement {
       const terminalTypeNode = generateTerminalTypeNode(field);
 
       // ThunkType.None
-      requiredSignature = field.required
-        ? undefined
-        : ts.createToken(ts.SyntaxKind.QuestionToken);
+      requiredSignature = field.required ? undefined : ts.createToken(ts.SyntaxKind.QuestionToken);
       typeNode = terminalTypeNode;
       break;
   }
@@ -394,8 +367,7 @@ export function generateEnumDeclaration(enumDescriptor: EnumTypeDescriptor) {
     members,
   );
 
-  if (enumDescriptor.comments)
-    prependJSDocComments(declaration, enumDescriptor.comments);
+  if (enumDescriptor.comments) prependJSDocComments(declaration, enumDescriptor.comments);
 
   return declaration;
 }
@@ -413,9 +385,7 @@ export function generateObjectTypeAlias(
     return [];
   }
 
-  const members: readonly ts.TypeElement[] = descriptor.fields.map(
-    generateTypeElement,
-  );
+  const members: readonly ts.TypeElement[] = descriptor.fields.map(generateTypeElement);
 
   const typenameElement = ts.createPropertySignature(
     undefined,
@@ -451,28 +421,17 @@ export function generateObjectTypeAlias(
     ts.createIdentifier(descriptor.name + 'Connection'),
     undefined,
     ts.createTypeReferenceNode(ts.createIdentifier(CONNECTION_NAME), [
-      ts.createTypeReferenceNode(
-        ts.createIdentifier(descriptor.name),
-        undefined,
-      ),
-      ts.createTypeReferenceNode(
-        ts.createIdentifier(INSTANCE_CONTEXT_NAME),
-        undefined,
-      ),
+      ts.createTypeReferenceNode(ts.createIdentifier(descriptor.name), undefined),
+      ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
     ]),
   );
-  prependJSDocComments(
-    connectionDeclaration,
-    CONNECTION_TYPE_COMMENT(descriptor.name),
-  );
+  prependJSDocComments(connectionDeclaration, CONNECTION_TYPE_COMMENT(descriptor.name));
   declarations.push(connectionDeclaration);
 
   return declarations;
 }
 
-export function generateUnionTypeAlias(
-  descriptor: UnionTypeDescriptor,
-): ts.TypeAliasDeclaration {
+export function generateUnionTypeAlias(descriptor: UnionTypeDescriptor): ts.TypeAliasDeclaration {
   const declaration = ts.createTypeAliasDeclaration(
     undefined,
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
@@ -533,69 +492,42 @@ export function createImportDeclaration(importDescription: ImportDescription) {
   let defaultClause: ts.Identifier | undefined = undefined;
 
   const members = [...importDescription.membersMap.entries()];
-  const importSpecifiers = members.reduce(
-    (acc: ts.ImportSpecifier[], [name, alias]) => {
-      if (name === 'default') {
-        defaultClause = ts.createIdentifier(
-          defaultImportName(importDescription),
-        );
-
-        return acc;
-      }
-
-      if (alias) {
-        acc.push(
-          ts.createImportSpecifier(
-            ts.createIdentifier(name),
-            ts.createIdentifier(alias),
-          ),
-        );
-      } else {
-        acc.push(
-          ts.createImportSpecifier(undefined, ts.createIdentifier(name)),
-        );
-      }
+  const importSpecifiers = members.reduce((acc: ts.ImportSpecifier[], [name, alias]) => {
+    if (name === 'default') {
+      defaultClause = ts.createIdentifier(defaultImportName(importDescription));
 
       return acc;
-    },
-    [],
-  );
+    }
+
+    if (alias) {
+      acc.push(ts.createImportSpecifier(ts.createIdentifier(name), ts.createIdentifier(alias)));
+    } else {
+      acc.push(ts.createImportSpecifier(undefined, ts.createIdentifier(name)));
+    }
+
+    return acc;
+  }, []);
 
   return ts.createImportDeclaration(
     undefined,
     undefined,
-    ts.createImportClause(
-      defaultClause,
-      ts.createNamedImports(importSpecifiers),
-    ),
+    ts.createImportClause(defaultClause, ts.createNamedImports(importSpecifiers)),
     ts.createStringLiteral(importModuleName),
   );
 }
 
 export type CodeGroup = { spacing: number; nodes: ReadonlyArray<ts.Node> };
 
-export function generateTypesFileNodes(
-  contents: TypesFileContents,
-): ReadonlyArray<CodeGroup> {
-  const vendorImports = [...contents.vendorImports.values()].map(
-    createImportDeclaration,
-  );
+export function generateTypesFileNodes(contents: TypesFileContents): ReadonlyArray<CodeGroup> {
+  const vendorImports = [...contents.vendorImports.values()].map(createImportDeclaration);
 
-  const fileImports = [...contents.fileImports.values()].map(
-    createImportDeclaration,
-  );
+  const fileImports = [...contents.fileImports.values()].map(createImportDeclaration);
 
-  const enumDeclarations = contents.enumDeclarations.map(
-    generateEnumDeclaration,
-  );
+  const enumDeclarations = contents.enumDeclarations.map(generateEnumDeclaration);
 
-  const objectTypeDeclarations = contents.typeDeclarations.flatMap(
-    generateObjectTypeAlias,
-  );
+  const objectTypeDeclarations = contents.typeDeclarations.flatMap(generateObjectTypeAlias);
 
-  const unionTypeDeclarations = contents.unionDeclarations.map(
-    generateUnionTypeAlias,
-  );
+  const unionTypeDeclarations = contents.unionDeclarations.map(generateUnionTypeAlias);
 
   const resolverSignatureDeclarations = contents.operationDeclarations.map(
     generateResolverSignatureDeclaration,
@@ -619,44 +551,11 @@ export function generateRootValueReturnExpression(
   } else if (descriptor.kind === 'ArrayFieldDescriptor') {
     if (descriptor.elementDescriptor.kind === 'SingleFieldDescriptor') {
       if (descriptor.elementDescriptor.type.kind === 'KnownScalarType') {
-        return ts.createArrayLiteral([
-          createMockLiteral(descriptor.elementDescriptor.type),
-        ]);
+        return ts.createArrayLiteral([createMockLiteral(descriptor.elementDescriptor.type)]);
       } else {
         const terminalTypeName = getTerminalTypeName(descriptor);
 
-        return ts.createCall(
-          ts.createIdentifier(INSTANCE_RESOLVE_ARRAY_NAME),
-          undefined,
-          [
-            ts.createObjectLiteral(
-              [
-                ts.createShorthandPropertyAssignment('data'),
-                ts.createShorthandPropertyAssignment('ctx'),
-                ts.createPropertyAssignment(
-                  ts.createIdentifier('using'),
-                  ts.createIdentifier(resolverName(terminalTypeName)),
-                ),
-                ts.createShorthandPropertyAssignment('ast'),
-              ],
-              true,
-            ),
-          ],
-        );
-      }
-    } else {
-      return generateRootValueReturnExpression(descriptor.elementDescriptor);
-    }
-  } else {
-    const terminalTypeName = getTerminalTypeName(descriptor);
-
-    if (descriptor.type.kind === 'KnownScalarType') {
-      return createMockLiteral(descriptor.type);
-    } else {
-      return ts.createCall(
-        ts.createIdentifier(INSTANCE_RESOLVE_NAME),
-        undefined,
-        [
+        return ts.createCall(ts.createIdentifier(INSTANCE_RESOLVE_ARRAY_NAME), undefined, [
           ts.createObjectLiteral(
             [
               ts.createShorthandPropertyAssignment('data'),
@@ -669,39 +568,168 @@ export function generateRootValueReturnExpression(
             ],
             true,
           ),
-        ],
-      );
+        ]);
+      }
+    } else {
+      return generateRootValueReturnExpression(descriptor.elementDescriptor);
+    }
+  } else {
+    const terminalTypeName = getTerminalTypeName(descriptor);
+
+    if (descriptor.type.kind === 'KnownScalarType') {
+      return createMockLiteral(descriptor.type);
+    } else {
+      return ts.createCall(ts.createIdentifier(INSTANCE_RESOLVE_NAME), undefined, [
+        ts.createObjectLiteral(
+          [
+            ts.createShorthandPropertyAssignment('data'),
+            ts.createShorthandPropertyAssignment('ctx'),
+            ts.createPropertyAssignment(
+              ts.createIdentifier('using'),
+              ts.createIdentifier(resolverName(terminalTypeName)),
+            ),
+            ts.createShorthandPropertyAssignment('ast'),
+          ],
+          true,
+        ),
+      ]);
     }
   }
 }
 
-export function generateRootFileNodes(
-  contents: RootFileContents,
-): ReadonlyArray<CodeGroup> {
-  const vendorImports = [...contents.vendorImports.values()].map(
-    createImportDeclaration,
-  );
+export function generateRootFileNodes(contents: RootFileContents): ReadonlyArray<CodeGroup> {
+  const vendorImports = [...contents.vendorImports.values()].map(createImportDeclaration);
 
-  const fileImports = [...contents.fileImports.values()].map(
-    createImportDeclaration,
-  );
+  const fileImports = [...contents.fileImports.values()].map(createImportDeclaration);
 
-  const functionDeclarations = flatMap(
-    contents.operationDeclarations,
-    operationDescriptor => {
-      const name = rootResolverName(operationDescriptor);
+  const functionDeclarations = flatMap(contents.operationDeclarations, operationDescriptor => {
+    const name = rootResolverName(operationDescriptor);
 
-      const commentStatement = ts.createEmptyStatement();
-      preprendComments(commentStatement, ROOT_BLOCK_COMMENT);
+    const commentStatement = ts.createEmptyStatement();
+    preprendComments(commentStatement, ROOT_BLOCK_COMMENT);
 
-      const returnStatement: ts.ReturnStatement = ts.createReturn(
-        generateRootValueReturnExpression(operationDescriptor),
+    const returnStatement: ts.ReturnStatement = ts.createReturn(
+      generateRootValueReturnExpression(operationDescriptor),
+    );
+
+    const functionContents = ts.createBlock([commentStatement, returnStatement], true);
+
+    const functionExpression = ts.createFunctionExpression(
+      [ts.createModifier(ts.SyntaxKind.AsyncKeyword)],
+      undefined,
+      ts.createIdentifier(name),
+      undefined,
+      [
+        ts.createParameter(
+          undefined,
+          undefined,
+          undefined,
+          ts.createIdentifier('args'),
+          undefined,
+          undefined,
+          undefined,
+        ),
+        ts.createParameter(
+          undefined,
+          undefined,
+          undefined,
+          ts.createIdentifier('ctx'),
+          undefined,
+          undefined,
+          undefined,
+        ),
+        ts.createParameter(
+          undefined,
+          undefined,
+          undefined,
+          ts.createIdentifier('ast'),
+          undefined,
+          undefined,
+          undefined,
+        ),
+      ],
+      undefined,
+      functionContents,
+    );
+
+    const functionDeclaration = ts.createVariableStatement(
+      [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+      ts.createVariableDeclarationList(
+        [
+          ts.createVariableDeclaration(
+            ts.createIdentifier(name),
+            ts.createTypeReferenceNode(
+              ts.createIdentifier(rootResolverSignatureName(operationDescriptor)),
+              undefined,
+            ),
+            functionExpression,
+          ),
+        ],
+        ts.NodeFlags.Const,
+      ),
+    );
+
+    let operationRegistrationFunctionName: string;
+    switch (operationDescriptor.operation) {
+      case SupportedOperation.Query:
+        operationRegistrationFunctionName = INSTANCE_ROOT_QUERY_NAME;
+        break;
+      case SupportedOperation.Mutation:
+        operationRegistrationFunctionName = INSTANCE_ROOT_MUTATION_NAME;
+        break;
+      default:
+        throw new Error(`Operation ${operationDescriptor.operation} not supported`);
+        break;
+    }
+
+    const operationRegistrationCall = ts.createCall(
+      ts.createIdentifier(operationRegistrationFunctionName),
+      undefined,
+      [
+        ts.createObjectLiteral([
+          ts.createPropertyAssignment(
+            ts.createIdentifier('implements'),
+            ts.createStringLiteral(operationDescriptor.fieldDescriptor.name),
+          ),
+          ts.createPropertyAssignment(ts.createIdentifier('using'), ts.createIdentifier(name)),
+        ]),
+      ],
+    );
+    preprendComments(operationRegistrationCall, ROOT_REGISTRATION_COMMENT);
+
+    return [functionDeclaration, operationRegistrationCall];
+  });
+
+  return [
+    { spacing: 0, nodes: vendorImports },
+    { spacing: 0, nodes: fileImports },
+    { spacing: 1, nodes: functionDeclarations },
+  ];
+}
+
+export function generateSourcesFileNodes(contents: SourcesFileContents): ReadonlyArray<CodeGroup> {
+  const vendorImports = [...contents.vendorImports.values()].map(createImportDeclaration);
+
+  const fileImports = [...contents.fileImports.values()].map(createImportDeclaration);
+
+  const batchFnStatements = flatMap(contents.batchFnDeclarations, declaration => {
+    return declaration.idFields.map(fieldDescriptor => {
+      const name = loaderName(declaration.objectDescriptor, fieldDescriptor);
+
+      const loaderSignature = ts.createTypeReferenceNode(ts.createIdentifier(CORE_BATCHFN_NAME), [
+        generateTerminalTypeNode(fieldDescriptor),
+        ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [
+          ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+        ]),
+        ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
+      ]);
+
+      const exceptionExpression = ts.createThrow(
+        ts.createNew(ts.createIdentifier('Error'), undefined, [
+          ts.createStringLiteral('Not implemented.'),
+        ]),
       );
-
-      const functionContents = ts.createBlock(
-        [commentStatement, returnStatement],
-        true,
-      );
+      preprendComments(exceptionExpression, SOURCE_COMMENT);
 
       const functionExpression = ts.createFunctionExpression(
         [ts.createModifier(ts.SyntaxKind.AsyncKeyword)],
@@ -713,170 +741,30 @@ export function generateRootFileNodes(
             undefined,
             undefined,
             undefined,
-            ts.createIdentifier('args'),
-            undefined,
-            undefined,
-            undefined,
-          ),
-          ts.createParameter(
-            undefined,
-            undefined,
-            undefined,
-            ts.createIdentifier('ctx'),
-            undefined,
-            undefined,
-            undefined,
-          ),
-          ts.createParameter(
-            undefined,
-            undefined,
-            undefined,
-            ts.createIdentifier('ast'),
-            undefined,
+            ts.createIdentifier(pluralize.plural(fieldDescriptor.name)),
             undefined,
             undefined,
           ),
         ],
         undefined,
-        functionContents,
+        ts.createBlock([exceptionExpression]),
       );
 
-      const functionDeclaration = ts.createVariableStatement(
+      return ts.createVariableStatement(
         [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
         ts.createVariableDeclarationList(
           [
             ts.createVariableDeclaration(
               ts.createIdentifier(name),
-              ts.createTypeReferenceNode(
-                ts.createIdentifier(
-                  rootResolverSignatureName(operationDescriptor),
-                ),
-                undefined,
-              ),
+              loaderSignature,
               functionExpression,
             ),
           ],
           ts.NodeFlags.Const,
         ),
       );
-
-      let operationRegistrationFunctionName: string;
-      switch (operationDescriptor.operation) {
-        case SupportedOperation.Query:
-          operationRegistrationFunctionName = INSTANCE_ROOT_QUERY_NAME;
-          break;
-        case SupportedOperation.Mutation:
-          operationRegistrationFunctionName = INSTANCE_ROOT_MUTATION_NAME;
-          break;
-        default:
-          throw new Error(
-            `Operation ${operationDescriptor.operation} not supported`,
-          );
-          break;
-      }
-
-      const operationRegistrationCall = ts.createCall(
-        ts.createIdentifier(operationRegistrationFunctionName),
-        undefined,
-        [
-          ts.createObjectLiteral([
-            ts.createPropertyAssignment(
-              ts.createIdentifier('implements'),
-              ts.createStringLiteral(operationDescriptor.fieldDescriptor.name),
-            ),
-            ts.createPropertyAssignment(
-              ts.createIdentifier('using'),
-              ts.createIdentifier(name),
-            ),
-          ]),
-        ],
-      );
-      preprendComments(operationRegistrationCall, ROOT_REGISTRATION_COMMENT);
-
-      return [functionDeclaration, operationRegistrationCall];
-    },
-  );
-
-  return [
-    { spacing: 0, nodes: vendorImports },
-    { spacing: 0, nodes: fileImports },
-    { spacing: 1, nodes: functionDeclarations },
-  ];
-}
-
-export function generateSourcesFileNodes(
-  contents: SourcesFileContents,
-): ReadonlyArray<CodeGroup> {
-  const vendorImports = [...contents.vendorImports.values()].map(
-    createImportDeclaration,
-  );
-
-  const fileImports = [...contents.fileImports.values()].map(
-    createImportDeclaration,
-  );
-
-  const batchFnStatements = flatMap(
-    contents.batchFnDeclarations,
-    declaration => {
-      return declaration.idFields.map(fieldDescriptor => {
-        const name = loaderName(declaration.objectDescriptor, fieldDescriptor);
-
-        const loaderSignature = ts.createTypeReferenceNode(
-          ts.createIdentifier(CORE_BATCHFN_NAME),
-          [
-            generateTerminalTypeNode(fieldDescriptor),
-            ts.createTypeReferenceNode(ts.createIdentifier(MAYBE_NAME), [
-              ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-            ]),
-            ts.createTypeReferenceNode(
-              ts.createIdentifier(INSTANCE_CONTEXT_NAME),
-              undefined,
-            ),
-          ],
-        );
-
-        const exceptionExpression = ts.createThrow(
-          ts.createNew(ts.createIdentifier('Error'), undefined, [
-            ts.createStringLiteral('Not implemented.'),
-          ]),
-        );
-        preprendComments(exceptionExpression, SOURCE_COMMENT);
-
-        const functionExpression = ts.createFunctionExpression(
-          [ts.createModifier(ts.SyntaxKind.AsyncKeyword)],
-          undefined,
-          ts.createIdentifier(name),
-          undefined,
-          [
-            ts.createParameter(
-              undefined,
-              undefined,
-              undefined,
-              ts.createIdentifier(pluralize.plural(fieldDescriptor.name)),
-              undefined,
-              undefined,
-            ),
-          ],
-          undefined,
-          ts.createBlock([exceptionExpression]),
-        );
-
-        return ts.createVariableStatement(
-          [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-          ts.createVariableDeclarationList(
-            [
-              ts.createVariableDeclaration(
-                ts.createIdentifier(name),
-                loaderSignature,
-                functionExpression,
-              ),
-            ],
-            ts.NodeFlags.Const,
-          ),
-        );
-      });
-    },
-  );
+    });
+  });
 
   return [
     { spacing: 0, nodes: vendorImports },
@@ -888,84 +776,17 @@ export function generateSourcesFileNodes(
 export function generateResolversFileNodes(
   contents: ResolversFileContents,
 ): ReadonlyArray<CodeGroup> {
-  const vendorImports = [...contents.vendorImports.values()].map(
-    createImportDeclaration,
-  );
+  const vendorImports = [...contents.vendorImports.values()].map(createImportDeclaration);
 
-  const fileImports = [...contents.fileImports.values()].map(
-    createImportDeclaration,
-  );
+  const fileImports = [...contents.fileImports.values()].map(createImportDeclaration);
 
-  const resolverStatements = contents.typeDeclarations.map(objectDescriptor => {
-    const functionName = resolverName(objectDescriptor.name);
+  const resolverStatements = contents.typeDeclarations.flatMap(objectDescriptor => {
+    const objectResolver = generateResolverStatement(objectDescriptor);
+    if (!objectDescriptor.annotations.has(ObjectTypeAnnotation.HasConnection)) {
+      return [objectResolver];
+    }
 
-    const resolverSignature = ts.createTypeReferenceNode(
-      ts.createIdentifier(CORE_RESOLVER_NAME),
-      [
-        ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
-        ts.createTypeReferenceNode(
-          ts.createIdentifier(referencedTypeName(objectDescriptor.name)),
-          undefined,
-        ),
-        ts.createTypeReferenceNode(
-          ts.createIdentifier(INSTANCE_CONTEXT_NAME),
-          undefined,
-        ),
-      ],
-    );
-
-    const attributesParameter = ts.createParameter(
-      undefined,
-      undefined,
-      undefined,
-      ts.createIdentifier('attributes'),
-      undefined,
-      undefined,
-    );
-
-    const commentsStatement = ts.createEmptyStatement();
-    preprendComments(commentsStatement, RESOLVER_COMMENTS);
-
-    const typenameAssignment = ts.createPropertyAssignment(
-      ts.createIdentifier(GRAPHQL_TYPENAME_FIELD),
-      ts.createStringLiteral(objectDescriptor.name),
-    );
-    preprendComments(typenameAssignment, RESOLVER_TYPENAME_COMMENT);
-
-    const otherPropsAssignment = ts.createSpreadAssignment(
-      ts.createIdentifier('otherProps'),
-    );
-    preprendComments(otherPropsAssignment, RESOLVER_OTHER_PROPS_COMMENT);
-
-    return ts.createVariableStatement(
-      [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-      ts.createVariableDeclarationList(
-        [
-          ts.createVariableDeclaration(
-            ts.createIdentifier(functionName),
-            resolverSignature, // TODO: Change to resolver signature
-            ts.createFunctionExpression(
-              undefined,
-              undefined,
-              ts.createIdentifier(functionName),
-              undefined,
-              [attributesParameter],
-              undefined,
-              ts.createBlock([
-                commentsStatement,
-                ts.createReturn(
-                  ts.createObjectLiteral([
-                    typenameAssignment,
-                    otherPropsAssignment,
-                  ]),
-                ),
-              ]),
-            ),
-          ),
-        ],
-        ts.NodeFlags.Const,
-      ),
-    );
+    return [objectResolver];
   });
 
   return [
@@ -973,4 +794,63 @@ export function generateResolversFileNodes(
     { spacing: 0, nodes: fileImports },
     { spacing: 1, nodes: resolverStatements },
   ];
+}
+
+function generateResolverStatement(objectDescriptor: ObjectTypeDescriptor): ts.VariableStatement {
+  const functionName = resolverName(objectDescriptor.name);
+
+  const resolverSignature = ts.createTypeReferenceNode(ts.createIdentifier(CORE_RESOLVER_NAME), [
+    ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+    ts.createTypeReferenceNode(
+      ts.createIdentifier(referencedTypeName(objectDescriptor.name)),
+      undefined,
+    ),
+    ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
+  ]);
+
+  const attributesParameter = ts.createParameter(
+    undefined,
+    undefined,
+    undefined,
+    ts.createIdentifier('attributes'),
+    undefined,
+    undefined,
+  );
+
+  const commentsStatement = ts.createEmptyStatement();
+  preprendComments(commentsStatement, RESOLVER_COMMENTS);
+
+  const typenameAssignment = ts.createPropertyAssignment(
+    ts.createIdentifier(GRAPHQL_TYPENAME_FIELD),
+    ts.createStringLiteral(objectDescriptor.name),
+  );
+  preprendComments(typenameAssignment, RESOLVER_TYPENAME_COMMENT);
+
+  const otherPropsAssignment = ts.createSpreadAssignment(ts.createIdentifier('otherProps'));
+  preprendComments(otherPropsAssignment, RESOLVER_OTHER_PROPS_COMMENT);
+
+  return ts.createVariableStatement(
+    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+    ts.createVariableDeclarationList(
+      [
+        ts.createVariableDeclaration(
+          ts.createIdentifier(functionName),
+          resolverSignature, // TODO: Change to resolver signature
+          ts.createFunctionExpression(
+            undefined,
+            undefined,
+            ts.createIdentifier(functionName),
+            undefined,
+            [attributesParameter],
+            undefined,
+            ts.createBlock([
+              commentsStatement,
+              ts.createReturn(ts.createObjectLiteral([typenameAssignment, otherPropsAssignment])),
+            ]),
+          ),
+        ),
+      ],
+      ts.NodeFlags.Const,
+    ),
+  );
 }

@@ -7,11 +7,7 @@ import {
   AdapterOptions,
   defaultAdapterOpts,
 } from '../connection';
-import {
-  ConnectionAdapter,
-  LoadOrder,
-  AdapterAnchorType,
-} from '@blossom-gql/core';
+import { ConnectionAdapter, LoadOrder, AdapterAnchorType } from '@blossom-gql/core';
 import sequelize from './fixtures/sequelize';
 import Movie from './fixtures/movie';
 
@@ -36,11 +32,7 @@ describe(sequelizeConnectionAdapter, () => {
     createdAt?: Date;
     rating?: number;
   };
-  const mapper: SequelizeConnectionArgsMapper<
-    UsersFilter,
-    User,
-    any
-  > = args => {
+  const mapper: SequelizeConnectionArgsMapper<UsersFilter, User, any> = args => {
     const firstName = args.filter.firstName
       ? { firstName: { [Op.iLike]: args.filter.firstName } }
       : undefined;
@@ -65,9 +57,7 @@ describe(sequelizeConnectionAdapter, () => {
     };
   };
 
-  function adapter(
-    args?: AdapterOptions<any>,
-  ): ConnectionAdapter<UsersFilter, User, any> {
+  function adapter(args?: AdapterOptions<any>): ConnectionAdapter<UsersFilter, User, any> {
     return sequelizeConnectionAdapter(User, mapper, args);
   }
 
@@ -80,9 +70,7 @@ describe(sequelizeConnectionAdapter, () => {
 
     describe('when a function is set', () => {
       test('it returns the function value', () => {
-        expect(
-          adapter({ ...defaultAdapterOpts, limit: () => 10 }).limit({}),
-        ).toBe(10);
+        expect(adapter({ ...defaultAdapterOpts, limit: () => 10 }).limit({})).toBe(10);
       });
     });
   });
@@ -90,17 +78,13 @@ describe(sequelizeConnectionAdapter, () => {
   describe('default', () => {
     describe('when a number is set', () => {
       test('it uses the number', () => {
-        expect(
-          adapter({ ...defaultAdapterOpts, default: 20 }).default({}),
-        ).toBe(20);
+        expect(adapter({ ...defaultAdapterOpts, default: 20 }).default({})).toBe(20);
       });
     });
 
     describe('when a function is set', () => {
       test('it returns the function value', () => {
-        expect(
-          adapter({ ...defaultAdapterOpts, default: () => 50 }).default({}),
-        ).toBe(50);
+        expect(adapter({ ...defaultAdapterOpts, default: () => 50 }).default({})).toBe(50);
       });
     });
   });

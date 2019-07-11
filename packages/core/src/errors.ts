@@ -25,9 +25,7 @@ type ErrorHandlerOutput = {
  * A function that receives an error (which will be available on the originalError
  * entry from GraphQLError type) and converts it to the GraphQL extension format.
  */
-export type ErrorHandlingFunction = <E extends Error>(
-  error: E,
-) => ErrorHandlerOutput;
+export type ErrorHandlingFunction = <E extends Error>(error: E) => ErrorHandlerOutput;
 
 /**
  * Dict that associates error class to error handler.

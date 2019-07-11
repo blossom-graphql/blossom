@@ -31,11 +31,7 @@ export type MaybePromise<T> = Promise<Maybe<T>>;
 /**
  * Base signature of a resolving function.
  */
-export type BaseResolverSignature<I, O, C> = (
-  args: I,
-  ctx: C,
-  ast: GraphQLResolveInfo,
-) => O;
+export type BaseResolverSignature<I, O, C> = (args: I, ctx: C, ast: GraphQLResolveInfo) => O;
 
 /**
  * Signature of field resolver.
@@ -62,10 +58,7 @@ export type Resolver<I, O, C> = BaseResolverSignature<I, O, C>;
 /**
  * Signature of the batch function.
  */
-export type BatchFunction<I, O, C> = (
-  ids: ReadonlyArray<I>,
-  ctx: C,
-) => Promise<O[]>;
+export type BatchFunction<I, O, C> = (ids: ReadonlyArray<I>, ctx: C) => Promise<O[]>;
 
 export type ResolverSignature = BaseResolverSignature<any, any, any>;
 
@@ -90,9 +83,7 @@ type ErrorHandlerOutput = {
  * A function that receives an error (which will be available on the originalError
  * entry from GraphQLError type) and converts it to the GraphQL extension format.
  */
-export type ErrorHandlingFunction = <E extends Error>(
-  error: E,
-) => ErrorHandlerOutput;
+export type ErrorHandlingFunction = <E extends Error>(error: E) => ErrorHandlerOutput;
 
 /**
  * Dict that associates error class to error handler.
@@ -112,10 +103,7 @@ export interface IBlossomInstance {
   ) => void;
   addDefinition: (definition: DefinitionNode) => void;
   rootValue: RootValueOutput;
-  addErrorHandler: (
-    errorClass: BlossomError,
-    handlingFunction?: ErrorHandlingFunction,
-  ) => void;
+  addErrorHandler: (errorClass: BlossomError, handlingFunction?: ErrorHandlingFunction) => void;
 }
 
 export type BootDirectiveHandler = (

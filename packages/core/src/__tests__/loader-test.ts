@@ -51,9 +51,7 @@ describe(createLoaderInstance, () => {
     const exampleLoader = new Dataloader(batchFn);
 
     // Replace instance's get method with the mock.
-    instance.get = jest
-      .fn<typeof instance.get>()
-      .mockReturnValueOnce(exampleLoader);
+    instance.get = jest.fn<typeof instance.get>().mockReturnValueOnce(exampleLoader);
 
     const result = getLoader(batchFn);
 

@@ -62,14 +62,7 @@ export function blossom(instance: IBlossomInstance) {
     context.loader.instance.setContext(context); // ! -> Circular!!
 
     // Actually pass the information to the parser
-    const response = await graphql(
-      rootSchema,
-      query,
-      rootValue,
-      context,
-      variables,
-      operationName,
-    );
+    const response = await graphql(rootSchema, query, rootValue, context, variables, operationName);
 
     // Format errors when available
     const formattedErrors =

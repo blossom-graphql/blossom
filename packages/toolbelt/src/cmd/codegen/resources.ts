@@ -15,12 +15,7 @@ import { resolversCodegenPair } from './resolvers';
 import { rootCodegenPair } from './root';
 
 export const generateResources = makeGraphCodegenPipeline({
-  generatorPairs: [
-    typesCodegenPair,
-    rootCodegenPair,
-    sourcesCodegenPair,
-    resolversCodegenPair,
-  ],
+  generatorPairs: [typesCodegenPair, rootCodegenPair, sourcesCodegenPair, resolversCodegenPair],
 });
 
 export default cliRunWrapper(generateResources);

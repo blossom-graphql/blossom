@@ -30,9 +30,7 @@ export function createConnectionResolver<I, O, C>(
   typename: string,
   resolver: Resolver<I, O, C>,
 ): Resolver<ConnectionData<I, C>, Connection<O, C>, C> {
-  return function connectionResolver(
-    attributes: ConnectionData<I, C>,
-  ): Connection<O, C> {
+  return function connectionResolver(attributes: ConnectionData<I, C>): Connection<O, C> {
     return {
       __typename: `${typename}Connection`,
       async edges(args: {}, ctx: C, ast: GraphQLResolveInfo) {

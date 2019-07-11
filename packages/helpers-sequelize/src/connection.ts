@@ -50,11 +50,7 @@ export type SequelizeConnectionArgsMapper<F, D, C> = (
  * @param key The key that is going to be used to generate the cursor.
  * @param _ctx The context of the GraphQL request, if required.
  */
-function defaultCursorGenerator<U extends Model, C>(
-  entity: U,
-  key: keyof U,
-  _ctx: C,
-): string {
+function defaultCursorGenerator<U extends Model, C>(entity: U, key: keyof U, _ctx: C): string {
   return String(entity[key]);
 }
 
@@ -99,12 +95,7 @@ export const defaultAdapterOpts = {
  * @param opts Optional hash of options that sets up the behavior for
  * pagination and cursor serialization.
  */
-export function sequelizeConnectionAdapter<
-  F,
-  U extends Model,
-  M extends SequelizeModel<U>,
-  C
->(
+export function sequelizeConnectionAdapter<F, U extends Model, M extends SequelizeModel<U>, C>(
   m: M,
   argsMapper: SequelizeConnectionArgsMapper<F, U, C>,
   opts: AdapterOptions<C> = defaultAdapterOpts,
@@ -128,9 +119,7 @@ export function sequelizeConnectionAdapter<
       // Ensure that the field labeled as primary is always present in the list
       // of fields.
       const attributes =
-        args.fields && args.fields.length > 0
-          ? new Set(args.fields).add(args.primary)
-          : undefined;
+        args.fields && args.fields.length > 0 ? new Set(args.fields).add(args.primary) : undefined;
 
       // Start the `where` and add the anchors to it, if any of them is present.
       const where = { ...mappedArgs.where };
@@ -152,12 +141,7 @@ export function sequelizeConnectionAdapter<
         where,
         include: mappedArgs.include,
         limit: args.max,
-        order: [
-          [
-            args.primary as string,
-            args.order === LoadOrder.ASC ? 'ASC' : 'DESC',
-          ],
-        ],
+        order: [[args.primary as string, args.order === LoadOrder.ASC ? 'ASC' : 'DESC']],
       });
 
       return results.map(result => ({

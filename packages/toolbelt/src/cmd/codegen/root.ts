@@ -18,9 +18,7 @@ import {
 } from '../../lib/cmd/codegen/common';
 
 export const rootCodegenPair: GeneratorPair = [
-  codegenPipelineMaker(
-    nodeGroupGeneratorMaker(linkRootFile, generateRootFileNodes),
-  ),
+  codegenPipelineMaker(nodeGroupGeneratorMaker(linkRootFile, generateRootFileNodes)),
   rootFilePath,
 ];
 

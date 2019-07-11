@@ -115,8 +115,7 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
       }
     });
 
-    const filter = (i: number): boolean =>
-      filters.reduce((acc, f) => acc && f(i), true as boolean);
+    const filter = (i: number): boolean => filters.reduce((acc, f) => acc && f(i), true as boolean);
 
     const base = SAMPLE_DATA.slice();
     if (args.order === LoadOrder.DESC) {
@@ -125,9 +124,7 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
 
     let slice: ExampleData[] = base.filter(datum => filter(datum.id));
     if (args.filter.fruits && args.filter.fruits.length > 0) {
-      slice = slice.filter(
-        datum => args.filter.fruits && args.filter.fruits.includes(datum.fruit),
-      );
+      slice = slice.filter(datum => args.filter.fruits && args.filter.fruits.includes(datum.fruit));
     }
 
     return slice.slice(0, count).map(datum => ({
@@ -146,10 +143,7 @@ const AdapterMock: ConnectionAdapter<ExampleFilter, ExampleData, any> = {
   },
 };
 
-function fieldMask(
-  data: ExampleData,
-  fields?: (keyof ExampleData)[],
-): ExampleData {
+function fieldMask(data: ExampleData, fields?: (keyof ExampleData)[]): ExampleData {
   if (!fields || fields.length === 0) {
     return data;
   }
@@ -183,9 +177,7 @@ describe('AdapterMock', () => {
     describe('when no filters are applied', () => {
       test('returns the correct value', async () => {
         expect.assertions(1);
-        expect(await AdapterMock.count({ primary: 'id', filter: {} }, {})).toBe(
-          SAMPLE_DATA.length,
-        );
+        expect(await AdapterMock.count({ primary: 'id', filter: {} }, {})).toBe(SAMPLE_DATA.length);
       });
     });
 
@@ -336,11 +328,7 @@ describe(connectionDataLoader, () => {
   describe('both first and last are present', () => {
     test('it raises ConnectionArgsError', () => {
       expect(() => {
-        loader(
-          {},
-          { primary: 'id', order: LoadOrder.ASC, first: 10, last: 10 },
-          RESOLVE_INFO,
-        );
+        loader({}, { primary: 'id', order: LoadOrder.ASC, first: 10, last: 10 }, RESOLVE_INFO);
       }).toThrowError(ConnectionArgsError);
     });
   });
@@ -364,17 +352,11 @@ describe(connectionDataLoader, () => {
 
     edges.forEach((edge, i) => {
       expect(edge.node).toEqual(expected.edges[i].node);
-      expect(edge.cursor({}, {}, RESOLVE_INFO)).toEqual(
-        expected.edges[i].cursor,
-      );
+      expect(edge.cursor({}, {}, RESOLVE_INFO)).toEqual(expected.edges[i].cursor);
     });
 
-    expect(await result.pageInfo.count({}, {}, RESOLVE_INFO)).toBe(
-      expected.count,
-    );
-    expect(await result.pageInfo.hasNextPage({}, {}, RESOLVE_INFO)).toBe(
-      expected.hasNextPage,
-    );
+    expect(await result.pageInfo.count({}, {}, RESOLVE_INFO)).toBe(expected.count);
+    expect(await result.pageInfo.hasNextPage({}, {}, RESOLVE_INFO)).toBe(expected.hasNextPage);
     expect(await result.pageInfo.hasPreviousPage({}, {}, RESOLVE_INFO)).toBe(
       expected.hasPreviousPage,
     );

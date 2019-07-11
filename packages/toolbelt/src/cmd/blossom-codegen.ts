@@ -44,9 +44,7 @@ addCommonOptions(
   program
     .command('sources')
     .alias('s')
-    .description(
-      'Generates **example** sources generators (e.g. loaders) from a GraphQL SDL.',
-    ),
+    .description('Generates **example** sources generators (e.g. loaders) from a GraphQL SDL.'),
 ).action(generateSources);
 
 addCommonOptions(
@@ -60,9 +58,7 @@ addCommonOptions(
   program
     .command('resources')
     .alias('r')
-    .description(
-      'Generates types, root, resolvers and loaders from a GraphQL SDL.',
-    ),
+    .description('Generates types, root, resolvers and loaders from a GraphQL SDL.'),
 ).action(generateResources);
 
 program.parse(process.argv);

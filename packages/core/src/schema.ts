@@ -95,19 +95,12 @@ export type RPCDescription = RPCDescriptionBase & {
  *
  * @param enumDescription The descriptor of the enum to be converted.
  */
-export function renderEnumToSchema({
-  name,
-  description,
-  values,
-}: Enum): string {
+export function renderEnumToSchema({ name, description, values }: Enum): string {
   const valuesStrings = values.map(
-    ({ name, description }) =>
-      `  """\n  ${description || ''}\n  """\n  ${name}`,
+    ({ name, description }) => `  """\n  ${description || ''}\n  """\n  ${name}`,
   );
 
-  return `"""\n${description || ''}\n"""\nenum ${name} {\n${valuesStrings.join(
-    '\n',
-  )}\n}`;
+  return `"""\n${description || ''}\n"""\nenum ${name} {\n${valuesStrings.join('\n')}\n}`;
 }
 
 /**
@@ -116,21 +109,17 @@ export function renderEnumToSchema({
  *
  * @param rpcDescription Descriptor of the remote procedure call.
  */
-export function renderRPCDescriptionToSchema(
-  rpcDescription: RPCDescription,
-): string {
+export function renderRPCDescriptionToSchema(rpcDescription: RPCDescription): string {
   const convertedArguments = rpcDescription.arguments
     ? rpcDescription.arguments.map(
         argument =>
-          `    """\n    ${argument.description || ''}\n    """\n    ${
-            argument.name
-          }: ${argument.type}`,
+          `    """\n    ${argument.description || ''}\n    """\n    ${argument.name}: ${
+            argument.type
+          }`,
       )
     : [];
   const argumentsText =
-    convertedArguments.length > 0
-      ? `(\n${convertedArguments.join('\n')}\n  )`
-      : '';
+    convertedArguments.length > 0 ? `(\n${convertedArguments.join('\n')}\n  )` : '';
 
   return `  """\n  ${rpcDescription.description || ''}\n  """\n  ${
     rpcDescription.name
@@ -154,19 +143,13 @@ export function renderSchema(
   rootMutations: string[],
 ): string {
   const rootQueriesStrings =
-    rootQueries.length > 0
-      ? [`type Query {\n${rootQueries.join('\n')}\n}`]
-      : [];
+    rootQueries.length > 0 ? [`type Query {\n${rootQueries.join('\n')}\n}`] : [];
   const rootMutationsStrings =
-    rootMutations.length > 0
-      ? [`type Mutation {\n${rootMutations.join('\n')}\n}`]
-      : [];
+    rootMutations.length > 0 ? [`type Mutation {\n${rootMutations.join('\n')}\n}`] : [];
 
   // Definition strings
-  const queryDefinitionString =
-    rootQueriesStrings.length > 0 ? '\n  query: Query' : ``;
-  const mutationDefinitionString =
-    rootMutationsStrings.length > 0 ? '\n  mutation: Mutation' : ``;
+  const queryDefinitionString = rootQueriesStrings.length > 0 ? '\n  query: Query' : ``;
+  const mutationDefinitionString = rootMutationsStrings.length > 0 ? '\n  mutation: Mutation' : ``;
 
   // Stitch them together, but only when
   const rootSchemaString =

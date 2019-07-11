@@ -18,13 +18,9 @@ jest.mock('../errors');
 import { instanceMock } from './mocks/instance-mocks';
 
 const MOCKS = {
-  createLoaderInstance: createLoaderInstance as jest.Mock<
-    typeof createLoaderInstance
-  >,
+  createLoaderInstance: createLoaderInstance as jest.Mock<typeof createLoaderInstance>,
   graphql: graphql as jest.Mock<typeof graphql>,
-  formatGraphQLErrors: formatGraphQLErrors as jest.Mock<
-    typeof formatGraphQLErrors
-  >,
+  formatGraphQLErrors: formatGraphQLErrors as jest.Mock<typeof formatGraphQLErrors>,
 };
 
 const reusableLoaderInstanceResult = {
@@ -36,9 +32,7 @@ describe(blossom, () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    MOCKS.createLoaderInstance.mockReturnValueOnce(
-      reusableLoaderInstanceResult,
-    );
+    MOCKS.createLoaderInstance.mockReturnValueOnce(reusableLoaderInstanceResult);
   });
 
   test('should have called createLoaderInstance in order to create a new loader context', async () => {
@@ -134,10 +128,7 @@ describe(blossom, () => {
   test('must call formatGraphQLErrors with correct arguments and properly wire output', async () => {
     expect.assertions(2);
 
-    const errorsResponse = [
-      new GraphQLError('test1'),
-      new GraphQLError('test2'),
-    ];
+    const errorsResponse = [new GraphQLError('test1'), new GraphQLError('test2')];
     MOCKS.graphql.mockReturnValue({
       data: {}, // doesn't matter for this case
       errors: errorsResponse,

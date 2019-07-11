@@ -9,17 +9,9 @@
 import chalk from 'chalk';
 import wrap from 'word-wrap';
 
-import {
-  ResolutionDescription,
-  ElementKind,
-  OriginDescription,
-} from './linking';
+import { ResolutionDescription, ElementKind, OriginDescription } from './linking';
 import { ErrorsOutput, makeTitleOriginDescriptor } from './utils';
-import {
-  ObjectTypeDescriptor,
-  EnumTypeDescriptor,
-  UnionTypeDescriptor,
-} from './parsing';
+import { ObjectTypeDescriptor, EnumTypeDescriptor, UnionTypeDescriptor } from './parsing';
 
 export class ExtendableError extends Error {
   constructor(error?: string | undefined) {
@@ -95,9 +87,7 @@ export class ImportParsingError extends Error {
 
   constructor(filePath: string, originalError: Error) {
     super(
-      `Error while parsing file ${filePath}: ${
-        originalError.message
-      }. Expand originalError for more info.`,
+      `Error while parsing file ${filePath}: ${originalError.message}. Expand originalError for more info.`,
     );
 
     this.filePath = filePath;
@@ -114,17 +104,14 @@ export class FileNotFoundInGraph extends Error {
   }
 }
 
-export class InvalidReferenceError extends ExtendableError
-  implements FormattableError {
+export class InvalidReferenceError extends ExtendableError implements FormattableError {
   field: string;
   filePath: string;
   reference: OriginDescription;
 
   constructor(field: string, filePath: string, reference: OriginDescription) {
     super(
-      `Reference to ${field} in file ${filePath} is invalid. ${field} cannot be referenced from kind ${
-        reference.originKind
-      }`,
+      `Reference to ${field} in file ${filePath} is invalid. ${field} cannot be referenced from kind ${reference.originKind}`,
     );
 
     this.field = field;
@@ -133,9 +120,7 @@ export class InvalidReferenceError extends ExtendableError
   }
 
   cliFormat() {
-    const title = chalk.red(
-      `File ${this.filePath}\n${makeTitleOriginDescriptor(this.reference)}`,
-    );
+    const title = chalk.red(`File ${this.filePath}\n${makeTitleOriginDescriptor(this.reference)}`);
     const message = `\nReference to ${chalk.bold(
       this.field,
     )} is invalid. This usually means you're trying to reference a type that cannot be used in the current declaration. Some examples:`;
@@ -148,17 +133,12 @@ export class InvalidReferenceError extends ExtendableError
   }
 }
 
-export class ReferenceNotFoundError extends ExtendableError
-  implements FormattableError {
+export class ReferenceNotFoundError extends ExtendableError implements FormattableError {
   field: string;
   filePath: string;
   references: ReadonlyArray<OriginDescription>;
 
-  constructor(
-    field: string,
-    filePath: string,
-    references: ReadonlyArray<OriginDescription>,
-  ) {
+  constructor(field: string, filePath: string, references: ReadonlyArray<OriginDescription>) {
     super(
       `Reference to ${field} required by file ${filePath} not found. Did you forget an \`# import\` statement?`,
     );
@@ -170,18 +150,11 @@ export class ReferenceNotFoundError extends ExtendableError
 
   cliFormat() {
     const titles: string[] = this.references.map(reference =>
-      chalk.red(
-        `File ${this.filePath}\n${makeTitleOriginDescriptor(reference)}`,
-      ),
+      chalk.red(`File ${this.filePath}\n${makeTitleOriginDescriptor(reference)}`),
     );
 
-    const message = `\nReference to ${chalk.bold(
-      this.field,
-    )} was nowhere to be found.`;
-    const help =
-      '\nDid you forget an ' +
-      chalk.gray('# import') +
-      ' statement in this file?';
+    const message = `\nReference to ${chalk.bold(this.field)} was nowhere to be found.`;
+    const help = '\nDid you forget an ' + chalk.gray('# import') + ' statement in this file?';
 
     return titles.join('\n') + message + help;
   }
@@ -202,9 +175,10 @@ export class LinkingError extends ExtendableError implements FormattableError {
       // in this instance.
       if (errorInstance instanceof LinkingError) {
         this.errors.push(
-          ...errorInstance.errors.map(
-            ([_, linkingError]): [number, Error] => [index, linkingError],
-          ),
+          ...errorInstance.errors.map(([_, linkingError]): [number, Error] => [
+            index,
+            linkingError,
+          ]),
         );
       } else {
         this.errors.push(error);
@@ -217,9 +191,7 @@ export class LinkingError extends ExtendableError implements FormattableError {
       chalk.bold('Linking Error.') +
       ' It was not possible to satisfy all the required types dependencies in the SDL:';
 
-    const details = this.errors
-      .map(([_, error]) => formatCLIError(error))
-      .join('\n\n');
+    const details = this.errors.map(([_, error]) => formatCLIError(error)).join('\n\n');
 
     return (
       wrap(title, { width: 94, indent: '' }) +
@@ -230,8 +202,7 @@ export class LinkingError extends ExtendableError implements FormattableError {
   }
 }
 
-export class DuplicateFieldError extends ExtendableError
-  implements FormattableError {
+export class DuplicateFieldError extends ExtendableError implements FormattableError {
   existingResolution: ResolutionDescription;
   name: string;
   filePath: string;
@@ -256,8 +227,7 @@ export class DuplicateFieldError extends ExtendableError
   }
 }
 
-export class EmptyLoadersFileError extends ExtendableError
-  implements FormattableError {
+export class EmptyLoadersFileError extends ExtendableError implements FormattableError {
   filePath: string;
 
   constructor(filePath: string) {
@@ -267,14 +237,11 @@ export class EmptyLoadersFileError extends ExtendableError
   }
 
   cliFormat() {
-    return `No loaders to generate in loaders file for ${
-      this.filePath
-    }. Add at least one ID type field to a type declaration within the file.`;
+    return `No loaders to generate in loaders file for ${this.filePath}. Add at least one ID type field to a type declaration within the file.`;
   }
 }
 
-export class NoFieldsTypeError extends ExtendableError
-  implements FormattableError {
+export class NoFieldsTypeError extends ExtendableError implements FormattableError {
   typeDescriptor: ObjectTypeDescriptor;
 
   constructor(typeDescriptor: ObjectTypeDescriptor) {
@@ -288,16 +255,15 @@ export class NoFieldsTypeError extends ExtendableError
 
     const help = `\nObject type ${
       this.typeDescriptor.name
-    } has no fields. Did you forget to ${chalk.blue(
-      'extend',
-    )} it or an ${chalk.gray('# import')} statement?`;
+    } has no fields. Did you forget to ${chalk.blue('extend')} it or an ${chalk.gray(
+      '# import',
+    )} statement?`;
 
     return title + help;
   }
 }
 
-export class NoMembersError extends ExtendableError
-  implements FormattableError {
+export class NoMembersError extends ExtendableError implements FormattableError {
   descriptor: EnumTypeDescriptor | UnionTypeDescriptor;
 
   constructor(descriptor: EnumTypeDescriptor | UnionTypeDescriptor) {
@@ -308,12 +274,9 @@ export class NoMembersError extends ExtendableError
 
   cliFormat() {
     const title = chalk.red(`${this.descriptor.name} has no members`);
-    const type =
-      this.descriptor.kind === 'EnumTypeDescriptor' ? 'Enum' : 'Union';
+    const type = this.descriptor.kind === 'EnumTypeDescriptor' ? 'Enum' : 'Union';
 
-    const help = `\n${type} ${
-      this.descriptor.name
-    } has no fields. Did you forget to ${chalk.blue(
+    const help = `\n${type} ${this.descriptor.name} has no fields. Did you forget to ${chalk.blue(
       'extend',
     )} it or an ${chalk.gray('# import')} statement?`;
 

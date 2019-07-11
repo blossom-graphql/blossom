@@ -251,10 +251,7 @@ describe(thunkTypeFromDirectives, () => {
               value: 'testDirective',
             },
           },
-          blossomImplDirective(
-            ThunkImplementationType.AsyncFunction,
-            'StringValue',
-          ),
+          blossomImplDirective(ThunkImplementationType.AsyncFunction, 'StringValue'),
         ],
       }),
     ).toBe(ThunkType.AsyncFunction);
@@ -271,10 +268,7 @@ describe(thunkTypeFromDirectives, () => {
               value: 'testDirective',
             },
           },
-          blossomImplDirective(
-            ThunkImplementationType.AsyncFunction,
-            'EnumValue',
-          ),
+          blossomImplDirective(ThunkImplementationType.AsyncFunction, 'EnumValue'),
         ],
       }),
     ).toBe(ThunkType.AsyncFunction);
@@ -293,10 +287,7 @@ describe(thunkTypeFromDirectives, () => {
               value: 'testDirective',
             },
           },
-          blossomImplDirective(
-            ThunkImplementationType.AsyncFunction,
-            'AnotherValue',
-          ),
+          blossomImplDirective(ThunkImplementationType.AsyncFunction, 'AnotherValue'),
         ],
       }),
     ).toBe(ThunkType.None);
@@ -1191,9 +1182,7 @@ describe(parseDocumentNode, () => {
       },
     ]);
 
-    expect(result.intermediateDict.objects[OBJECT_NAME].node).toEqual(
-      definition,
-    );
+    expect(result.intermediateDict.objects[OBJECT_NAME].node).toEqual(definition);
   });
 
   test('must return a correctly parsed input', () => {
@@ -1222,9 +1211,7 @@ describe(parseDocumentNode, () => {
       },
     ]);
 
-    expect(result.intermediateDict.inputs[OBJECT_NAME].node).toEqual(
-      definition,
-    );
+    expect(result.intermediateDict.inputs[OBJECT_NAME].node).toEqual(definition);
   });
 
   test('must do nothing with an unhandled DefinitionNode', () => {

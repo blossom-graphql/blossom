@@ -47,11 +47,7 @@ describe(deliver, () => {
       { id: 2, key: 'bar' },
     ];
 
-    const EXPECTED = [
-      { id: 1, key: 'foo' },
-      { id: 2, key: 'bar' },
-      { id: 3, key: 'foo' },
-    ];
+    const EXPECTED = [{ id: 1, key: 'foo' }, { id: 2, key: 'bar' }, { id: 3, key: 'foo' }];
 
     expect(deliver(KEYS, RESULTS, pluckById)).toEqual(EXPECTED);
   });

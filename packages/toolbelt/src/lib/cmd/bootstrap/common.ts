@@ -41,9 +41,7 @@ export function printPackageList(packages: DependenciesDescription): string {
   return list.join('\n');
 }
 
-export function addDependencies(
-  packages: DependenciesDescription,
-): ActionDescriptor {
+export function addDependencies(packages: DependenciesDescription): ActionDescriptor {
   return {
     description: chalk.blue.bold('Updating package.json file'),
     dryDescription: `add the following dependencies to package.json:\n${printPackageList(
@@ -58,10 +56,7 @@ export function addDependencies(
       // TODO: Maybe warn about this?
       merge(packageJSON, packages);
 
-      await fsExtra.writeFile(
-        packagePath,
-        JSON.stringify(packageJSON, null, 2),
-      );
+      await fsExtra.writeFile(packagePath, JSON.stringify(packageJSON, null, 2));
     },
   };
 }
@@ -119,9 +114,7 @@ export function shouldUseYarn(): boolean {
   }
 }
 
-export async function installDependencies(
-  useNpm: boolean = false,
-): Promise<ActionDescriptor> {
+export async function installDependencies(useNpm: boolean = false): Promise<ActionDescriptor> {
   const useYarn = useNpm ? false : shouldUseYarn();
   const pkgManager = useYarn ? 'yarn' : 'npm install';
 

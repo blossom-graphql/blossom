@@ -15,17 +15,8 @@ function coerceTemplateInput(input: string): string {
 }
 
 program
-  .option(
-    '-t, --template <template>',
-    'Template to use for bootstrapping.',
-    coerceTemplateInput,
-  )
-  .option(
-    '-d, --dry',
-    'Do not write anything, just print what will be done.',
-    undefined,
-    false,
-  )
+  .option('-t, --template <template>', 'Template to use for bootstrapping.', coerceTemplateInput)
+  .option('-d, --dry', 'Do not write anything, just print what will be done.', undefined, false)
   .parse(process.argv);
 
 if (!program.template) {

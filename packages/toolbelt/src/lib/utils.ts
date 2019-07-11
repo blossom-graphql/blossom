@@ -56,12 +56,7 @@ export function reduceWithErrors<U, V>(
       array,
     ): ReducedWithErrorsOutput<V> => {
       try {
-        const reducedValue = callbackfn(
-          previousValue,
-          currentValue,
-          currentIndex,
-          array,
-        );
+        const reducedValue = callbackfn(previousValue, currentValue, currentIndex, array);
 
         return [reducedValue, accumulatedErrors];
       } catch (error) {
@@ -84,49 +79,29 @@ export function repeatChar(token: string, length: number): string {
     .join('');
 }
 
-export function makeTitleOriginDescriptor(
-  originDescriptor: OriginDescription,
-): string {
+export function makeTitleOriginDescriptor(originDescriptor: OriginDescription): string {
   switch (originDescriptor.originKind) {
     case OriginKind.Object:
-      return `Type: ${originDescriptor.objectName} > Field: ${
-        originDescriptor.fieldName
-      }`;
+      return `Type: ${originDescriptor.objectName} > Field: ${originDescriptor.fieldName}`;
     case OriginKind.ObjectArgument:
-      return `Type: ${
-        originDescriptor.fieldOriginDescription.objectName
-      } > Field: ${
-        originDescriptor.fieldOriginDescription.fieldName
-      } > Argument: ${originDescriptor.argumentName}`;
+      return `Type: ${originDescriptor.fieldOriginDescription.objectName} > Field: ${originDescriptor.fieldOriginDescription.fieldName} > Argument: ${originDescriptor.argumentName}`;
       break;
     case OriginKind.Input:
-      return `Input: ${originDescriptor.objectName} > Field: ${
-        originDescriptor.fieldName
-      }`;
+      return `Input: ${originDescriptor.objectName} > Field: ${originDescriptor.fieldName}`;
     case OriginKind.InputArgument:
-      return `Input: ${
-        originDescriptor.fieldOriginDescription.objectName
-      } > Field: ${
-        originDescriptor.fieldOriginDescription.fieldName
-      } > Argument: ${originDescriptor.argumentName}`;
+      return `Input: ${originDescriptor.fieldOriginDescription.objectName} > Field: ${originDescriptor.fieldOriginDescription.fieldName} > Argument: ${originDescriptor.argumentName}`;
     case OriginKind.Union:
       return `Union: ${originDescriptor.name}`;
     case OriginKind.Operation:
       return `Operation: ${originDescriptor.operationType}`;
     case OriginKind.ObjectExtension:
-      return `Type Extension: ${originDescriptor.objectName} > Field: ${
-        originDescriptor.fieldName
-      }`;
+      return `Type Extension: ${originDescriptor.objectName} > Field: ${originDescriptor.fieldName}`;
     case OriginKind.InputExtension:
-      return `Input Extension: ${originDescriptor.objectName} > Field: ${
-        originDescriptor.fieldName
-      }`;
+      return `Input Extension: ${originDescriptor.objectName} > Field: ${originDescriptor.fieldName}`;
   }
 }
 
-export async function listDirFilesRecursive(
-  pathName: string,
-): Promise<string[] | undefined> {
+export async function listDirFilesRecursive(pathName: string): Promise<string[] | undefined> {
   const pathStat = await fsExtra.stat(pathName);
 
   if (!pathStat.isDirectory()) {

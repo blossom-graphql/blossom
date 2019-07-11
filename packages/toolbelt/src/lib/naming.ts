@@ -8,16 +8,10 @@
 
 import { camelCase, upperFirst } from 'lodash';
 
-import {
-  OperationFieldDescriptor,
-  FieldDescriptor,
-  ObjectTypeDescriptor,
-} from './parsing';
+import { OperationFieldDescriptor, FieldDescriptor, ObjectTypeDescriptor } from './parsing';
 import { SupportedOperation, ReferencedTypeDescriptor } from './parsing';
 
-export function referencedTypeName(
-  descriptor: ReferencedTypeDescriptor | string,
-): string {
+export function referencedTypeName(descriptor: ReferencedTypeDescriptor | string): string {
   if (typeof descriptor === 'string') {
     return descriptor;
   } else {
@@ -53,9 +47,7 @@ export function resolverName(gqlTypeName: string): string {
   return camelCase(gqlTypeName) + 'Resolver';
 }
 
-export function signatureName(
-  descriptor: OperationFieldDescriptor | FieldDescriptor,
-) {
+export function signatureName(descriptor: OperationFieldDescriptor | FieldDescriptor) {
   if (descriptor.hasOwnProperty('operation')) {
     descriptor;
   }
@@ -65,9 +57,5 @@ export function loaderName(
   objectDescriptor: ObjectTypeDescriptor,
   fieldDescriptor: FieldDescriptor,
 ) {
-  return (
-    camelCase(objectDescriptor.name) +
-    'By' +
-    upperFirst(camelCase(fieldDescriptor.name))
-  );
+  return camelCase(objectDescriptor.name) + 'By' + upperFirst(camelCase(fieldDescriptor.name));
 }

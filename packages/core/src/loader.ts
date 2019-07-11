@@ -18,10 +18,7 @@ export type BlossomLoaderSignature<C> = {
 export class LoaderInstance<C> {
   private context: C | undefined = undefined;
 
-  loaderMap: Map<
-    BatchFunction<any, any, any>,
-    Dataloader<any, any>
-  > = new Map();
+  loaderMap: Map<BatchFunction<any, any, any>, Dataloader<any, any>> = new Map();
 
   constructor() {}
 
@@ -49,14 +46,10 @@ export class LoaderInstance<C> {
   }
 }
 
-export function generateLoaderInstance<C>(): BlossomLoaderSignature<
-  BlossomContext<C>
-> {
+export function generateLoaderInstance<C>(): BlossomLoaderSignature<BlossomContext<C>> {
   const instance = new LoaderInstance<BlossomContext<C>>();
 
-  const exportedFunction = <K, V>(
-    batchFn: BatchFunction<K, V, BlossomContext<C>>,
-  ) => {
+  const exportedFunction = <K, V>(batchFn: BatchFunction<K, V, BlossomContext<C>>) => {
     return instance.getLoader(batchFn);
   };
   exportedFunction.instance = instance;

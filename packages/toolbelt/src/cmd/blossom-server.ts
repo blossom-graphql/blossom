@@ -133,21 +133,10 @@ export async function devServer() {
   const tmpDirPath = (await tmp.dir()).path;
 
   tmp.setGracefulCleanup();
-  fsExtra.symlink(
-    appPath('./node_modules'),
-    path.join(tmpDirPath, 'node_modules'),
-  );
-  fsExtra.symlink(
-    appPath('./package.json'),
-    path.join(tmpDirPath, 'package.json'),
-  );
+  fsExtra.symlink(appPath('./node_modules'), path.join(tmpDirPath, 'node_modules'));
+  fsExtra.symlink(appPath('./package.json'), path.join(tmpDirPath, 'package.json'));
 
-  console.log(
-    '🌺',
-    chalk.red.bold('Blossom'),
-    '-',
-    chalk.bold(`Toolbelt v${VERSION}`),
-  );
+  console.log('🌺', chalk.red.bold('Blossom'), '-', chalk.bold(`Toolbelt v${VERSION}`));
   console.log('Starting development server...');
 
   // Extend the base config based on our needs.

@@ -33,15 +33,11 @@ export async function bootstrapProject(opts: BootstrapOptions) {
   }
 
   if (opts.dry) {
-    console.log(
-      chalk.cyan.bold('Bootstrap will perform the following actions:') + '\n',
-    );
+    console.log(chalk.cyan.bold('Bootstrap will perform the following actions:') + '\n');
 
     actions.forEach(action => console.log(`Will ${action.dryDescription}\n`));
 
-    console.log(
-      chalk.cyan('Run this command without the -d / --dry flag to continue.'),
-    );
+    console.log(chalk.cyan('Run this command without the -d / --dry flag to continue.'));
   } else {
     for (const action of actions) {
       writeInSameLine(action.description + chalk.bold.blue('...'), false);
@@ -49,23 +45,16 @@ export async function bootstrapProject(opts: BootstrapOptions) {
       await action.perform();
 
       writeInSameLine(
-        action.description +
-          chalk.bold.blue('...') +
-          ' ' +
-          chalk.bold.green('Done!'),
+        action.description + chalk.bold.blue('...') + ' ' + chalk.bold.green('Done!'),
         true,
       );
     }
 
     console.log(
-      '\n' +
-        chalk.green.bold('Done!') +
-        ' Your project has been bootstraped succesfully 🌺.',
+      '\n' + chalk.green.bold('Done!') + ' Your project has been bootstraped succesfully 🌺.',
     );
     console.log(
-      'You can now start your development server using ' +
-        chalk.blue('npx blossom server') +
-        '.',
+      'You can now start your development server using ' + chalk.blue('npx blossom server') + '.',
     );
     console.log(
       'Check your ' +

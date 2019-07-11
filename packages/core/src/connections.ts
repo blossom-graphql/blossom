@@ -75,11 +75,7 @@ export type ConnectionPageInfo<C> = {
    * function just for type safety, but the arguments won't actually be used in
    * practice.
    */
-  hasPreviousPage: (
-    args: {},
-    ctx: C,
-    ast: GraphQLResolveInfo,
-  ) => Promise<boolean>;
+  hasPreviousPage: (args: {}, ctx: C, ast: GraphQLResolveInfo) => Promise<boolean>;
   /**
    * Has the item a next page? This matches the signature of any GraphQL
    * function just for type safety, but the arguments won't actually be used in
@@ -155,10 +151,7 @@ export type ConnectionAdapter<F, D, C> = {
    * return a list of records that match the criteria. These are going to
    * be used to populate `edges`, `hasNextPage` and `hasPreviousPage`.
    */
-  load: (
-    args: AdapterLoadInput<F, D>,
-    context: C,
-  ) => Promise<ReadonlyArray<ConnectionEdge<D>>>;
+  load: (args: AdapterLoadInput<F, D>, context: C) => Promise<ReadonlyArray<ConnectionEdge<D>>>;
 
   /**
    * Given a certain criteria, it should return the **maximum** number of
@@ -331,11 +324,7 @@ export function connectionDataLoader<F, D, C>(
   adapter: ConnectionAdapter<F, D, C>,
 ): ConnectionDataLoader<F, D, C> {
   return function load(filter: F, connectionArgs: ConnectionArgs<D>, ctx: C) {
-    const { anchors, limit, order } = computeOrientation(
-      adapter,
-      connectionArgs,
-      ctx,
-    );
+    const { anchors, limit, order } = computeOrientation(adapter, connectionArgs, ctx);
 
     /**
      * So, what does this trick do? Notice that this loader we are creating is
@@ -370,17 +359,12 @@ export function connectionDataLoader<F, D, C>(
       }
     });
 
-    const hasVertex = async (
-      anchorType: AdapterAnchorType,
-    ): Promise<boolean> => {
+    const hasVertex = async (anchorType: AdapterAnchorType): Promise<boolean> => {
       const results = await resultsLoader.load(0);
       if (results.length == 0) return false;
 
       let cursor: string;
-      if (
-        anchorType === AdapterAnchorType.GT ||
-        anchorType === AdapterAnchorType.GTE
-      ) {
+      if (anchorType === AdapterAnchorType.GT || anchorType === AdapterAnchorType.GTE) {
         cursor = results[results.length - 1].cursor();
       } else {
         cursor = results[0].cursor();
@@ -411,10 +395,7 @@ export function connectionDataLoader<F, D, C>(
       },
       pageInfo: {
         count() {
-          return adapter.count(
-            { primary: connectionArgs.primary, filter },
-            ctx,
-          );
+          return adapter.count({ primary: connectionArgs.primary, filter }, ctx);
         },
         hasNextPage(): Promise<boolean> {
           return hasVertex(AdapterAnchorType.GT);
@@ -445,9 +426,7 @@ function computeOrientation<F, D, C>(
   // The gql request is asking for both first and last at the same time.
   // This is not supported.
   if (!!connectionArgs.first && !!connectionArgs.last) {
-    throw new ConnectionArgsError(
-      "'first' and 'last' keys are not supported at the same time",
-    );
+    throw new ConnectionArgsError("'first' and 'last' keys are not supported at the same time");
   }
 
   const anchors: AdapterAnchor[] = [];
@@ -455,9 +434,7 @@ function computeOrientation<F, D, C>(
 
   // When we are fetching the last `N` elements, we want to ask the data store
   // to fetch the information in reverse order.
-  let order = !!connectionArgs.last
-    ? invertOrder(connectionArgs.order)
-    : connectionArgs.order;
+  let order = !!connectionArgs.last ? invertOrder(connectionArgs.order) : connectionArgs.order;
 
   if (!!connectionArgs.first) {
     limit = Math.min(connectionArgs.first, adapter.limit(ctx));
@@ -508,26 +485,15 @@ function invertOrder(order: LoadOrder): LoadOrder {
  * @param anchorType Type of anchor that needs to be adapted.
  * @param order Current expected ordering for **the page.**
  */
-function adaptAnchorType(
-  anchorType: AdapterAnchorType,
-  order: LoadOrder,
-): AdapterAnchorType {
+function adaptAnchorType(anchorType: AdapterAnchorType, order: LoadOrder): AdapterAnchorType {
   switch (anchorType) {
     case AdapterAnchorType.GT:
-      return order === LoadOrder.ASC
-        ? AdapterAnchorType.GT
-        : AdapterAnchorType.LT;
+      return order === LoadOrder.ASC ? AdapterAnchorType.GT : AdapterAnchorType.LT;
     case AdapterAnchorType.LT:
-      return order === LoadOrder.ASC
-        ? AdapterAnchorType.LT
-        : AdapterAnchorType.GT;
+      return order === LoadOrder.ASC ? AdapterAnchorType.LT : AdapterAnchorType.GT;
     case AdapterAnchorType.GTE:
-      return order === LoadOrder.ASC
-        ? AdapterAnchorType.GTE
-        : AdapterAnchorType.LTE;
+      return order === LoadOrder.ASC ? AdapterAnchorType.GTE : AdapterAnchorType.LTE;
     case AdapterAnchorType.LTE:
-      return order === LoadOrder.ASC
-        ? AdapterAnchorType.LTE
-        : AdapterAnchorType.GTE;
+      return order === LoadOrder.ASC ? AdapterAnchorType.LTE : AdapterAnchorType.GTE;
   }
 }

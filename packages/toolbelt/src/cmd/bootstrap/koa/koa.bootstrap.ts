@@ -19,9 +19,7 @@ import {
 export default async function koaBootstrap(): Promise<ActionDescriptor[]> {
   const actions: ActionDescriptor[] = [
     addDependencies(packages),
-    await copyFiles(
-      path.join(__dirname, '..', '..', '..', '..', 'templates', 'koa'),
-    ),
+    await copyFiles(path.join(__dirname, '..', '..', '..', '..', 'templates', 'koa')),
     await installDependencies(),
   ];
 

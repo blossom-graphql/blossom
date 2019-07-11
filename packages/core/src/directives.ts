@@ -16,10 +16,7 @@ const EDGE_COMMENT = (node: ObjectTypeDefinitionNode) =>
 const CONNECTION_COMMENT = (node: ObjectTypeDefinitionNode) =>
   `Connection type for ${node.name.value}. Automatically generated type because the object type attached the \`hasConnection\ flag.`;
 
-export const hasConnectionDirectiveHandler: BootDirectiveHandler = (
-  object,
-  node,
-) => {
+export const hasConnectionDirectiveHandler: BootDirectiveHandler = (object, node) => {
   if (node.kind !== 'ObjectTypeDefinition') {
     return;
   }

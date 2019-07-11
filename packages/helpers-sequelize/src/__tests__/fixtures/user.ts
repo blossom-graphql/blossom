@@ -81,9 +81,7 @@ export async function setup() {
 
   // Add users to the database
   await User.truncate({ cascade: true });
-  const data = JSON.parse(
-    (await fs.readFile(path.join(__dirname, 'users.json'))).toString(),
-  );
+  const data = JSON.parse((await fs.readFile(path.join(__dirname, 'users.json'))).toString());
   await User.bulkCreate(data);
 
   // Add movies to the database

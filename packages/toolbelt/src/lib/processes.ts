@@ -33,9 +33,7 @@ export class SpawnProcess {
   }
 
   private handleSignal = (code: number, signal?: string) => {
-    const message = `\n[Process exited with code ${code}${
-      signal ? ` and signal ${signal}` : ''
-    }]`;
+    const message = `\n[Process exited with code ${code}${signal ? ` and signal ${signal}` : ''}]`;
 
     if (code !== 0) {
       console.log(chalk.red.bold(message));

@@ -26,9 +26,7 @@ export type CommonCodegenOptions = {
   stdout?: boolean;
 };
 
-export function generateCodeChunks(
-  groups: ReadonlyArray<CodeGroup>,
-): ReadonlyArray<string> {
+export function generateCodeChunks(groups: ReadonlyArray<CodeGroup>): ReadonlyArray<string> {
   const sourceFile = ts.createSourceFile(
     'output.ts',
     '',
@@ -86,23 +84,15 @@ export function nodeGroupGeneratorMaker<T>(
 }
 
 export function codegenPipelineMaker(
-  nodeGroupGenerator: (
-    filePath: string,
-    fileGraph: ParsedFileGraph,
-  ) => ReadonlyArray<CodeGroup>,
+  nodeGroupGenerator: (filePath: string, fileGraph: ParsedFileGraph) => ReadonlyArray<CodeGroup>,
   headerText?: string,
 ) {
-  return async function generator(
-    filePath: string,
-    fileGraph: ParsedFileGraph,
-  ) {
+  return async function generator(filePath: string, fileGraph: ParsedFileGraph) {
     const nodeGroups = nodeGroupGenerator(filePath, fileGraph);
 
     let generatedCode: string;
     if (headerText) {
-      generatedCode = [headerText, ...generateCodeChunks(nodeGroups)].join(
-        CODE_GROUP_SPACING,
-      );
+      generatedCode = [headerText, ...generateCodeChunks(nodeGroups)].join(CODE_GROUP_SPACING);
     } else {
       generatedCode = generateCodeChunks(nodeGroups).join(CODE_GROUP_SPACING);
     }
@@ -113,12 +103,10 @@ export function codegenPipelineMaker(
 
 export type GeneratorPair = [
   (filePath: string, fileGraph: ParsedFileGraph) => Promise<string>,
-  (schemaFilePath: string) => string
+  (schemaFilePath: string) => string,
 ];
 
-export function makeGraphCodegenPipeline(opts: {
-  generatorPairs: GeneratorPair[];
-}) {
+export function makeGraphCodegenPipeline(opts: { generatorPairs: GeneratorPair[] }) {
   const { generatorPairs } = opts;
 
   return async function codegenPipeline(options: CommonCodegenOptions) {
@@ -134,47 +122,39 @@ export function makeGraphCodegenPipeline(opts: {
     const filesOutput: { [key: string]: string } = {};
 
     // Generate all the files based on the pairs.
-    const codegenPromises = generatorPairs.map(
-      async ([codeGenerator, pathGenerator]) => {
-        const outputFilePath = pathGenerator(fullInputFilePath);
-        const parsedFileGraph = await parseFileGraph(fullInputFilePath);
+    const codegenPromises = generatorPairs.map(async ([codeGenerator, pathGenerator]) => {
+      const outputFilePath = pathGenerator(fullInputFilePath);
+      const parsedFileGraph = await parseFileGraph(fullInputFilePath);
 
-        // Generate the base file and check other files to generate by checking
-        // the recursive option.
-        const baseGenerator = async () => {
-          filesOutput[outputFilePath] = await codeGenerator(
-            fullInputFilePath,
-            parsedFileGraph,
-          );
-        };
+      // Generate the base file and check other files to generate by checking
+      // the recursive option.
+      const baseGenerator = async () => {
+        filesOutput[outputFilePath] = await codeGenerator(fullInputFilePath, parsedFileGraph);
+      };
 
-        // On recursive mode, generate code for all the extra files in the
-        // file graph.
-        let extraGenerators: Promise<void>[] = [];
-        if (options.recursive) {
-          extraGenerators = [...parsedFileGraph.keys()].map(async fullPath => {
-            const typesFilePathname = pathGenerator(fullPath);
+      // On recursive mode, generate code for all the extra files in the
+      // file graph.
+      let extraGenerators: Promise<void>[] = [];
+      if (options.recursive) {
+        extraGenerators = [...parsedFileGraph.keys()].map(async fullPath => {
+          const typesFilePathname = pathGenerator(fullPath);
 
-            filesOutput[typesFilePathname] = await codeGenerator(
-              fullPath,
-              parsedFileGraph,
-            );
-          });
-        }
+          filesOutput[typesFilePathname] = await codeGenerator(fullPath, parsedFileGraph);
+        });
+      }
 
-        await Promise.all([baseGenerator(), ...extraGenerators]);
+      await Promise.all([baseGenerator(), ...extraGenerators]);
 
-        if (options.stdout && !options.recursive) {
-          console.log(filesOutput[outputFilePath]);
-        }
-      },
-    );
+      if (options.stdout && !options.recursive) {
+        console.log(filesOutput[outputFilePath]);
+      }
+    });
 
     await Promise.all(codegenPromises);
 
     if (!options.stdout) {
-      const writePromises = Object.entries(filesOutput).map(
-        ([path, contents]) => fsExtra.writeFile(path, contents),
+      const writePromises = Object.entries(filesOutput).map(([path, contents]) =>
+        fsExtra.writeFile(path, contents),
       );
 
       await writePromises;
@@ -182,10 +162,7 @@ export function makeGraphCodegenPipeline(opts: {
   };
 }
 
-export function comment(
-  segments: ReadonlyArray<string>,
-  ..._replacements: any[]
-): string {
+export function comment(segments: ReadonlyArray<string>, ..._replacements: any[]): string {
   const joined = segments.join('');
   const start = joined.startsWith('\n') ? 1 : 0;
   const end = joined.endsWith('\n') ? joined.length - 1 : joined.length;

@@ -6,11 +6,7 @@
  *
  */
 
-import {
-  renderEnumToSchema,
-  renderRPCDescriptionToSchema,
-  renderSchema,
-} from '../schema';
+import { renderEnumToSchema, renderRPCDescriptionToSchema, renderSchema } from '../schema';
 
 describe(renderRPCDescriptionToSchema, () => {
   test('should return correct string when function has no description', () => {
@@ -215,10 +211,7 @@ describe(renderSchema, () => {
   test('should correctly consider inclusion of query RPC strings', () => {
     // Basically, the type Query {} must be defined and the Query RPC String
     // must be inside of it.
-    const SEARCH_REGEXP = new RegExp(
-      `type Query {[.\n]*${TEST_QUERY_RPC}[.\n]*}`,
-      'g',
-    );
+    const SEARCH_REGEXP = new RegExp(`type Query {[.\n]*${TEST_QUERY_RPC}[.\n]*}`, 'g');
 
     const renderedSchema = renderSchema([], [], [TEST_QUERY_RPC], []);
 
@@ -228,10 +221,7 @@ describe(renderSchema, () => {
   test('should correctly consider inclusion of mutation RPC strings', () => {
     // Basically, the type Query {} must be defined and the Query RPC String
     // must be inside of it.
-    const SEARCH_REGEXP = new RegExp(
-      `type Mutation {[.\n]*${TEST_MUTATION_RPC}[.\n]*}`,
-      'g',
-    );
+    const SEARCH_REGEXP = new RegExp(`type Mutation {[.\n]*${TEST_MUTATION_RPC}[.\n]*}`, 'g');
 
     const renderedSchema = renderSchema([], [], [], [TEST_MUTATION_RPC]);
 
@@ -245,9 +235,7 @@ describe(renderSchema, () => {
 
     const renderedSchema = renderSchema([], [], [TEST_QUERY_RPC], []);
 
-    expect(renderedSchema.indexOf(EXPECTED_SCHEMA_STATEMENT)).toBeGreaterThan(
-      -1,
-    );
+    expect(renderedSchema.indexOf(EXPECTED_SCHEMA_STATEMENT)).toBeGreaterThan(-1);
   });
 
   test('should only return `mutation: Mutation` in schema statement when only mutation strings are sent', () => {
@@ -257,9 +245,7 @@ describe(renderSchema, () => {
 
     const renderedSchema = renderSchema([], [], [], [TEST_MUTATION_RPC]);
 
-    expect(renderedSchema.indexOf(EXPECTED_SCHEMA_STATEMENT)).toBeGreaterThan(
-      -1,
-    );
+    expect(renderedSchema.indexOf(EXPECTED_SCHEMA_STATEMENT)).toBeGreaterThan(-1);
   });
 
   test('should include complete schema statement when both query and mutation strings are passed', () => {
@@ -268,16 +254,9 @@ describe(renderSchema, () => {
   mutation: Mutation
 }`;
 
-    const renderedSchema = renderSchema(
-      [],
-      [],
-      [TEST_QUERY_RPC],
-      [TEST_MUTATION_RPC],
-    );
+    const renderedSchema = renderSchema([], [], [TEST_QUERY_RPC], [TEST_MUTATION_RPC]);
 
-    expect(renderedSchema.indexOf(EXPECTED_SCHEMA_STATEMENT)).toBeGreaterThan(
-      -1,
-    );
+    expect(renderedSchema.indexOf(EXPECTED_SCHEMA_STATEMENT)).toBeGreaterThan(-1);
   });
 
   test('should include every type of argument passed by in the global string, with correct spacing', () => {

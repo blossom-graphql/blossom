@@ -12,17 +12,11 @@ import VERSION from '../version';
 
 program.version(VERSION, '-v, --version');
 
-program
-  .command('server', 'Starts development server on the current working dir.')
-  .alias('s');
+program.command('server', 'Starts development server on the current working dir.').alias('s');
 
-program
-  .command('bootstrap', 'Bootstraps a new Blossom project from a template.')
-  .alias('b');
+program.command('bootstrap', 'Bootstraps a new Blossom project from a template.').alias('b');
 
-program
-  .command('codegen', 'General utility for automatic code generation.')
-  .alias('cg');
+program.command('codegen', 'General utility for automatic code generation.').alias('cg');
 
 // Parse and start running.
 program.parse(process.argv);

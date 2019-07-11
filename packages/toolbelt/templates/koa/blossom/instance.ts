@@ -1,8 +1,4 @@
-import {
-  BlossomContext,
-  BlossomInstance,
-  createBlossomDecorators,
-} from '@blossom-gql/core';
+import { BlossomContext, BlossomInstance, createBlossomDecorators } from '@blossom-gql/core';
 import { Context } from 'koa';
 
 // Creates a new BlossomInstance. You can have multiple instances, with their
