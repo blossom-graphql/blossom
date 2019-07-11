@@ -11,6 +11,9 @@
     "@blossom-gql/core": "^0.0.0",
     "@types/lodash.set": "^4.3.6",
     "pg": "^7.11.0",
-    "sequelize": "^5.9.2"
+    "sequelize": "^5.9.4"
+  },
+  "peerDependencies": {
+    "sequelize": "^5.9.4"
   }
 }
