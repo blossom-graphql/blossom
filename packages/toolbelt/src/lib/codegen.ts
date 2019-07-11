@@ -42,7 +42,9 @@ import {
   CORE_RESOLVER_NAME,
   INSTANCE_CONTEXT_NAME,
   INSTANCE_RESOLVE_ARRAY_NAME,
-  CONNECTION_NAME,
+  CORE_CONNECTION_NAME,
+  CORE_CONNECTION_RESOLVER_CREATOR_NAME,
+  CORE_CONNECTION_DATA_NAME,
 } from './linking';
 import { projectImportPath } from './paths';
 import {
@@ -51,6 +53,7 @@ import {
   resolverName,
   loaderName,
   referencedTypeName,
+  resolverConnectionName,
 } from './naming';
 import {
   SOURCE_COMMENT,
@@ -60,6 +63,7 @@ import {
   ROOT_BLOCK_COMMENT,
   ROOT_REGISTRATION_COMMENT,
   CONNECTION_TYPE_COMMENT,
+  CONNECTION_RESOLVER_COMMENT,
 } from './cmd/codegen/comments';
 
 export const CODE_GROUP_SPACING = '\n\n';
@@ -420,7 +424,7 @@ export function generateObjectTypeAlias(
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
     ts.createIdentifier(descriptor.name + 'Connection'),
     undefined,
-    ts.createTypeReferenceNode(ts.createIdentifier(CONNECTION_NAME), [
+    ts.createTypeReferenceNode(ts.createIdentifier(CORE_CONNECTION_NAME), [
       ts.createTypeReferenceNode(ts.createIdentifier(descriptor.name), undefined),
       ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
     ]),
@@ -781,12 +785,17 @@ export function generateResolversFileNodes(
   const fileImports = [...contents.fileImports.values()].map(createImportDeclaration);
 
   const resolverStatements = contents.typeDeclarations.flatMap(objectDescriptor => {
+    if (objectDescriptor.virtual) {
+      return []; // these are skipped
+    }
+
     const objectResolver = generateResolverStatement(objectDescriptor);
     if (!objectDescriptor.annotations.has(ObjectTypeAnnotation.HasConnection)) {
       return [objectResolver];
     }
 
-    return [objectResolver];
+    const connectionResolver = generateConnectionResolverStatement(objectDescriptor);
+    return [objectResolver, connectionResolver];
   });
 
   return [
@@ -853,4 +862,46 @@ function generateResolverStatement(objectDescriptor: ObjectTypeDescriptor): ts.V
       ts.NodeFlags.Const,
     ),
   );
+}
+
+function generateConnectionResolverStatement(
+  objectDescriptor: ObjectTypeDescriptor,
+): ts.VariableStatement {
+  const functionName = resolverConnectionName(objectDescriptor.name);
+  const resolverFunctionName = resolverName(objectDescriptor.name);
+
+  const resolverSignature = ts.createTypeReferenceNode(ts.createIdentifier(CORE_RESOLVER_NAME), [
+    ts.createTypeReferenceNode(ts.createIdentifier(CORE_CONNECTION_DATA_NAME), [
+      ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+      ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
+    ]),
+    ts.createTypeReferenceNode(ts.createIdentifier(CORE_CONNECTION_NAME), [
+      ts.createTypeReferenceNode(
+        ts.createIdentifier(referencedTypeName(objectDescriptor.name)),
+        undefined,
+      ),
+      ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
+    ]),
+    ts.createTypeReferenceNode(ts.createIdentifier(INSTANCE_CONTEXT_NAME), undefined),
+  ]);
+
+  const statement = ts.createVariableStatement(
+    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
+    ts.createVariableDeclarationList(
+      [
+        ts.createVariableDeclaration(
+          ts.createIdentifier(functionName),
+          resolverSignature,
+          ts.createCall(ts.createIdentifier(CORE_CONNECTION_RESOLVER_CREATOR_NAME), undefined, [
+            ts.createStringLiteral(objectDescriptor.name),
+            ts.createIdentifier(resolverFunctionName),
+          ]),
+        ),
+      ],
+      ts.NodeFlags.Const,
+    ),
+  );
+  preprendComments(statement, CONNECTION_RESOLVER_COMMENT);
+
+  return statement;
 }

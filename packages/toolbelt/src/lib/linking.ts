@@ -53,7 +53,9 @@ export const CORE_DELIVER_NAME = 'deliver';
 export const QUERY_SIGNATURE_NAME = 'QueryResolverSignature';
 export const MUTATION_SIGNATURE_NAME = 'MutationResolverSignature';
 export const OBJECT_SIGNATURE_NAME = 'ObjectResolverSignature';
-export const CONNECTION_NAME = 'Connection';
+export const CORE_CONNECTION_NAME = 'Connection';
+export const CORE_CONNECTION_RESOLVER_CREATOR_NAME = 'createConnectionResolver';
+export const CORE_CONNECTION_DATA_NAME = 'ConnectionData';
 
 const OPERATION_MAP: { [key in SupportedOperation]: string } = {
   // Using [SupportOperation.Query] throws runtime error.
@@ -874,7 +876,7 @@ export function addTypesFileImports(result: TypesFileContents, linkingContext: L
 
   // 3. Add connections, if required
   if (result.dependencyFlags.has(DependencyFlag.HasConnection)) {
-    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CONNECTION_NAME);
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_CONNECTION_NAME);
   }
 }
 
@@ -941,12 +943,18 @@ export function addResolversFileImports(
   result: ResolversFileContents,
   linkingContext: LinkingContext,
 ) {
-  addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_RESOLVER_NAME);
-
-  addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_CONTEXT_NAME);
+  let hasConnections = false;
 
   // For each of the types import the definition from types file
   result.typeDeclarations.forEach(objectDescriptor => {
+    // Connection types are skipped here, since they are not required
+    if (objectDescriptor.virtual) return;
+
+    // Very primitive flag in the meantime
+    if (objectDescriptor.annotations.has(ObjectTypeAnnotation.HasConnection) && !hasConnections) {
+      hasConnections = true;
+    }
+
     addImport(
       result.fileImports,
       'FileImport',
@@ -954,6 +962,13 @@ export function addResolversFileImports(
       referencedTypeName(objectDescriptor.name),
     );
   });
+
+  addImport(result.fileImports, 'FileImport', blossomInstancePath(), INSTANCE_CONTEXT_NAME);
+  addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_RESOLVER_NAME);
+  if (hasConnections) {
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_CONNECTION_NAME);
+    addImport(result.vendorImports, 'VendorImport', CORE_PACKAGE_NAME, CORE_CONNECTION_DATA_NAME);
+  }
 }
 
 export function linkTypesFile(filePath: string, fileGraph: ParsedFileGraph): TypesFileContents {

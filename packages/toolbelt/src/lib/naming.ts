@@ -47,6 +47,10 @@ export function resolverName(gqlTypeName: string): string {
   return camelCase(gqlTypeName) + 'Resolver';
 }
 
+export function resolverConnectionName(gqlTypeName: string): string {
+  return camelCase(gqlTypeName) + 'ConnectionResolver';
+}
+
 export function signatureName(descriptor: OperationFieldDescriptor | FieldDescriptor) {
   if (descriptor.hasOwnProperty('operation')) {
     descriptor;

@@ -93,6 +93,18 @@ export const RESOLVER_OTHER_PROPS_COMMENT = comment`
 TODO: Remove this and map attributes to the properties of the output type.
 `;
 
+export const CONNECTION_RESOLVER_COMMENT = comment`
+This is an automatically generated resolver by using the base resolver for the
+type. It was automatically added because you added a @hasConnection directive
+to your type in the schema declaration file.
+
+Whenever resolving a connection, you should be using this resolver in your
+\`resolve\` function instead.
+
+TODO: Define the value of \`unknown\`. It should match the one on your base
+resolver.
+`;
+
 export const CONNECTION_TYPE_COMMENT = (name: string) => comment`
 This is the connection type that must be returned on a field or operation that
 resolves to a ${name}Connection.
