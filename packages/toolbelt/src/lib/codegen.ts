@@ -590,6 +590,9 @@ export function generateRootValueReturnExpression(
             ts.createShorthandPropertyAssignment('ctx'),
             ts.createPropertyAssignment(
               ts.createIdentifier('using'),
+              // ! Careful! Just right now it's a coincidence, but resolver names
+              // ! for connections might not match later on with these kind of
+              // ! patterns.
               ts.createIdentifier(resolverName(terminalTypeName)),
             ),
             ts.createShorthandPropertyAssignment('ast'),
