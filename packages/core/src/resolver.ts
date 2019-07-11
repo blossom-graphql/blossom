@@ -29,7 +29,7 @@ export type Connection<O, C> = {
 export function createConnectionResolver<I, O, C>(
   typename: string,
   resolver: Resolver<I, O, C>,
-) {
+): Resolver<ConnectionData<I, C>, Connection<O, C>, C> {
   return function connectionResolver(
     attributes: ConnectionData<I, C>,
   ): Connection<O, C> {
