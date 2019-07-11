@@ -92,6 +92,9 @@ export class BlossomInstance implements IBlossomInstance {
         definitions.push(
           this.extensionMap.getFinalDefinition(definition.name.value),
         );
+      } else if (isExtension(definition)) {
+        // Skip. These should be handled above.
+        return;
       } else {
         definitions.push(definition);
       }
@@ -218,4 +221,18 @@ function handleDirectives(
 
     handler(object, node, directive);
   });
+}
+
+const EXTENSIONS = new Set([
+  'ObjectTypeExtension',
+  'EnumTypeExtension',
+  'InputObjectTypeExtension',
+  'InterfaceTypeExtension',
+  'ScalarTypeExtension',
+  'SchemaExtension',
+  'UnionTypeExtension',
+]);
+
+function isExtension(node: DefinitionNode): boolean {
+  return EXTENSIONS.has(node.kind);
 }
