@@ -1,6 +1,8 @@
 import { GraphQLResolveInfo } from 'graphql';
 import Dataloader from 'dataloader';
 
+import { Maybe } from './common';
+
 // Generics guide:
 // - `F` represents the type of the filter in a connection operation.
 // - `D` represents the type of the base data.
@@ -28,24 +30,24 @@ export type ConnectionArgs<D> = {
    * The numbers of elements that must be fetched for this connection. Usually
    * used in conjuntion with `after`.
    */
-  first?: number;
+  first?: Maybe<number>;
   /**
    * The number of elements that must be fetched for this connection. Usually
    * used in conjuntion with `before`.
    */
-  last?: number;
+  last?: Maybe<number>;
   /**
-   * Cursor indicanting an anchor from which to start fetching elements. It's
+   * Cursor indicating an anchor from which to start fetching elements. It's
    * associated with the notion of *smaller than*, relative to the cursor in
    * **the page** (not in the data source).
    */
-  before?: string;
+  before?: Maybe<string>;
   /**
-   * Cursor indicanting an anchor from which to start fetching elements. It's
+   * Cursor indicating an anchor from which to start fetching elements. It's
    * associated with the notion of *greater than*, relative to the cursor in
    * **the page** (not in the data source).
    */
-  after?: string;
+  after?: Maybe<string>;
   /**
    * Field from `D` that is going to be used as the primary key for fetching
    * the information. It **has** to be a `string` key available in `D`, since
