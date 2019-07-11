@@ -34,7 +34,7 @@
     "tmp-promise": "^1.0.5",
     "ts-loader": "^6.0.4",
     "tsconfig-paths-webpack-plugin": "^3.2.0",
-    "typescript": "^3.5.2",
+    "typescript": "^3.5.3",
     "webpack": "^4.35.3",
     "webpack-node-externals": "^1.7.2",
     "word-wrap": "^1.2.3"
@@ -44,6 +44,6 @@
     "@types/webpack": "^4.4.21",
     "@types/webpack-node-externals": "^1.6.3",
     "ts-node": "^7.0.1",
-    "typescript": "^3.5.2"
+    "typescript": "^3.5.3"
   }
 }
