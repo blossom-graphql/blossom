@@ -15,5 +15,8 @@
   },
   "peerDependencies": {
     "sequelize": "^5.9.4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
