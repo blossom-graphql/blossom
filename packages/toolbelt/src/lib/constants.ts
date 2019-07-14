@@ -10,4 +10,8 @@ import path from 'path';
 
 export const BLOSSOM_CORE_VERSION = process.env.BLOSSOM_DEV_PATH
   ? path.join(process.env.BLOSSOM_DEV_PATH, 'packages', 'core')
+  : undefined;
+
+export const BLOSSOM_TOOLBELT_VERSION = process.env.BLOSSOM_DEV_PATH
+  ? path.join(process.env.BLOSSOM_DEV_PATH, 'packages', 'toolbelt')
   : '0.0.0';

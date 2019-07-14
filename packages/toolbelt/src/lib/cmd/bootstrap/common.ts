@@ -143,3 +143,40 @@ export async function installDependencies(useNpm: boolean = false): Promise<Acti
     },
   };
 }
+
+export async function addPackage(
+  name: string,
+  version?: string,
+  useNpm: boolean = false,
+): Promise<ActionDescriptor> {
+  const useYarn = useNpm ? false : shouldUseYarn();
+  const pkgManager = useYarn ? 'yarn' : 'npm install';
+
+  return {
+    description: chalk.blue.bold(
+      `Adding dependency ${name} @ ${version || 'latest'} (${pkgManager})`,
+    ),
+    dryDescription: `install dependency ${name} @ ${version || 'latest'} (${pkgManager})`,
+    perform: () => {
+      return new Promise((resolve, reject) => {
+        const cwd = appPath('.');
+        const pkg = version ? `${name}@${version}` : name;
+
+        let childProcess: ChildProcess;
+        if (useYarn) {
+          childProcess = spawn('yarn', ['add', pkg], { stdio: 'inherit', cwd });
+        } else {
+          childProcess = spawn('npm', ['install', pkg], { stdio: 'inherit', cwd });
+        }
+
+        childProcess.on('close', code => {
+          if (code !== 0) {
+            reject(new Error(`Program exited with code ${code}.`));
+            return;
+          }
+          resolve();
+        });
+      });
+    },
+  };
+}

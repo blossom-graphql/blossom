@@ -14,13 +14,16 @@ import {
   addDependencies,
   copyFiles,
   installDependencies,
+  addPackage,
 } from '../../../lib/cmd/bootstrap/common';
+import { BLOSSOM_CORE_VERSION } from '../../../lib/constants';
 
 export default async function koaBootstrap(): Promise<ActionDescriptor[]> {
   const actions: ActionDescriptor[] = [
     addDependencies(packages),
     await copyFiles(path.join(__dirname, '..', '..', '..', '..', 'templates', 'koa')),
     await installDependencies(),
+    await addPackage('@blossom-gql/core', BLOSSOM_CORE_VERSION),
   ];
 
   return actions;
