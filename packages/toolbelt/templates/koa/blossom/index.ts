@@ -31,7 +31,12 @@ blossomRootFiles.keys().forEach(blossomRootFiles);
 // Create resolve instance and add a route
 const blossomResolve = blossom(instance);
 router.post('/graphql', async (ctx, next) => {
-  const { operationName, query, variables } = ctx.request.body;
+  // For some unknown reason koa.Request is failing to capture the extensions
+  // given by @types/koa-bodyparser. Since this is a hot path and we have
+  // assurances about how this is going to behave, we can just remove the
+  // type safety check here by assuming that ctx.request is any for this
+  // assignment.
+  const { operationName, query, variables } = (ctx.request as any).body;
 
   const result = await blossomResolve({ operationName, query, variables }, ctx);
 
