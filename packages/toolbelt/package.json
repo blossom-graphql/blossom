@@ -1,6 +1,6 @@
 {
   "name": "@blossom-gql/toolbelt",
-  "version": "0.0.0",
+  "version": "0.0.0-alpha.0",
   "main": "index.js",
   "repository": "git@github.com/spsoto/blossom",
   "author": "Sebastian Soto",
@@ -40,7 +40,7 @@
     "word-wrap": "^1.2.3"
   },
   "devDependencies": {
-    "@blossom-gql/core": "^0.0.0",
+    "@blossom-gql/core": "^0.0.0-alpha.0",
     "@types/webpack": "^4.4.21",
     "@types/webpack-node-externals": "^1.6.3",
     "ts-node": "^7.0.1",
